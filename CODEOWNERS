@@ -42,21 +42,6 @@
 /soc/arm/xilinx_zynq7000/                 @ibirnbaum
 /soc/arm/xilinx_zynqmp/                   @stephanosio
 /soc/arm/renesas_rcar/                    @aaillet
-/soc/xtensa/intel_s1000/                  @sathishkuttan @dcpleung
-/soc/arm64/                               @carlocaione
-/soc/arm64/qemu_cortex_a53/               @carlocaione
-/soc/arm64/bcm_vk/                        @abhishek-brcm
-/soc/arm64/nxp_layerscape/                @JiafeiPan
-/soc/arm64/xenvm/                         @lorc @firscity
-/soc/arm64/arm/                           @povergoing
-/soc/arm64/arm/fvp_aemv8a/                @carlocaione
-/submanifests/*                           @mbolivar-nordic
-/arch/x86/                                @jhedberg @nashif @jenmwms @aasthagr
-/arch/nios2/                              @nashif
-/arch/posix/                              @aescolar @daor-oti
-/arch/riscv/                              @kgugala @pgielda
-/soc/posix/                               @aescolar @daor-oti
-/soc/riscv/                               @kgugala @pgielda
 /soc/riscv/bouffalolab/                   @nandojve
 /soc/riscv/openisa*/                      @dleach02
 /soc/riscv/riscv-privileged/andes_v5/      @cwshu @kevinwang821020 @jimmyzhe
