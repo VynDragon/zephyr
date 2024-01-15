@@ -222,7 +222,7 @@ Node dependency ordering (ordinal and path):
 """
 
     for scc in edt.scc_order:
-        if len(scc) > 2:
+        if len(scc) > 1:
             err("cycle in devicetree involving "
                 + ", ".join(node.path for node in scc))
         s += f"  {scc[0].dep_ordinal:<3} {scc[0].path}\n"
