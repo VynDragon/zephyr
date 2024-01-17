@@ -156,7 +156,7 @@ manifest:
     - name: bouffalo_sdk
       remote: bouffalolab
       path: modules/hal/bouffalolab
-      revision: release_v1.4.5
+      revision: 302e017ea06b4c75963212f7144f8800c05901f1
       groups:
         - hal
     - name: hal_espressif

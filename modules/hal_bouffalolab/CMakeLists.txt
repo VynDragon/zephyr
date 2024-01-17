@@ -9,29 +9,33 @@ zephyr_compile_definitions(
   ARCH_RISCV
 )
 
+if (EXISTS ${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR})
+  set(CONFIG_HAS_BFLB_HAL TRUE CACHE BOOL)
+endif()
+
 zephyr_library_compile_definitions(
   BFLB_USE_HAL_DRIVER
   BFLB_USE_CUSTOM_LD_SECTIONS
 )
 
-set(bflb_soc         ${CONFIG_SOC_SUB_SERIES})
-set(bflb_drv_dir     ${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/drivers/${bflb_soc}_driver)
-set(bflb_common_dir  ${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/common)
-set(bflb_drv_src_dir ${bflb_drv_dir}/std_drv/src)
+set(bflb_soc            ${CONFIG_SOC_SUB_SERIES})
+set(bflb_drv_dir        ${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/drivers/soc/${bflb_soc}/std)
+set(bflb_drv_src_dir    ${bflb_drv_dir}/src)
+set(bflb_components_dir ${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/components)
+set(bflb_lhal_dir       ${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/drivers/lhal)
 
-# Global includes to be used outside hal_gigadevice
 zephyr_include_directories(
   include
 
-  ${bflb_drv_dir}/regs
+  ${bflb_drv_dir}/include
   ${bflb_drv_dir}/startup
-  ${bflb_drv_dir}/std_drv/inc
-
-  ${bflb_common_dir}/misc
+  ${bflb_lhal_dir}/include
 )
 
+
+# probably not right
 zephyr_library_include_directories(
-  ${bflb_common_dir}/soft_crc
+  ${bflb_components_dir}/utils/math/include
 )
 
 zephyr_library_sources(
@@ -43,7 +47,7 @@ zephyr_library_sources(
   ${bflb_drv_src_dir}/${bflb_soc}_pds.c
   ${bflb_drv_src_dir}/${bflb_soc}_romapi.c
 
-  ${bflb_common_dir}/soft_crc/softcrc.c
+  ${bflb_components_dir}/utils/math/src/utils_crc.c
 )
 
 
