@@ -21,8 +21,8 @@ manifest:
   remotes:
     - name: upstream
       url-base: https://github.com/zephyrproject-rtos
-    - name: bouffalolab
-      url-base: https://github.com/bouffalolab
+    - name: VynDragon
+      url-base: https://github.com/VynDragon
     - name: babblesim
       url-base: https://github.com/BabbleSim
 
@@ -153,10 +153,10 @@ manifest:
       path: modules/hal/atmel
       groups:
         - hal
-    - name: bouffalo_sdk
-      remote: bouffalolab
-      path: modules/hal/bouffalolab
-      revision: 302e017ea06b4c75963212f7144f8800c05901f1
+    - name: hal_bouffalolab
+      remote: VynDragon
+      path: modules/hal/hal_bouffalolab
+      revision: aa334b67f64f7f280b699e81b6c6282b13d7e0a1
       groups:
         - hal
     - name: hal_espressif

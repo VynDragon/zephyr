@@ -22,11 +22,7 @@
 /* Add include for DTS generated information */
 #include <zephyr/devicetree.h>
 
-#if defined(CONFIG_SOC_SERIES_BL6)
-#include <bl602.h>
-#else
-#error Library does not support the specified device.
-#endif
+#include <blbl.h>
 
 /* RISC-V Machine Timer configuration */
 #define RISCV_MTIME_BASE             0x0200BFF8

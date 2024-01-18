@@ -5,13 +5,16 @@ if(CONFIG_SOC_FAMILY_BFLB)
 
 zephyr_library_named(hal_bouffalolab)
 
+set(CMAKE_FIND_ROOT_PATH ${CROSS_COMPILE}gcc)
+
 zephyr_compile_definitions(
   ARCH_RISCV
 )
 
-if (EXISTS ${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR})
-  set(CONFIG_HAS_BFLB_HAL TRUE CACHE BOOL)
-endif()
+string(TOUPPER ${CONFIG_SOC_SUB_SERIES} CONFIG_SOC_SUB_SERIES_SDK)
+zephyr_compile_definitions(${CONFIG_SOC_SUB_SERIES})
+zephyr_compile_definitions(${CONFIG_SOC_SUB_SERIES_SDK})
+
 
 zephyr_library_compile_definitions(
   BFLB_USE_HAL_DRIVER
@@ -23,13 +26,21 @@ set(bflb_drv_dir        ${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/drivers/soc/${bflb_
 set(bflb_drv_src_dir    ${bflb_drv_dir}/src)
 set(bflb_components_dir ${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/components)
 set(bflb_lhal_dir       ${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/drivers/lhal)
+set(bflb_lhal_src_dir   ${bflb_lhal_dir}/src)
 
 zephyr_include_directories(
   include
 
   ${bflb_drv_dir}/include
+  ${bflb_drv_dir}/include/hardware
   ${bflb_drv_dir}/startup
+
   ${bflb_lhal_dir}/include
+  ${bflb_lhal_dir}/include/arch
+  ${bflb_lhal_src_dir}/flash
+
+  # good question, i dont know.
+  #${SYSROOT_DIR}/include
 )
 
 
@@ -40,13 +51,18 @@ zephyr_library_include_directories(
 
 zephyr_library_sources(
   ${bflb_drv_src_dir}/${bflb_soc}_aon.c
-  ${bflb_drv_src_dir}/${bflb_soc}_ef_ctrl.c
   ${bflb_drv_src_dir}/${bflb_soc}_glb.c
   ${bflb_drv_src_dir}/${bflb_soc}_hbn.c
   ${bflb_drv_src_dir}/${bflb_soc}_l1c.c
   ${bflb_drv_src_dir}/${bflb_soc}_pds.c
   ${bflb_drv_src_dir}/${bflb_soc}_romapi.c
+  ${bflb_drv_src_dir}/${bflb_soc}_clock.c
 
+  ${bflb_lhal_src_dir}//flash/bflb_sflash.c
+  ${bflb_lhal_src_dir}//flash/bflb_xip_sflash.c
+
+  ${bflb_lhal_src_dir}/bflb_ef_ctrl.c
+  ${bflb_lhal_src_dir}/bflb_clock.c
   ${bflb_components_dir}/utils/math/src/utils_crc.c
 )
 
@@ -60,6 +76,6 @@ zephyr_library_sources_ifdef(CONFIG_USE_BFLB_I2C   ${bflb_drv_src_dir}/${bflb_so
 zephyr_library_sources_ifdef(CONFIG_USE_BFLB_IR    ${bflb_drv_src_dir}/${bflb_soc}_ir.c)
 zephyr_library_sources_ifdef(CONFIG_USE_BFLB_PWM   ${bflb_drv_src_dir}/${bflb_soc}_pwm.c)
 zephyr_library_sources_ifdef(CONFIG_USE_BFLB_SPI   ${bflb_drv_src_dir}/${bflb_soc}_spi.c)
-zephyr_library_sources_ifdef(CONFIG_USE_BFLB_UART  ${bflb_drv_src_dir}/${bflb_soc}_uart.c)
+zephyr_library_sources_ifdef(CONFIG_USE_BFLB_UART  ${bflb_lhal_src_dir}/bflb_uart.c)
 
 endif()

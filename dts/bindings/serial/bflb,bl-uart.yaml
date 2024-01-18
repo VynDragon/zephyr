@@ -10,8 +10,3 @@ include: [uart-controller.yaml, pinctrl-device.yaml]
 properties:
     reg:
       required: true
-
-    peripheral-id:
-      type: int
-      description: peripheral ID
-      required: true
