@@ -10,6 +10,12 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+#ifdef __cplusplus
+#define ZRESTRICT __restrict
+#else
+#define ZRESTRICT restrict
+#endif
+
 /**
  *
  * @brief Copy a string

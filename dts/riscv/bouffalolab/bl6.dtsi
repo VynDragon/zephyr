@@ -81,22 +81,6 @@
 
 		pinctrl: pinctrl@40000000 {
 			compatible = "bflb,bl-pinctrl";
-			#address-cells = <1>;
-			#size-cells = <1>;
-			ranges = <0x40000000 0x40000000 0x1000>;
-
-		};
-
-		glb: gpio@40000000 {
-				compatible = "bflb,bl-gpio";
-				reg = <0x40000000 0x1000>;
-				label = "GLB";
-				interrupts = <1 0>;
-				interrupt-parent = <&ictrl>;
-				gpio-controller;
-				#gpio-cells = <0>;
-				#bflb,pin-cells = <2>;
-				#bflb,signal-cells = <1>;
 		};
 
 		spi0: spi@4000a200 {
@@ -129,6 +113,7 @@
 			interrupts = <29 0>;
 			interrupt-parent = <&ictrl>;
 			status = "disabled";
+			current-speed = <115200>;
 			label = "uart_0";
 		};
 		uart1: uart@4000a100 {
@@ -137,6 +122,7 @@
 			interrupts = <30 0>;
 			interrupt-parent = <&ictrl>;
 			status = "disabled";
+			current-speed = <115200>;
 			label = "uart_1";
 		};
 	};

@@ -22,7 +22,7 @@
 /* Add include for DTS generated information */
 #include <zephyr/devicetree.h>
 
-#include <blbl.h>
+// #include <blbl.h>
 
 /* RISC-V Machine Timer configuration */
 #define RISCV_MTIME_BASE             0x0200BFF8
@@ -38,6 +38,12 @@
 
 #ifdef CONFIG_RISCV_GP
 ulong_t __soc_get_gp_initial_value(void);
+#endif
+
+#ifdef __cplusplus
+#define ZRESTRICT __restrict
+#else
+#define ZRESTRICT restrict
 #endif
 
 #endif /* !_ASMLANGUAGE */

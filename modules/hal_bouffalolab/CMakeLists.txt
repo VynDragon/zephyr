@@ -5,10 +5,12 @@ if(CONFIG_SOC_FAMILY_BFLB)
 
 zephyr_library_named(hal_bouffalolab)
 
+# for errno.h, helps find toolchain includes
 set(CMAKE_FIND_ROOT_PATH ${CROSS_COMPILE}gcc)
 
 zephyr_compile_definitions(
   ARCH_RISCV
+  __LINUX_ERRNO_EXTENSIONS__
 )
 
 string(TOUPPER ${CONFIG_SOC_SUB_SERIES} CONFIG_SOC_SUB_SERIES_SDK)
@@ -30,17 +32,18 @@ set(bflb_lhal_src_dir   ${bflb_lhal_dir}/src)
 
 zephyr_include_directories(
   include
+  include/zephyr/toolchain/
 
-  ${bflb_drv_dir}/include
-  ${bflb_drv_dir}/include/hardware
-  ${bflb_drv_dir}/startup
+  #${bflb_drv_dir}/include
+  #${bflb_drv_dir}/include/hardware
+  #${bflb_drv_dir}/startup
 
   ${bflb_lhal_dir}/include
-  ${bflb_lhal_dir}/include/arch
+  #${bflb_lhal_dir}/include/arch
   ${bflb_lhal_src_dir}/flash
 
-  # good question, i dont know.
-  #${SYSROOT_DIR}/include
+  # bflb errno.h
+  ${SYSROOT_DIR}/include
 )
 
 
@@ -50,16 +53,16 @@ zephyr_library_include_directories(
 )
 
 zephyr_library_sources(
-  ${bflb_drv_src_dir}/${bflb_soc}_aon.c
-  ${bflb_drv_src_dir}/${bflb_soc}_glb.c
-  ${bflb_drv_src_dir}/${bflb_soc}_hbn.c
-  ${bflb_drv_src_dir}/${bflb_soc}_l1c.c
-  ${bflb_drv_src_dir}/${bflb_soc}_pds.c
-  ${bflb_drv_src_dir}/${bflb_soc}_romapi.c
-  ${bflb_drv_src_dir}/${bflb_soc}_clock.c
+  #${bflb_drv_src_dir}/${bflb_soc}_aon.c
+  #${bflb_drv_src_dir}/${bflb_soc}_glb.c
+  #${bflb_drv_src_dir}/${bflb_soc}_hbn.c
+  #${bflb_drv_src_dir}/${bflb_soc}_l1c.c
+  #${bflb_drv_src_dir}/${bflb_soc}_pds.c
+  #${bflb_drv_src_dir}/${bflb_soc}_romapi.c
+  #${bflb_drv_src_dir}/${bflb_soc}_clock.c
 
-  ${bflb_lhal_src_dir}//flash/bflb_sflash.c
-  ${bflb_lhal_src_dir}//flash/bflb_xip_sflash.c
+  ${bflb_lhal_src_dir}/flash/bflb_sflash.c
+  ${bflb_lhal_src_dir}/flash/bflb_xip_sflash.c
 
   ${bflb_lhal_src_dir}/bflb_ef_ctrl.c
   ${bflb_lhal_src_dir}/bflb_clock.c
@@ -68,14 +71,14 @@ zephyr_library_sources(
 
 
 
-zephyr_library_sources_ifdef(CONFIG_USE_BFLB_ACOMP ${bflb_drv_src_dir}/${bflb_soc}_acomp.c)
-zephyr_library_sources_ifdef(CONFIG_USE_BFLB_ADC   ${bflb_drv_src_dir}/${bflb_soc}_adc.c)
-zephyr_library_sources_ifdef(CONFIG_USE_BFLB_DAC   ${bflb_drv_src_dir}/${bflb_soc}_dac.c)
-zephyr_library_sources_ifdef(CONFIG_USE_BFLB_DMA   ${bflb_drv_src_dir}/${bflb_soc}_dma.c)
-zephyr_library_sources_ifdef(CONFIG_USE_BFLB_I2C   ${bflb_drv_src_dir}/${bflb_soc}_i2c.c)
-zephyr_library_sources_ifdef(CONFIG_USE_BFLB_IR    ${bflb_drv_src_dir}/${bflb_soc}_ir.c)
-zephyr_library_sources_ifdef(CONFIG_USE_BFLB_PWM   ${bflb_drv_src_dir}/${bflb_soc}_pwm.c)
-zephyr_library_sources_ifdef(CONFIG_USE_BFLB_SPI   ${bflb_drv_src_dir}/${bflb_soc}_spi.c)
+#zephyr_library_sources_ifdef(CONFIG_USE_BFLB_ACOMP ${bflb_drv_src_dir}/${bflb_soc}_acomp.c)
+#zephyr_library_sources_ifdef(CONFIG_USE_BFLB_ADC   ${bflb_drv_src_dir}/${bflb_soc}_adc.c)
+#zephyr_library_sources_ifdef(CONFIG_USE_BFLB_DAC   ${bflb_drv_src_dir}/${bflb_soc}_dac.c)
+#zephyr_library_sources_ifdef(CONFIG_USE_BFLB_DMA   ${bflb_drv_src_dir}/${bflb_soc}_dma.c)
+#zephyr_library_sources_ifdef(CONFIG_USE_BFLB_I2C   ${bflb_drv_src_dir}/${bflb_soc}_i2c.c)
+#zephyr_library_sources_ifdef(CONFIG_USE_BFLB_IR    ${bflb_drv_src_dir}/${bflb_soc}_ir.c)
+#zephyr_library_sources_ifdef(CONFIG_USE_BFLB_PWM   ${bflb_drv_src_dir}/${bflb_soc}_pwm.c)
+#zephyr_library_sources_ifdef(CONFIG_USE_BFLB_SPI   ${bflb_drv_src_dir}/${bflb_soc}_spi.c)
 zephyr_library_sources_ifdef(CONFIG_USE_BFLB_UART  ${bflb_lhal_src_dir}/bflb_uart.c)
 
 endif()

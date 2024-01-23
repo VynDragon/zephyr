@@ -3,5 +3,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <bouffalolab/bl602.dtsi>
 
-#include "../dt_bl10_devkit/dt_bl10_devkit-pinctrl.dtsi"
+&pinctrl {
+	uart0_default: uart0_default {
+		group1 {
+			pinmuxes = <BFLB_PIN(7, uart)>, <BFLB_PIN(16, uart)>;
+			bias-pull-up;
+			input-schmitt-enable;
+		};
+	};
+	uart0_sleep: uart0_sleep {
+		group1 {
+			pinmuxes = <BFLB_PIN(7, uart)>, <BFLB_PIN(16, uart)>;
+			bias-high-impedance;
+		};
+	};
+};

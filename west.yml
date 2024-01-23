@@ -155,8 +155,8 @@ manifest:
         - hal
     - name: hal_bouffalolab
       remote: VynDragon
-      path: modules/hal/hal_bouffalolab
-      revision: aa334b67f64f7f280b699e81b6c6282b13d7e0a1
+      path: modules/hal/bouffalolab
+      revision: 2523d6718ed2ff4526d7f5042ec79bc3713b18d4
       groups:
         - hal
     - name: hal_espressif

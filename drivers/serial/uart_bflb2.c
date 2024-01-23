@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#define DT_DRV_COMPAT bflb_bflb_uart
+#define DT_DRV_COMPAT bflb_bl_uart
 
 /**
  * @brief UART driver for Bouffalo Lab MCU family.
@@ -15,15 +15,13 @@
 
 #include <soc.h>
 
-#include <blglb.h>
-
 #include <bflb_uart.h>
 #include <bflb_clock.h>
 #include <hardware/uart_reg.h>
 
 struct bflb_config {
-	const struct pinctrl_dev_config *pinctrl_cfg;
-	const struct bflb_uart_config_s *config;
+	const struct pinctrl_dev_config *pincfg;
+	struct bflb_uart_config_s config;
 	uint32_t base_reg;
 };
 
@@ -59,7 +57,7 @@ static int uart_bflb_configure(const struct device *dev)
 
 	reg_base = cfg->base_reg;
 
-	div = (bflb_clk_get_peripheral_clock(BFLB_DEVICE_TYPE_UART, idx) * 10 / cfg->config->baudrate + 5) / 10;
+	div = (bflb_clk_get_peripheral_clock(BFLB_DEVICE_TYPE_UART, idx) * 10 / cfg->config.baudrate + 5) / 10;
 
 	tx_cfg = getreg32(reg_base + UART_UTX_CONFIG_OFFSET);
 	rx_cfg = getreg32(reg_base + UART_URX_CONFIG_OFFSET);
@@ -75,7 +73,7 @@ static int uart_bflb_configure(const struct device *dev)
 	tx_cfg = getreg32(reg_base + UART_UTX_CONFIG_OFFSET);
 	rx_cfg = getreg32(reg_base + UART_URX_CONFIG_OFFSET);
 
-	switch (cfg->config->parity) {
+	switch (cfg->config.parity) {
 		case UART_PARITY_NONE:
 			tx_cfg &= ~UART_CR_UTX_PRT_EN;
 			rx_cfg &= ~UART_CR_URX_PRT_EN;
@@ -98,16 +96,16 @@ static int uart_bflb_configure(const struct device *dev)
 
 	/* Configure data bits */
 	tx_cfg &= ~UART_CR_UTX_BIT_CNT_D_MASK;
-	tx_cfg |= (cfg->config->data_bits + 4) << UART_CR_UTX_BIT_CNT_D_SHIFT;
+	tx_cfg |= (cfg->config.data_bits + 4) << UART_CR_UTX_BIT_CNT_D_SHIFT;
 	rx_cfg &= ~UART_CR_URX_BIT_CNT_D_MASK;
-	rx_cfg |= (cfg->config->data_bits + 4) << UART_CR_URX_BIT_CNT_D_SHIFT;
+	rx_cfg |= (cfg->config.data_bits + 4) << UART_CR_URX_BIT_CNT_D_SHIFT;
 
 	/* Configure tx stop bits */
 	tx_cfg &= ~UART_CR_UTX_BIT_CNT_P_MASK;
-	tx_cfg |= cfg->config->stop_bits << UART_CR_UTX_BIT_CNT_P_SHIFT;
+	tx_cfg |= cfg->config.stop_bits << UART_CR_UTX_BIT_CNT_P_SHIFT;
 
 	/* Configure tx cts flow control function */
-	if (cfg->config->flow_ctrl & UART_FLOWCTRL_CTS) {
+	if (cfg->config.flow_ctrl & UART_FLOWCTRL_CTS) {
 		tx_cfg |= UART_CR_UTX_CTS_EN;
 	} else {
 		tx_cfg &= ~UART_CR_UTX_CTS_EN;
@@ -141,8 +139,8 @@ static int uart_bflb_configure(const struct device *dev)
 	regval = getreg32(reg_base + UART_FIFO_CONFIG_1_OFFSET);
 	regval &= ~UART_TX_FIFO_TH_MASK;
 	regval &= ~UART_RX_FIFO_TH_MASK;
-	regval |= (cfg->config->tx_fifo_threshold << UART_TX_FIFO_TH_SHIFT) & UART_TX_FIFO_TH_MASK;
-	regval |= (cfg->config->rx_fifo_threshold << UART_RX_FIFO_TH_SHIFT) & UART_RX_FIFO_TH_MASK;
+	regval |= (cfg->config.tx_fifo_threshold << UART_TX_FIFO_TH_SHIFT) & UART_TX_FIFO_TH_MASK;
+	regval |= (cfg->config.rx_fifo_threshold << UART_RX_FIFO_TH_SHIFT) & UART_RX_FIFO_TH_MASK;
 	putreg32(regval, reg_base + UART_FIFO_CONFIG_1_OFFSET);
 
 	/* Clear FIFO */
@@ -176,7 +174,7 @@ static int uart_bflb_init(const struct device *dev)
 		return idx;
 	}
 
-	pinctrl_apply_state(cfg->pinctrl_cfg, PINCTRL_STATE_DEFAULT);
+	pinctrl_apply_state(cfg->pincfg, PINCTRL_STATE_DEFAULT);
 
 	GLB_Set_UART_CLK(1, HBN_UART_CLK_160M, 0);
 
@@ -212,7 +210,7 @@ static void uart_bflb_poll_out(const struct device *dev, unsigned char c)
 	return;
 }
 
-#ifdef uart_bflb_pm_control
+#ifdef CONFIG_PM_DEVICE
 static int uart_bl_pm_control(const struct device *dev,
 			      enum pm_device_action action)
 {
@@ -220,7 +218,7 @@ static int uart_bl_pm_control(const struct device *dev,
 
 	switch (action) {
 	case PM_DEVICE_ACTION_RESUME:
-		(void)pinctrl_apply_state(cfg->pinctrl_cfg, PINCTRL_STATE_DEFAULT);
+		(void)pinctrl_apply_state(cfg->pincfg, PINCTRL_STATE_DEFAULT);
 		const struct bflb_config *cfg = dev->config;
 		uint32_t tx_cfg;
 		uint32_t rx_cfg;
@@ -233,7 +231,7 @@ static int uart_bl_pm_control(const struct device *dev,
 		putreg32(rx_cfg, cfg->base_reg + UART_URX_CONFIG_OFFSET);
 		break;
 	case PM_DEVICE_ACTION_SUSPEND:
-		if (pinctrl_apply_state(cfg->pinctrl_cfg, PINCTRL_STATE_SLEEP)) {
+		if (pinctrl_apply_state(cfg->pincfg, PINCTRL_STATE_SLEEP)) {
 			return -134;
 		}
 		const struct bflb_config *cfg = dev->config;
@@ -260,25 +258,27 @@ static const struct uart_driver_api uart_bflb_driver_api = {
 	.poll_out = uart_bflb_poll_out,
 };
 
-#define BL_UART_INIT(n)								\
-	PINCTRL_DT_INST_DEFINE(n);						\
-	static const struct bflb_config blfb_uart##n##_config = {			\
-		.pinctrl_cfg = PINCTRL_DT_INST_DEV_CONFIG_GET(n),		\
-		.base_reg = DT_REG_ADDR(n),					\
+#define BL_UART_INIT(instance)							\
+	PINCTRL_DT_INST_DEFINE(instance);					\
+	static const struct bflb_config bl_uart##instance##_config = {		\
+		.pincfg = PINCTRL_DT_INST_DEV_CONFIG_GET(instance),		\
+		.base_reg = DT_INST_REG_ADDR(instance),				\
 										\
-		.config.baudrate = DT_INST_PROP(n, current_speed),		\
+		.config.baudrate = DT_INST_PROP(instance, current_speed),	\
 		.config.data_bits = UART_DATA_BITS_8,				\
 		.config.stop_bits = UART_STOP_BITS_1,				\
 		.config.parity = UART_PARITY_NONE,				\
-		.config.flow_ctrl = UART_FLOWCTRL_RTS_CTS,			\
 		.config.bit_order = UART_MSB_FIRST,				\
+		.config.flow_ctrl = UART_FLOWCTRL_RTS_CTS,			\
 		.config.tx_fifo_threshold = 1,					\
-		.config.rx_fifo_threshold = 1					\
+		.config.rx_fifo_threshold = 1,					\
 										\
 	};									\
-	DEVICE_DT_INST_DEFINE(n, &uart_bflb_init,					\
-			      uart_bflb_pm_control,				\
+	DEVICE_DT_INST_DEFINE(instance, &uart_bflb_init,			\
+			      uart_bl_pm_control,				\
 			      NULL,						\
-			      &blfb_uart##n##_config, PRE_KERNEL_1,		\
+			      &bl_uart##instance##_config, PRE_KERNEL_1,	\
 			      CONFIG_KERNEL_INIT_PRIORITY_DEVICE,		\
 			      &uart_bflb_driver_api);
+
+DT_INST_FOREACH_STATUS_OKAY(BL_UART_INIT)

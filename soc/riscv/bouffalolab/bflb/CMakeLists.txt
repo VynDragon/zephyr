@@ -4,6 +4,7 @@
 #
 
 zephyr_include_directories(.)
+zephyr_include_directories(${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/drivers/lhal/include/arch)
 zephyr_sources(soc.c)
 
 zephyr_linker_sources_ifdef(CONFIG_SOC_FAMILY_BFLB RODATA rodata.ld)

@@ -13,8 +13,8 @@
 #include <zephyr/init.h>
 #include <zephyr/irq.h>
 
-#include <blhbn.h>
-#include <blglb.h>
+//#include <blhbn.h>
+//#include <blglb.h>
 
 #include <clic.h>
 
@@ -64,14 +64,13 @@ ulong_t __soc_get_gp_initial_value(void)
  * @return 0
  */
 
-static int bl_riscv_init(const struct device *arg)
+static int bl_riscv_init(void)
 {
 	uint32_t key;
 	uint32_t *p;
 	uint32_t i = 0;
 	uint32_t tmpVal = 0;
 
-	ARG_UNUSED(arg);
 
 	key = irq_lock();
 
