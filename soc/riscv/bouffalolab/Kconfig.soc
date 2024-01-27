@@ -2,3 +2,4 @@
 # SPDX-License-Identifier: Apache-2.0
 
 source "soc/riscv/bouffalolab/*/Kconfig.series"
+TOOLCHAIN_HAS_NEWLIB=y

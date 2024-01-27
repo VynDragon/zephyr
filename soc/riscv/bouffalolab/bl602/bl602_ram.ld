@@ -24,6 +24,7 @@ MEMORY
     itcm_memory (rx)  : ORIGIN = 0x22020000, LENGTH = 0K
     dtcm_memory (rx)  : ORIGIN = 0x22020000, LENGTH = 4K
     ram_memory  (!rx) : ORIGIN = 0x42021000, LENGTH = 176K - 4K
+    IDT_LIST  (wx)      : ORIGIN = 0xFFFFF7FF, LENGTH = 2K
 }
 
 SECTIONS
@@ -176,8 +177,9 @@ SECTIONS
         . = ALIGN(4);
         __HeapBase = .;
 
-        /*__end__ = .;*/
-        /*end = __end__;*/
+        __end__ = .;
+        end = __end__;
+        _end = __end__;
         KEEP(*(.heap*))
 
         . = ALIGN(4);

@@ -16,5 +16,6 @@ config SOC_SERIES_BL6
 	select RISCV_ISA_EXT_A
 	select RISCV_ISA_EXT_C
 	select FLOAT_HARD
+	select REQUIRES_FULL_LIBC
 	help
 	  Enable support for Bouffalo Lab BL6 MCU series

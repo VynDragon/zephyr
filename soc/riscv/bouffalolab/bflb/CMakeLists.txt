@@ -14,6 +14,6 @@ zephyr_sources(
   soc.c
 )
 
-zephyr_linker_sources_ifdef(CONFIG_SOC_FAMILY_BFLB RODATA rodata.ld)
+# zephyr_linker_sources_ifdef(CONFIG_SOC_FAMILY_BFLB RODATA rodata.ld)
 
 set(SOC_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/../${CONFIG_SOC_SUB_SERIES}/linker.ld CACHE INTERNAL "")

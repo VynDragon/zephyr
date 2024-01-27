@@ -3,9 +3,6 @@ if(CONFIG_SOC_FAMILY_BFLB)
 
 zephyr_library_named(hal_bouffalolab)
 
-# for errno.h, helps find toolchain includes
-set(CMAKE_FIND_ROOT_PATH ${CROSS_COMPILE}gcc)
-
 zephyr_compile_definitions(
   ARCH_RISCV
   __LINUX_ERRNO_EXTENSIONS__
@@ -109,6 +106,12 @@ if("${CONFIG_SOC_SUB_SERIES}" STREQUAL "bl702")
 sdk_library_add_sources(${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/drivers/lhal/src/bflb_usb_v1.c)
 endif()
 
+zephyr_library_sources(
+${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/drivers/lhal/src/bflb_irq.c
+${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/drivers/lhal/src/bflb_l1c.c
+${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/drivers/lhal/src/bflb_mtimer.c
+)
+
 zephyr_include_directories(
   # bflb errno.h
   ${SYSROOT_DIR}/include
@@ -136,5 +139,8 @@ ${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/drivers/lhal/config/${CONFIG_SOC_SUB_SERIES
 )
 
 include(${CONFIG_SOC_SUB_SERIES}.cmake)
+include(newlib.cmake)
+include(easyflash4.cmake)
 
+target_link_libraries(zephyr_interface INTERFACE -lc)
 endif()
