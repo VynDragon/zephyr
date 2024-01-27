@@ -7,9 +7,6 @@
 #include <zephyr/toolchain.h>
 #include <zephyr/arch/riscv/csr.h>
 
-/* exports */
-GTEXT(__start)
-
 /* imports */
 GTEXT(__initialize)
 GTEXT(_isr_wrapper)

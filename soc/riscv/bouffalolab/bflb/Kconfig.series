@@ -4,6 +4,7 @@
 config SOC_SERIES_BL6
 	bool "Bouffalo Lab BL6 series MCU"
 	select RISCV
+	select FPU
 #	select RISCV_GP
 	select RISCV_HAS_CPU_IDLE
 	select RISCV_MACHINE_TIMER
@@ -11,5 +12,9 @@ config SOC_SERIES_BL6
 	select COMPRESSED_ISA
 	select SOC_FAMILY_BFLB
 	select CPU_HAS_FPU
+	select RISCV_ISA_EXT_M
+	select RISCV_ISA_EXT_A
+	select RISCV_ISA_EXT_C
+	select FLOAT_HARD
 	help
 	  Enable support for Bouffalo Lab BL6 MCU series
