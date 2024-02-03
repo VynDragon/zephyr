@@ -5,6 +5,7 @@
 
 /dts-v1/;
 
+#include <bouffalolab/bl602.dtsi>
 #include "ai_wb2_12f-pinctrl.dtsi"
 
 / {
