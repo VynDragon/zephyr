@@ -8,6 +8,8 @@
 
 #ifdef CONFIG_SOC_SERIES_BL6
 	#include <bl602_gpio.h>
+#elif CONFIG_SOC_SERIES_BL7
+	#include <bl702_gpio.h>
 #endif
 
 #endif	/* ZEPHYR_HAL_BFLB_GPIO_H_ */

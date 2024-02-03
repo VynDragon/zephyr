@@ -34,6 +34,8 @@ static uint32_t mtimer_get_clk_src_div(void)
 		/ 1000 / 1000 - 1);
 }
 
+#ifdef CONFIG_SOC_SERIES_BL6
+
 static void system_clock_init(void)
 {
 	GLB_Set_System_CLK(GLB_PLL_XTAL_40M, GLB_SYS_CLK_PLL160M);
@@ -45,6 +47,22 @@ static void peripheral_clock_init(void)
 {
 	GLB_Set_UART_CLK(1, HBN_UART_CLK_160M, ROOT_UART_CLOCK_DIV);
 }
+
+#elif CONFIG_SOC_SERIES_BL7
+
+static void system_clock_init(void)
+{
+	GLB_Set_System_CLK(GLB_DLL_XTAL_32M, GLB_SYS_CLK_DLL144M);
+	GLB_Set_System_CLK_Div(ROOT_FCLK_DIV, ROOT_BCLK_DIV);
+	GLB_Set_MTimer_CLK(1, GLB_MTIMER_CLK_BCLK, mtimer_get_clk_src_div());
+}
+
+static void peripheral_clock_init(void)
+{
+	GLB_Set_UART_CLK(1, HBN_UART_CLK_96M, ROOT_UART_CLOCK_DIV);
+}
+
+#endif
 
 #ifdef CONFIG_RISCV_GP
 ulong_t __soc_get_gp_initial_value(void)

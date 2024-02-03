@@ -7,7 +7,9 @@
 #define ZEPHYR_HAL_BFLB_PINCTRL_H_
 
 #ifdef CONFIG_SOC_SERIES_BL6
-#  include <zephyr/dt-bindings/pinctrl/bl60x-pinctrl.h>
+	#include <zephyr/dt-bindings/pinctrl/bl60x-pinctrl.h>
+#elif CONFIG_SOC_SERIES_BL7
+	#include <zephyr/dt-bindings/pinctrl/bl70x-pinctrl.h>
 #endif
 #include <zephyr/dt-bindings/pinctrl/bflb-common-pinctrl.h>
 

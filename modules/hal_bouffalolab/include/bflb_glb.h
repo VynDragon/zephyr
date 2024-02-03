@@ -8,6 +8,8 @@
 
 #ifdef CONFIG_SOC_SERIES_BL6
 	#include <bl602_glb.h>
+#elif CONFIG_SOC_SERIES_BL7
+	#include <bl702_glb.h>
 #endif
 
 #endif	/* ZEPHYR_HAL_BFLB_GLB_H_ */

@@ -24,6 +24,8 @@
 
 #if defined(CONFIG_SOC_SERIES_BL6)
 #include <bl602.h>
+#elif defined(CONFIG_SOC_SERIES_BL7)
+#include <bl702.h>
 #else
 #error Library does not support the specified device.
 #endif
@@ -37,6 +39,7 @@
 #define RISCV_RAM_SIZE               KB(DT_SRAM_SIZE)
 
 #define SOC_BOUFFALOLAB_BL_PLL160_FREQ_HZ (160000000)
+#define SOC_BOUFFALOLAB_BL_PLL144_FREQ_HZ (144000000)
 #define SOC_BOUFFALOLAB_BL_HCLK_FREQ_HZ	\
 	DT_PROP(DT_PATH(cpus, cpu_0), clock_frequency)
 

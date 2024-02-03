@@ -34,7 +34,12 @@ static int uart_bl_init(const struct device *dev)
 
 	pinctrl_apply_state(cfg->pinctrl_cfg, PINCTRL_STATE_DEFAULT);
 
+#ifdef CONFIG_SOC_SERIES_BL6
 	GLB_Set_UART_CLK(1, HBN_UART_CLK_160M, UART_CLOCK_DIV);
+#elif CONFIG_SOC_SERIES_BL7
+	GLB_Set_UART_CLK(1, HBN_UART_CLK_96M, UART_CLOCK_DIV);
+#endif
+
 
 	UART_IntMask(cfg->periph_id, UART_INT_ALL, 1);
 	UART_Disable(cfg->periph_id, UART_TXRX);
@@ -96,6 +101,8 @@ static const struct uart_driver_api uart_bl_driver_api = {
 	.poll_out = uart_bl_poll_out,
 };
 
+#ifdef CONFIG_SOC_SERIES_BL6
+
 #define BL_UART_INIT(n)								\
 	PINCTRL_DT_INST_DEFINE(n);						\
 	static const struct bl_config bl_uart##n##_config = {			\
@@ -122,5 +129,35 @@ static const struct uart_driver_api uart_bl_driver_api = {
 			      &bl_uart##n##_config, PRE_KERNEL_1,		\
 			      CONFIG_KERNEL_INIT_PRIORITY_DEVICE,		\
 			      &uart_bl_driver_api);
+
+#elif CONFIG_SOC_SERIES_BL7
+
+#define BL_UART_INIT(n)								\
+	PINCTRL_DT_INST_DEFINE(n);						\
+	static const struct bl_config bl_uart##n##_config = {			\
+		.pinctrl_cfg = PINCTRL_DT_INST_DEV_CONFIG_GET(n),		\
+		.periph_id = DT_INST_PROP(n, peripheral_id),			\
+										\
+		.uart_cfg.baudRate = DT_INST_PROP(n, current_speed),		\
+		.uart_cfg.dataBits = UART_DATABITS_8,				\
+		.uart_cfg.stopBits = UART_STOPBITS_1,				\
+		.uart_cfg.parity = UART_PARITY_NONE,				\
+		.uart_cfg.uartClk = SOC_BOUFFALOLAB_BL_PLL144_FREQ_HZ,		\
+		.uart_cfg.ctsFlowControl = UART_CTS_FLOWCONTROL_ENABLE,		\
+		.uart_cfg.rtsSoftwareControl = UART_RTS_FLOWCONTROL_ENABLE,	\
+		.uart_cfg.byteBitInverse = UART_MSB_FIRST_ENABLE,		\
+										\
+		.fifo_cfg.txFifoDmaThreshold = 1,				\
+		.fifo_cfg.rxFifoDmaThreshold = 1,				\
+		.fifo_cfg.txFifoDmaEnable = 0,					\
+		.fifo_cfg.rxFifoDmaEnable = 0,					\
+	};									\
+	DEVICE_DT_INST_DEFINE(n, &uart_bl_init,					\
+			      uart_bl_pm_control,				\
+			      NULL,						\
+			      &bl_uart##n##_config, PRE_KERNEL_1,		\
+			      CONFIG_KERNEL_INIT_PRIORITY_DEVICE,		\
+			      &uart_bl_driver_api);
+#endif
 
 DT_INST_FOREACH_STATUS_OKAY(BL_UART_INIT)

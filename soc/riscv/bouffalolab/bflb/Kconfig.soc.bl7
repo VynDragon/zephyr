@@ -1,0 +1,62 @@
+# Copyright (c) 2024, MASSDRIVER EI (massdriver.space)
+# SPDX-License-Identifier: Apache-2.0
+
+choice
+	prompt "bouffalo Lab BL7 MCU Selection"
+	depends on SOC_SERIES_BL7
+
+	config SOC_PART_NUMBER_BL702SA0Q2I
+		bool "BL702SA0Q2I"
+		select RISCV_ISA_RV32I
+		select RISCV_ISA_EXT_M
+		select RISCV_ISA_EXT_A
+		select RISCV_ISA_EXT_C
+		select RISCV_ISA_EXT_ZICSR
+		select RISCV_ISA_EXT_ZIFENCEI
+
+	config SOC_PART_NUMBER_BL702S10Q2I
+		bool "BL702S10Q2I"
+		select RISCV_ISA_RV32I
+		select RISCV_ISA_EXT_M
+		select RISCV_ISA_EXT_A
+		select RISCV_ISA_EXT_C
+		select RISCV_ISA_EXT_ZICSR
+		select RISCV_ISA_EXT_ZIFENCEI
+
+	config SOC_PART_NUMBER_BL702C10Q2H
+		bool "BL702C10Q2H"
+		select RISCV_ISA_RV32I
+		select RISCV_ISA_EXT_M
+		select RISCV_ISA_EXT_A
+		select RISCV_ISA_EXT_C
+		select RISCV_ISA_EXT_ZICSR
+		select RISCV_ISA_EXT_ZIFENCEI
+
+	config SOC_PART_NUMBER_BL706C10Q2I
+		bool "BL706C10Q2I"
+		select RISCV_ISA_RV32I
+		select RISCV_ISA_EXT_M
+		select RISCV_ISA_EXT_A
+		select RISCV_ISA_EXT_C
+		select RISCV_ISA_EXT_ZICSR
+		select RISCV_ISA_EXT_ZIFENCEI
+
+	config SOC_PART_NUMBER_BL706S10Q2I
+		bool "BL706S10Q2I"
+		select RISCV_ISA_RV32I
+		select RISCV_ISA_EXT_M
+		select RISCV_ISA_EXT_A
+		select RISCV_ISA_EXT_C
+		select RISCV_ISA_EXT_ZICSR
+		select RISCV_ISA_EXT_ZIFENCEI
+
+	config SOC_PART_NUMBER_BL706C22Q2I
+		bool "BL706C22Q2I"
+		select RISCV_ISA_RV32I
+		select RISCV_ISA_EXT_M
+		select RISCV_ISA_EXT_A
+		select RISCV_ISA_EXT_C
+		select RISCV_ISA_EXT_ZICSR
+		select RISCV_ISA_EXT_ZIFENCEI
+
+endchoice
