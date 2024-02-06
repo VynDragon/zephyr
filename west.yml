@@ -25,6 +25,8 @@ manifest:
       url-base: https://github.com/BabbleSim
     - name: nandojve
       url-base: https://github.com/nandojve
+    - name: vyndragon
+      url-base: https://github.com/VynDragon
 
   group-filter: [-babblesim, -optional]
 
@@ -153,10 +155,10 @@ manifest:
       path: modules/hal/atmel
       groups:
         - hal
-    - name: bl_mcu_sdk
-      remote: nandojve
+    - name: hal_bouffalolab
+      remote: vyndragon
       path: modules/hal/bouffalolab
-      revision: zephyr
+      revision: master
       groups:
         - hal
     - name: hal_espressif

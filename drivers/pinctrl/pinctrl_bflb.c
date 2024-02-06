@@ -5,9 +5,9 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/pinctrl.h>
-#include <bflb_pinctrl.h>
-#include <bflb_glb.h>
-#include <bflb_gpio.h>
+#include <bl_soc_pinctrl.h>
+#include <bl_soc_glb.h>
+#include <bl_soc_gpio.h>
 
 int pinctrl_configure_pins(const pinctrl_soc_pin_t *pins, uint8_t pin_cnt,
 			   uintptr_t reg)

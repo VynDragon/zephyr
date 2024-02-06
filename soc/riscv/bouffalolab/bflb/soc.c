@@ -13,8 +13,8 @@
 #include <zephyr/init.h>
 #include <zephyr/irq.h>
 
-#include <bflb_hbn.h>
-#include <bflb_glb.h>
+#include <bl_soc_hbn.h>
+#include <bl_soc_glb.h>
 #include <clic.h>
 
 #define ROOT_FCLK_DIV			(0)

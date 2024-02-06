@@ -21,3 +21,5 @@ include(${ZEPHYR_BASE}/boards/common/openocd.board.cmake)
 
 board_runner_args(blflash --port /dev/ttyUSB0)
 include(${ZEPHYR_BASE}/boards/common/blflash.board.cmake)
+
+board_set_flasher(blflash)

@@ -14,6 +14,8 @@
 
 #include <zephyr/devicetree.h>
 #include <zephyr/types.h>
+#include <bl_soc_pinctrl.h>
+
 
 #ifdef __cplusplus
 extern "C" {

@@ -6,6 +6,6 @@
 zephyr_include_directories(.)
 zephyr_sources(soc.c)
 
-zephyr_linker_sources_ifdef(CONFIG_SOC_FAMILY_BFLB RODATA rodata.ld)
+#zephyr_linker_sources_ifdef(CONFIG_SOC_FAMILY_BFLB RODATA rodata.ld)
 
 set(SOC_LINKER_SCRIPT ${ZEPHYR_BASE}/include/zephyr/arch/riscv/common/linker.ld CACHE INTERNAL "")
