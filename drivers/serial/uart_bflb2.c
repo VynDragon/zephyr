@@ -79,9 +79,10 @@ static int uart_bflb_poll_in(const struct device *dev, unsigned char *c)
 
 	if ((getreg32(cfg->base_reg + UART_FIFO_CONFIG_1_OFFSET) & UART_RX_FIFO_CNT_MASK) != 0) {
 		*c = getreg8(cfg->base_reg + UART_FIFO_RDATA_OFFSET);
+		return 0;
 	}
 
-	return *c;
+	return -1;
 }
 
 static void uart_bflb_poll_out(const struct device *dev, unsigned char c)
