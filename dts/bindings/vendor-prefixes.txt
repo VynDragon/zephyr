@@ -715,6 +715,7 @@ ys	Shenzhen Yashi Changhua Intelligent Technology Co., Ltd.
 ysoft	Y Soft Corporation a.s.
 zealz	Zealz
 zarlink	Zarlink Semiconductor
+zb	Zbit Semiconductor, Inc.
 zeitec	ZEITEC Semiconductor Co., LTD.
 zephyr	Zephyr-specific binding
 zidoo	Shenzhen Zidoo Technology Co., Ltd.
