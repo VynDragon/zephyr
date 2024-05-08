@@ -66,25 +66,29 @@ USB Serial converter and port is used for both program and console.
 Programming and Debugging
 *************************
 
-BL Flash tool
-=============
 
-The BL702 have a ROM bootloader that allows users to flash the device by serial port.
-There are some tools available at internet and this will describe one of them.
+Debugging
+=======
 
-#. Install blflash.
+Jtag defaults for BL702 are as follow:
+GPIO0 TMS
+GPIO1 TDI
+GPIO2 TCK
+GPIO9 TDO
 
-#. Test
+/!\ BEWARE: The markings on some BL702 devkits are wrong, the JTAG pins are swapped.
+The following for my board:
+'D1' : GPIO9
+'D2' : GPIO1
+'D9' : GPIO2
 
-   .. code-block:: console
+/!\ BEWARE:
+This board's UART DID NOT WORK via the built-in CH340 with default settings
 
-      $ blflash -V
-
-   It will print blflash version
-
-   .. code-block:: console
-
-      $ blflash 0.3.3
+.. image:: img/bl702_white_devboard.jpg
+     :width: 450px
+     :align: center
+     :alt: a bad bl702 devboard with many issues
 
 Samples
 =======
@@ -107,7 +111,7 @@ Samples
 
    .. code-block:: console
 
-      west flash -r blflash
+      west flash
 
 #. Run your favorite terminal program to listen for output. Under Linux the
    terminal should be :code:`/dev/ttyUSB0`. For example:

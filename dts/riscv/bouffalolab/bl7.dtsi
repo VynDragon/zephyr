@@ -5,7 +5,7 @@
  */
 
 #include <mem.h>
-#include <dt-bindings/pinctrl/bl60x-pinctrl.h>
+#include <dt-bindings/pinctrl/bl70x-pinctrl.h>
 #include <dt-bindings/pinctrl/bflb-common-pinctrl.h>
 
 / {
@@ -39,18 +39,18 @@
 		compatible = "simple-bus";
 		ranges;
 
-		itcm: itcm@22010000 {
+		itcm: itcm@22014000 {
 			compatible = "zephyr,memory-region", "sifive,dtim0";
-			reg = <0x22010000 DT_SIZE_K(16)>;
+			reg = <0x22014000 DT_SIZE_K(12)>;
 			zephyr,memory-region = "ITCM";
 		};
-		dtcm: dtcm@42014000 {
+		dtcm: dtcm@42017000 {
 			compatible = "zephyr,memory-region", "sifive,dtim0";
-			reg = <0x42014000 DT_SIZE_K(48)>;
+			reg = <0x42017000 DT_SIZE_K(4)>;
 			zephyr,memory-region = "DTCM";
 		};
 
-		sram0: memory@42020000 {
+		sram0: memory@42018000 {
 			compatible = "mmio-sram";
 		};
 

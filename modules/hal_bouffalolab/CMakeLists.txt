@@ -107,9 +107,9 @@ ${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/drivers/lhal/src/bflb_wo.c
 )
 endif()
 
-if("${CONFIG_SOC_SUB_SERIES}" STREQUAL "bl702")
-sdk_library_add_sources(${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/drivers/lhal/src/bflb_usb_v1.c)
-endif()
+#if("${CONFIG_SOC_SUB_SERIES}" STREQUAL "bl702")
+#zephyr_library_sources(${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/drivers/lhal/src/bflb_usb_v1.c)
+#endif()
 
 zephyr_library_sources(
 ${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/drivers/lhal/src/bflb_irq.c
@@ -119,6 +119,9 @@ ${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/drivers/lhal/src/bflb_mtimer.c
 
 zephyr_include_directories(
   include/${CONFIG_SOC_SUB_SERIES}
+  # this MUST be before /drivers/lhal/include/arch, there is a interface for nonmatching risc-v
+  # and riscv paths so as to not redefine risc-v related stuffs (the defines are the same)
+  include
 
   ${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/drivers/lhal/include
   ${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/drivers/lhal/include/arch
@@ -127,7 +130,8 @@ zephyr_include_directories(
   ${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/include
 )
 
-if(NOT (("${CONFIG_SOC_SUB_SERIES}" STREQUAL "bl702") OR ("${CONFIG_SOC_SUB_SERIES}" STREQUAL "bl602") OR ("${CONFIG_SOC_SUB_SERIES}" STREQUAL "bl702l")))
+if(NOT (("${CONFIG_SOC_SUB_SERIES}" STREQUAL "bl702") OR
+("${CONFIG_SOC_SUB_SERIES}" STREQUAL "bl602") OR ("${CONFIG_SOC_SUB_SERIES}" STREQUAL "bl702l")))
 zephyr_include_directories(
   include
   ${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/drivers/lhal/include/arch/risc-v/t-head

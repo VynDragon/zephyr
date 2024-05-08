@@ -160,9 +160,9 @@ static const struct uart_driver_api uart_bflb_driver_api = {
 		.config.stop_bits = UART_STOP_BITS_1,				\
 		.config.parity = UART_PARITY_NONE,				\
 		.config.bit_order = UART_MSB_FIRST,				\
-		.config.flow_ctrl = UART_FLOWCTRL_RTS_CTS,			\
-		.config.tx_fifo_threshold = 1,					\
-		.config.rx_fifo_threshold = 1,					\
+		.config.flow_ctrl = UART_FLOWCTRL_NONE,			\
+		.config.tx_fifo_threshold = 15,					\
+		.config.rx_fifo_threshold = 15,					\
 										\
 	};									\
 	DEVICE_DT_INST_DEFINE(instance, &uart_bflb_init,			\

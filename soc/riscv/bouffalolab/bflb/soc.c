@@ -55,10 +55,14 @@ static void system_clock_init(void)
 	GLB_Set_System_CLK(GLB_DLL_XTAL_32M, GLB_SYS_CLK_DLL144M);
 	GLB_Set_System_CLK_Div(ROOT_FCLK_DIV, ROOT_BCLK_DIV);
 	GLB_Set_MTimer_CLK(1, GLB_MTIMER_CLK_BCLK, mtimer_get_clk_src_div());
+	HBN_Set_XCLK_CLK_Sel(HBN_XCLK_CLK_XTAL);
 }
 
 static void peripheral_clock_init(void)
 {
+	uint32_t regval = getreg32(0x40000024);
+        regval |= (1 << 16);
+        putreg32(regval, 0x40000024);
 	GLB_Set_UART_CLK(1, HBN_UART_CLK_96M, ROOT_UART_CLOCK_DIV);
 }
 
@@ -102,6 +106,7 @@ static int bl_riscv_init(void)
 	tmpVal = BL_SET_REG_BITS_VAL(tmpVal, GLB_EM_SEL, GLB_EM_0KB);
 	BL_WR_REG(GLB_BASE, GLB_SEAM_MISC, tmpVal);
 
+#ifdef CONFIG_SOC_SERIES_BL6
 	/* Fix 26M xtal clkpll_sdmin */
 	tmpVal = BL_RD_REG(PDS_BASE, PDS_CLKPLL_SDM);
 
@@ -110,7 +115,6 @@ static int bl_riscv_init(void)
 		BL_WR_REG(PDS_BASE, PDS_CLKPLL_SDM, tmpVal);
 	}
 
-	/* Restore default setting*/
 
 	/* GLB_UART_Sig_Swap_Set(UART_SIG_SWAP_NONE); */
 	tmpVal = BL_RD_REG(GLB_BASE, GLB_PARM);
@@ -122,6 +126,20 @@ static int bl_riscv_init(void)
 	tmpVal = BL_SET_REG_BITS_VAL(tmpVal, GLB_JTAG_SWAP_SET, JTAG_SIG_SWAP_NONE);
 	BL_WR_REG(GLB_BASE, GLB_PARM, tmpVal);
 
+#elif CONFIG_SOC_SERIES_BL7
+
+	/* GLB_UART_Sig_Swap_Set(UART_SIG_SWAP_NONE); */
+	tmpVal = BL_RD_REG(GLB_BASE, GLB_PARM);
+	tmpVal = BL_SET_REG_BITS_VAL(tmpVal, GLB_UART_SWAP_SET, UART_SIG_SWAP_NONE);
+	BL_WR_REG(GLB_BASE, GLB_PARM, tmpVal);
+
+	/* GLB_JTAG_Sig_Swap_Set(JTAG_SIG_SWAP_NONE); */
+	/* This breaks jtag connection on BL702
+	tmpVal = BL_RD_REG(GLB_BASE, GLB_PARM);
+	tmpVal = BL_SET_REG_BITS_VAL(tmpVal, GLB_JTAG_SWAP_SET, JTAG_SIG_SWAP_NONE);
+	BL_WR_REG(GLB_BASE, GLB_PARM, tmpVal); */
+
+#endif
 	/* CLear all interrupt */
 	p = (uint32_t *)(CLIC_HART0_ADDR + CLIC_INTIE);
 
@@ -137,11 +155,14 @@ static int bl_riscv_init(void)
 
 	/* init bor for all platform */
 	system_bor_init();
-	/* global IRQ enable */
-	__enable_irq();
 
 	system_clock_init();
 	peripheral_clock_init();
+
+	/* global IRQ enable */
+	__enable_irq();
+
+
 
 	irq_unlock(key);
 
