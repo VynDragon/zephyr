@@ -59,8 +59,8 @@ The BL702 Development Board is configured to run at max speed (144MHz).
 Serial Port
 ===========
 
-The xt_bl_zb1_ uses UART0 as default serial port.  It is connected to
-USB Serial converter and port is used for both program and console.
+The xt_bl_zb1_ uses UART0 as default serial port.  It is connected to a
+USB Serial converter and is used for both programming and UART.
 
 
 Programming and Debugging
@@ -70,25 +70,29 @@ Programming and Debugging
 Debugging
 =======
 
-Jtag defaults for BL702 are as follow:
+#. Jtag defaults for BL702 are as follow:
 GPIO0 TMS
 GPIO1 TDI
 GPIO2 TCK
 GPIO9 TDO
 
-/!\ BEWARE: The markings on some BL702 devkits are wrong, the JTAG pins are swapped.
-The following for my board:
-'D1' : GPIO9
-'D2' : GPIO1
-'D9' : GPIO2
-
-/!\ BEWARE:
-This board's UART DID NOT WORK via the built-in CH340 with default settings
+#. BEWARE
 
 .. image:: img/bl702_white_devboard.jpg
      :width: 450px
      :align: center
      :alt: a bad bl702 devboard with many issues
+
+The markings on some BL702 devkits are wrong, the JTAG pins are swapped.
+The following for my board:
+'D1' : GPIO2
+'D2' : GPIO9
+'D9' : GPIO1
+
+This board's UART DID NOT WORK via the built-in CH340 with default settings, use a external UART to
+USB in this case.
+
+
 
 Samples
 =======
@@ -101,7 +105,7 @@ Samples
       :goals: build
       :compact:
 
-#. To flash an image using blflash runner:
+#. To flash an image:
 
    #. Pull up GPIO28
 
@@ -118,23 +122,14 @@ Samples
 
    .. code-block:: console
 
-      $ minicom -D /dev/ttyUSB0 -o
+      $ screen /dev/ttyUSB0 115200
 
-   The -o option tells minicom not to send the modem initialization
-   string. Connection should be configured as follows:
-
-      - Speed: 115200
-      - Data: 8 bits
-      - Parity: None
-      - Stop bits: 1
-
-   Then, press and release EN button
 
 .. _Bouffalo Lab BL702 MCU Website:
 	https://en.bouffalolab.com/product/?type=detail&id=8
 
 .. _Bouffalo Lab BL602 MCU Datasheet:
-	https://github.com/bouffalolab/bl_docs/tree/main/BL702_DS/enn
+	https://github.com/bouffalolab/bl_docs/tree/main/BL702_DS/
 
 .. _Bouffalo Lab Development Zone:
 	https://dev.bouffalolab.com/home?id=guest
