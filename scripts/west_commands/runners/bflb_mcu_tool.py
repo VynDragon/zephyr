@@ -55,7 +55,10 @@ class BlFlashCommandBinaryRunner(ZephyrBinaryRunner):
         print(args)
         if shutil.which(DEFAULT_EXECUTABLE) is None:
             raise ValueError("Couldnt find bflb-mcu-tool in PATH, please install with pip install \
-bflb-mcu-tool")
+bflb-mcu-tool\n\
+You may also need to install pyelftools.\n\
+If you use venvs, you will still need to install the tool out of a venv, as it references some \
+modules within itself that do not play nice in a venv.")
         return BlFlashCommandBinaryRunner(cfg,
                                         port=args.port,
                                         baudrate=args.baudrate,
