@@ -7,18 +7,20 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/pinctrl.h>
-#include <bl_soc_pinctrl.h>
-#include <bl_soc_glb.h>
-#include <bl_soc_gpio.h>
 
+/* TODO: When proper headers are integrated, use those instead and remove this */
+#define GLB_BASE ((uint32_t)0x40000000)
+#define GLB_GPIO_CFGCTL34_OFFSET (0x190)
+#define GLB_GPIO_CFGCTL0_OFFSET (0x100)
+#define GLB_UART_SIG_SEL_0_OFFSET (0xC0)
 void pinctrl_configure_uart(uint8_t pin, uint8_t func)
 {
 	/* uart func for BL602 and BL702 Only*/
 	uint32_t regval;
 	uint8_t sig;
 	uint8_t sig_pos;
-	#define GLB_UART_SIG_SEL_0_OFFSET (0xC0)
-	regval = getreg32(GLB_BASE + GLB_UART_SIG_SEL_0_OFFSET);
+
+	regval = sys_read32(GLB_BASE + GLB_UART_SIG_SEL_0_OFFSET);
 
 	sig = pin % 8;
 	sig_pos = sig << 2;
@@ -35,7 +37,7 @@ void pinctrl_configure_uart(uint8_t pin, uint8_t func)
 		}
 	}
 
-	putreg32(regval, GLB_BASE + GLB_UART_SIG_SEL_0_OFFSET);
+	sys_write32(regval, GLB_BASE + GLB_UART_SIG_SEL_0_OFFSET);
 }
 
 void pinctrl_init_pin(pinctrl_soc_pin_t pin)
@@ -55,15 +57,15 @@ void pinctrl_init_pin(pinctrl_soc_pin_t pin)
 	drive = BFLB_PINMUX_GET_DRIVER_STRENGTH(pin);
 
 	/* Disable output anyway */
-	regval = getreg32(GLB_BASE + GLB_GPIO_CFGCTL34_OFFSET + ((real_pin >> 5) << 2));
+	regval = sys_read32(GLB_BASE + GLB_GPIO_CFGCTL34_OFFSET + ((real_pin >> 5) << 2));
 	regval &= ~(1 << (pin & 0x1f));
-	putreg32(regval, GLB_BASE + GLB_GPIO_CFGCTL34_OFFSET + ((real_pin >> 5) << 2));
+	sys_write32(regval, GLB_BASE + GLB_GPIO_CFGCTL34_OFFSET + ((real_pin >> 5) << 2));
 
 #if defined(BL702)
 #define GLB_GPIO_USE_PSRAM__IO_OFFSET 0x88
 	/* SF pad use exclusive IE/PD/PU/DRIVE/SMTCTRL */
 	if (real_pin >= 23 && real_pin <= 28) {
-		if (getreg32(GLB_BASE + GLB_GPIO_USE_PSRAM__IO_OFFSET) & (1 << (real_pin - 23))) {
+		if (sys_read32(GLB_BASE + GLB_GPIO_USE_PSRAM__IO_OFFSET) & (1 << (real_pin - 23))) {
 		real_pin += 9;
 		}
 	}
@@ -71,10 +73,10 @@ void pinctrl_init_pin(pinctrl_soc_pin_t pin)
 	is_odd = real_pin & 1;
 
 	cfg_address = GLB_BASE + GLB_GPIO_CFGCTL0_OFFSET + (real_pin / 2 * 4);
-	cfg = getreg32(cfg_address);
+	cfg = sys_read32(cfg_address);
 	cfg &= ~(0xffff << (16 * is_odd));
 
-	regval = getreg32(GLB_BASE + GLB_GPIO_CFGCTL34_OFFSET + ((real_pin >> 5) << 2));
+	regval = sys_read32(GLB_BASE + GLB_GPIO_CFGCTL34_OFFSET + ((real_pin >> 5) << 2));
 
 	if (mode == BFLB_PINMUX_MODE_analog) {
 		regval &= ~(1 << (real_pin & 0x1f));
@@ -94,7 +96,7 @@ void pinctrl_init_pin(pinctrl_soc_pin_t pin)
 		}
 	}
 
-	putreg32(regval, GLB_BASE + GLB_GPIO_CFGCTL34_OFFSET + ((real_pin >> 5) << 2));
+	sys_write32(regval, GLB_BASE + GLB_GPIO_CFGCTL34_OFFSET + ((real_pin >> 5) << 2));
 
 	uint8_t pull_up = BFLB_PINMUX_GET_PULL_UP(pin);
 	uint8_t pull_down = BFLB_PINMUX_GET_PULL_DOWN(pin);
@@ -111,7 +113,7 @@ void pinctrl_init_pin(pinctrl_soc_pin_t pin)
 
 	cfg |= (drive << (is_odd * 16 + 2));
 	cfg |= (function << (is_odd * 16 + 8));
-	putreg32(cfg, cfg_address);
+	sys_write32(cfg, cfg_address);
 }
 
 int pinctrl_configure_pins(const pinctrl_soc_pin_t *pins, uint8_t pin_cnt,
