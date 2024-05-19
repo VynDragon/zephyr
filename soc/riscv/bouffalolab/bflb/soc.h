@@ -22,8 +22,6 @@
 /* Add include for DTS generated information */
 #include <zephyr/devicetree.h>
 
-#include <bl_soc_hbn.h>
-
 /* RISC-V Machine Timer configuration */
 #define RISCV_MTIME_BASE             0x0200BFF8
 #define RISCV_MTIMECMP_BASE          0x02004000
@@ -40,6 +38,18 @@
 #ifdef CONFIG_RISCV_GP
 ulong_t __soc_get_gp_initial_value(void);
 #endif
+
+/* Addresses */
+
+#include <hardware/bflb_soc.h>
+#include <hardware/aon_reg.h>
+#include <hardware/glb_reg.h>
+#include <hardware/hbn_reg.h>
+#include <hardware/l1c_reg.h>
+#include <hardware/pds_reg.h>
+#include <hardware/tzc_sec_reg.h>
+#include <hardware/ef_ctrl_reg.h>
+#include <supplementary.h>
 
 #endif /* !_ASMLANGUAGE */
 
