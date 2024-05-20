@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2024, ATL Electronics
+ * Copyright (c) 2024, MASSDRIVER EI (massdriver.space)
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -7,346 +7,390 @@
 
 /**
  * @brief UART driver for Bouffalo Lab MCU family.
+ * Based on bouffalo_SDK 2.0 UART driver
  */
+
 #include <zephyr/drivers/uart.h>
 #include <zephyr/drivers/pinctrl.h>
-#include <zephyr/irq.h>
-#include <bflb_pinctrl.h>
-#include <bflb_uart.h>
-#include <bflb_glb.h>
-#include <soc.h>
+#include <zephyr/arch/common/sys_io.h>
+#include <zephyr/drivers/timer/system_timer.h>
 
-#define UART_CTS_FLOWCONTROL_ENABLE	(0)
-#define UART_RTS_FLOWCONTROL_ENABLE	(0)
-#define UART_MSB_FIRST_ENABLE		(0)
-#define UART_DEFAULT_RTO_TIMEOUT	(255)
-#define UART_CLOCK_DIV			(0)
+
+#include <soc.h>
+#include <common_hardware/uart_reg.h>
+#include <bflb_uart.h>
+
+
 
 struct bflb_config {
-	uint32_t *reg;
-	const struct pinctrl_dev_config *pinctrl_cfg;
-	uint32_t periph_id;
-	UART_CFG_Type uart_cfg;
-	UART_FifoCfg_Type fifo_cfg;
-#ifdef CONFIG_UART_INTERRUPT_DRIVEN
-	uart_irq_config_func_t irq_config_func;
-#endif /* CONFIG_UART_INTERRUPT_DRIVEN */
+	const struct pinctrl_dev_config *pincfg;
+	uint32_t baudrate;
+	uint8_t direction;
+	uint8_t data_bits;
+	uint8_t stop_bits;
+	uint8_t parity;
+	uint8_t bit_order;
+	uint8_t flow_ctrl;
+	uint8_t tx_fifo_threshold;
+	uint8_t rx_fifo_threshold;
+	uint32_t base_reg;
 };
 
-struct bflb_data {
-#ifdef CONFIG_UART_INTERRUPT_DRIVEN
-	uart_irq_callback_user_data_t user_cb;
-	void *user_data;
-#endif /* CONFIG_UART_INTERRUPT_DRIVEN */
-};
 
-static int uart_bl_init(const struct device *dev)
+static void uart_bflb_enabled(const struct device *dev, uint32_t enable)
 {
 	const struct bflb_config *cfg = dev->config;
+	uint32_t rxt = 0;
+	uint32_t txt = 0;
 
-	pinctrl_apply_state(cfg->pinctrl_cfg, PINCTRL_STATE_DEFAULT);
+	if (enable > 1)
+	{
+		enable = 1;
+	}
 
-	GLB_Set_UART_CLK(1, HBN_UART_CLK_160M, UART_CLOCK_DIV);
+	txt = sys_read32(cfg->base_reg + UART_UTX_CONFIG_OFFSET);
+	txt = (txt & ~UART_CR_UTX_EN) | enable;
+	rxt = sys_read32(cfg->base_reg + UART_URX_CONFIG_OFFSET);
+	rxt = (rxt & ~UART_CR_URX_EN) | enable;
+	sys_write32(rxt, cfg->base_reg + UART_URX_CONFIG_OFFSET);
+	sys_write32(txt, cfg->base_reg + UART_UTX_CONFIG_OFFSET);
+}
 
-	UART_IntMask(cfg->periph_id, UART_INT_ALL, 1);
-	UART_Disable(cfg->periph_id, UART_TXRX);
+static uint32_t uart_bflb_get_crystal_frequency(void)
+{
+	uint32_t tmpVal;
 
-	UART_Init(cfg->periph_id, (UART_CFG_Type *)&cfg->uart_cfg);
-	UART_TxFreeRun(cfg->periph_id, 1);
-	UART_SetRxTimeoutValue(cfg->periph_id, UART_DEFAULT_RTO_TIMEOUT);
-	UART_FifoConfig(cfg->periph_id, (UART_FifoCfg_Type *)&cfg->fifo_cfg);
-	UART_Enable(cfg->periph_id, UART_TXRX);
+	/* get clkpll_sdmin */
+	tmpVal = sys_read32(PDS_BASE + PDS_CLKPLL_SDM_OFFSET);
+	tmpVal = (tmpVal & PDS_CLKPLL_SDMIN_MSK) >> PDS_CLKPLL_SDMIN_POS;
 
-#ifdef CONFIG_UART_INTERRUPT_DRIVEN
-	cfg->irq_config_func(dev);
-#endif /* CONFIG_UART_INTERRUPT_DRIVEN */
+	switch (tmpVal) {
+		case 0x500000:
+		/* 24m */
+		return (24 * 1000 * 1000);
+
+		case 0x3C0000:
+		/* 32m */
+		return (32 * 1000 * 1000);
+
+		case 0x320000:
+		/* 38.4m */
+		return (384 * 100 * 1000);
+
+		case 0x300000:
+		/* 40m */
+		return (40 * 1000 * 1000);
+
+		case 0x49D39D:
+		/* 26m */
+		return (26 * 1000 * 1000);
+
+		default:
+		/* 32m */
+		return (32 * 1000 * 1000);
+	}
+}
+
+static uint32_t uart_bflb_get_PLL_frequency(void)
+{
+	uint32_t tmpVal;
+
+	tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG0_OFFSET);
+	tmpVal = (tmpVal & GLB_REG_PLL_SEL_MSK) >> GLB_REG_PLL_SEL_POS;
+
+	if (tmpVal == 0) {
+		/* pll 48m */
+		return (48 * 1000 * 1000);
+	} else if (tmpVal == 1) {
+		/* pll 120m */
+		return (120 * 1000 * 1000);
+	} else if (tmpVal == 2) {
+		/* pll 160m */
+		return (160 * 1000 * 1000);
+	} else if (tmpVal == 3) {
+		/* pll 192m */
+		return (192 * 1000 * 1000);
+	} else {
+		return 0;
+	}
+}
+
+static uint32_t uart_bflb_get_clock(void)
+{
+	uint32_t tmpVal = 0;
+	uint32_t uart_divider = 0;
+	uint32_t hclk_divider = 0;
+
+
+	tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG2_OFFSET);
+	uart_divider = (tmpVal & GLB_UART_CLK_DIV_MSK) >> GLB_UART_CLK_DIV_POS;
+
+
+	tmpVal = sys_read32(HBN_BASE + HBN_GLB_OFFSET);
+	tmpVal = (tmpVal & HBN_UART_CLK_SEL_MSK) >> HBN_UART_CLK_SEL_POS;
+
+
+	if (tmpVal == 0)
+	{
+		/* FCLK */
+		tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG0_OFFSET);
+		hclk_divider = (tmpVal & GLB_REG_HCLK_DIV_MSK) >> GLB_REG_HCLK_DIV_POS;
+
+		tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG0_OFFSET);
+		tmpVal = (tmpVal & GLB_HBN_ROOT_CLK_SEL_MSK) >> GLB_HBN_ROOT_CLK_SEL_POS;
+
+		if (tmpVal == 0)
+		{
+			/* RC32M clock */
+			tmpVal = (32 * 1000 * 1000) / (hclk_divider + 1);
+			return (tmpVal / (uart_divider + 1));
+		}
+		else if (tmpVal == 1)
+		{
+			/* Crystal clock */
+			tmpVal = uart_bflb_get_crystal_frequency() / (hclk_divider + 1);
+			return (tmpVal / (uart_divider + 1));
+		}
+		else if (tmpVal > 1)
+		{
+			/* PLL Clock */
+			tmpVal = uart_bflb_get_PLL_frequency() / (hclk_divider + 1);
+			return (tmpVal / (uart_divider + 1));
+
+		}
+	}
+	else
+	{
+		/* UART PLL 160 */
+		return ((160 * 1000 * 1000) / (uart_divider + 1));
+	}
+	return 0;
+}
+
+static int uart_bflb_configure(const struct device *dev)
+{
+	const struct bflb_config *cfg = dev->config;
+	uint32_t tx_cfg = 0;
+	uint32_t rx_cfg = 0;
+	uint32_t divider = 0;
+	uint32_t tmpVal = 0;
+
+	//bflb_uart_init(uart, &(cfg->config));
+	divider = (uart_bflb_get_clock() * 10 / cfg->baudrate + 5) / 10;
+	if (divider >= 0xFFFF)
+	{
+		divider = 0xFFFF - 1;
+	}
+
+	uart_bflb_enabled(dev, 0);
+
+	sys_write32(((divider - 1) << 0x10) | ((divider - 1) & 0xFFFF), \
+cfg->base_reg + UART_BIT_PRD_OFFSET);
+
+
+	/* Configure Parity */
+	tx_cfg = sys_read32(cfg->base_reg + UART_UTX_CONFIG_OFFSET);
+	rx_cfg = sys_read32(cfg->base_reg + UART_URX_CONFIG_OFFSET);
+
+	switch (cfg->parity) {
+		case UART_PARITY_NONE:
+			tx_cfg &= ~UART_CR_UTX_PRT_EN;
+			rx_cfg &= ~UART_CR_URX_PRT_EN;
+			break;
+		case UART_PARITY_ODD:
+			tx_cfg |= UART_CR_UTX_PRT_EN;
+			tx_cfg |= UART_CR_UTX_PRT_SEL;
+			rx_cfg |= UART_CR_URX_PRT_EN;
+			rx_cfg |= UART_CR_URX_PRT_SEL;
+			break;
+		case UART_PARITY_EVEN:
+			tx_cfg |= UART_CR_UTX_PRT_EN;
+			tx_cfg &= ~UART_CR_UTX_PRT_SEL;
+			rx_cfg |= UART_CR_URX_PRT_EN;
+			rx_cfg &= ~UART_CR_URX_PRT_SEL;
+			break;
+		default:
+			break;
+	}
+
+	/* Configure data bits */
+	tx_cfg &= ~UART_CR_UTX_BIT_CNT_D_MASK;
+	tx_cfg |= (cfg->data_bits + 4) << UART_CR_UTX_BIT_CNT_D_SHIFT;
+	rx_cfg &= ~UART_CR_URX_BIT_CNT_D_MASK;
+	rx_cfg |= (cfg->data_bits + 4) << UART_CR_URX_BIT_CNT_D_SHIFT;
+
+	/* Configure tx stop bits */
+	tx_cfg &= ~UART_CR_UTX_BIT_CNT_P_MASK;
+	tx_cfg |= cfg->stop_bits << UART_CR_UTX_BIT_CNT_P_SHIFT;
+
+	/* Configure tx cts flow control function */
+	if (cfg->flow_ctrl & UART_FLOWCTRL_CTS) {
+		tx_cfg |= UART_CR_UTX_CTS_EN;
+	} else {
+		tx_cfg &= ~UART_CR_UTX_CTS_EN;
+	}
+
+	rx_cfg &= ~UART_CR_URX_DEG_EN;
+
+
+	/* Write config */
+	sys_write32(tx_cfg, cfg->base_reg + UART_UTX_CONFIG_OFFSET);
+	sys_write32(rx_cfg, cfg->base_reg + UART_URX_CONFIG_OFFSET);
+
+	/* enable hardware control RTS */
+	#if defined(CONFIG_SOC_SERIES_BL6)
+	tmpVal = sys_read32(cfg->base_reg + UART_URX_CONFIG_OFFSET);
+	tmpVal &= ~UART_CR_URX_RTS_SW_MODE;
+	sys_write32(tmpVal, cfg->base_reg + UART_URX_CONFIG_OFFSET);
+	#else
+	tmpVal = sys_read32(cfg->base_reg + UART_SW_MODE_OFFSET);
+	tmpVal &= ~UART_CR_URX_RTS_SW_MODE;
+	sys_write32(tmpVal, cfg->base_reg + UART_SW_MODE_OFFSET);
+	#endif
+
+	/* disable inversion */
+	tmpVal = sys_read32(cfg->base_reg + UART_DATA_CONFIG_OFFSET);
+	tmpVal &= ~UART_CR_UART_BIT_INV;
+	sys_write32(tmpVal, cfg->base_reg + UART_DATA_CONFIG_OFFSET);
+
+
+	/* TX free run enable */
+	tmpVal = sys_read32(cfg->base_reg + UART_UTX_CONFIG_OFFSET);
+	tmpVal |= UART_CR_UTX_FRM_EN;
+	sys_write32(tmpVal, cfg->base_reg + UART_UTX_CONFIG_OFFSET);
+
+
+	/* Configure FIFO thresholds */
+	tmpVal = sys_read32(cfg->base_reg + UART_FIFO_CONFIG_1_OFFSET);
+	tmpVal &= ~UART_TX_FIFO_TH_MASK;
+	tmpVal &= ~UART_RX_FIFO_TH_MASK;
+	tmpVal |= (cfg->tx_fifo_threshold << UART_TX_FIFO_TH_SHIFT) & UART_TX_FIFO_TH_MASK;
+	tmpVal |= (cfg->rx_fifo_threshold << UART_RX_FIFO_TH_SHIFT) & UART_RX_FIFO_TH_MASK;
+	sys_write32(tmpVal, cfg->base_reg + UART_FIFO_CONFIG_1_OFFSET);
+
+	/* Clear FIFO */
+	tmpVal = sys_read32(cfg->base_reg + UART_FIFO_CONFIG_0_OFFSET);
+	tmpVal |= UART_TX_FIFO_CLR;
+	tmpVal |= UART_RX_FIFO_CLR;
+	tmpVal &= ~UART_DMA_TX_EN;
+	tmpVal &= ~UART_DMA_RX_EN;
+	sys_write32(tmpVal, cfg->base_reg + UART_FIFO_CONFIG_0_OFFSET);
+
+	/* enable all irqs */
+	sys_write32(0xFFFFFFFF, cfg->base_reg + UART_INT_MASK_OFFSET);
+
+	uart_bflb_enabled(dev, 1);
 
 	return 0;
 }
 
-static int uart_bl_poll_in(const struct device *dev, unsigned char *c)
+static int uart_bflb_init(const struct device *dev)
 {
 	const struct bflb_config *cfg = dev->config;
 
-	return UART_ReceiveData(cfg->periph_id, (uint8_t *)c, 1) ? 0 : -1;
+	pinctrl_apply_state(cfg->pincfg, PINCTRL_STATE_DEFAULT);
+	return uart_bflb_configure(dev);
 }
 
-static void uart_bl_poll_out(const struct device *dev, unsigned char c)
+static int uart_bflb_poll_in(const struct device *dev, unsigned char *c)
 {
 	const struct bflb_config *cfg = dev->config;
 
-	while (UART_GetTxFifoCount(cfg->periph_id) == 0) {
-		;
+	if ((sys_read32(cfg->base_reg + UART_FIFO_CONFIG_1_OFFSET) & UART_RX_FIFO_CNT_MASK) != 0) {
+		*c = sys_read8(cfg->base_reg + UART_FIFO_RDATA_OFFSET);
+		return 0;
 	}
 
-	(void)UART_SendData(cfg->periph_id, (uint8_t *)&c, 1);
+	return -1;
 }
 
-#ifdef CONFIG_UART_INTERRUPT_DRIVEN
-static int uart_bl_err_check(const struct device *dev)
+static void uart_bflb_poll_out(const struct device *dev, unsigned char c)
 {
-	const struct bflb_config *const cfg = dev->config;
-	uint32_t status = BL_RD_REG(cfg->reg, UART_INT_STS);
-	uint32_t tmpVal = BL_RD_REG(cfg->reg, UART_INT_CLEAR);
-	int errors = 0;
+	const struct bflb_config *cfg = dev->config;
 
-	if (status & BIT(UART_INT_RX_FER)) {
-		tmpVal |= BIT(UART_INT_RX_FER);
+	uint64_t start_time;
 
-		errors |= UART_ERROR_OVERRUN;
+	start_time = sys_clock_cycle_get_64();
+	while ((sys_read32(cfg->base_reg + UART_FIFO_CONFIG_1_OFFSET) & UART_TX_FIFO_CNT_MASK) == 0)
+	{
+		/* TODO: Incorrect usage of mtime */
+		if ((sys_clock_cycle_get_64() - start_time) > 100000) {
+			return;
+		}
 	}
-
-	if (status & BIT(UART_INT_TX_FER)) {
-		tmpVal |= BIT(UART_INT_TX_FER);
-
-		errors |= UART_ERROR_OVERRUN;
-	}
-
-	if (status & BIT(UART_INT_PCE)) {
-		tmpVal |= BIT(UART_INT_PCE);
-
-		errors |= UART_ERROR_PARITY;
-	}
-
-	BL_WR_REG(cfg->reg, UART_INT_CLEAR, tmpVal);
-
-	return errors;
+	sys_write8(c, cfg->base_reg + UART_FIFO_WDATA_OFFSET);
+	return;
 }
-
-int uart_bl_fifo_fill(const struct device *dev, const uint8_t *tx_data, int len)
-{
-	const struct bflb_config *const cfg = dev->config;
-	uint8_t num_tx = 0U;
-
-	while ((len - num_tx > 0) && (UART_GetTxFifoCount(cfg->periph_id) > 0)) {
-		BL_WR_BYTE(cfg->reg + UART_FIFO_WDATA_OFFSET, tx_data[num_tx++]);
-	}
-
-	return num_tx;
-}
-
-int uart_bl_fifo_read(const struct device *dev, uint8_t *rx_data, const int size)
-{
-	const struct bflb_config *const cfg = dev->config;
-	uint8_t num_rx = 0U;
-
-	while ((size - num_rx > 0) && (UART_GetRxFifoCount(cfg->periph_id) > 0)) {
-		rx_data[num_rx++] = BL_RD_BYTE(cfg->reg + UART_FIFO_RDATA_OFFSET);
-	}
-
-	return num_rx;
-}
-
-void uart_bl_irq_tx_enable(const struct device *dev)
-{
-	const struct bflb_config *const cfg = dev->config;
-
-	UART_IntMask(cfg->periph_id, UART_INT_TX_FIFO_REQ, 1);
-}
-
-void uart_bl_irq_tx_disable(const struct device *dev)
-{
-	const struct bflb_config *const cfg = dev->config;
-
-	UART_IntMask(cfg->periph_id, UART_INT_TX_FIFO_REQ, 0);
-}
-
-int uart_bl_irq_tx_ready(const struct device *dev)
-{
-	const struct bflb_config *const cfg = dev->config;
-	uint32_t maskVal = BL_RD_REG(cfg->reg, UART_INT_MASK);
-
-	return (UART_GetTxFifoCount(cfg->periph_id) > 0)
-	       && BL_IS_REG_BIT_SET(maskVal, UART_CR_UTX_FIFO_MASK);
-}
-
-int uart_bl_irq_tx_complete(const struct device *dev)
-{
-	const struct bflb_config *const cfg = dev->config;
-
-	return !UART_GetTxBusBusyStatus(cfg->periph_id);
-}
-
-void uart_bl_irq_rx_enable(const struct device *dev)
-{
-	const struct bflb_config *const cfg = dev->config;
-
-	UART_IntMask(cfg->periph_id, UART_INT_RX_FIFO_REQ, 1);
-}
-
-void uart_bl_irq_rx_disable(const struct device *dev)
-{
-	const struct bflb_config *const cfg = dev->config;
-
-	UART_IntMask(cfg->periph_id, UART_INT_RX_FIFO_REQ, 0);
-}
-
-int uart_bl_irq_rx_ready(const struct device *dev)
-{
-	const struct bflb_config *const cfg = dev->config;
-
-	return UART_GetRxFifoCount(cfg->periph_id) > 0;
-}
-
-void uart_bl_irq_err_enable(const struct device *dev)
-{
-	const struct bflb_config *const cfg = dev->config;
-
-	UART_IntMask(cfg->periph_id, UART_INT_PCE
-				   | UART_INT_TX_FER
-				   | UART_INT_RX_FER, 1);
-}
-
-void uart_bl_irq_err_disable(const struct device *dev)
-{
-	const struct bflb_config *const cfg = dev->config;
-
-	UART_IntMask(cfg->periph_id, UART_INT_PCE
-				   | UART_INT_TX_FER
-				   | UART_INT_RX_FER, 0);
-}
-
-int uart_bl_irq_is_pending(const struct device *dev)
-{
-	const struct bflb_config *const cfg = dev->config;
-	uint32_t tmpVal = BL_RD_REG(cfg->reg, UART_INT_STS);
-	uint32_t maskVal = BL_RD_REG(cfg->reg, UART_INT_MASK);
-
-	return ((BL_IS_REG_BIT_SET(tmpVal,  UART_URX_FIFO_INT) &&
-		 BL_IS_REG_BIT_SET(maskVal, UART_CR_URX_FIFO_MASK)) ||
-		(BL_IS_REG_BIT_SET(tmpVal,  UART_UTX_FIFO_INT) &&
-		 BL_IS_REG_BIT_SET(maskVal, UART_CR_UTX_FIFO_MASK)));
-}
-
-int uart_bl_irq_update(const struct device *dev)
-{
-	ARG_UNUSED(dev);
-
-	return 1;
-}
-
-void uart_bl_irq_callback_set(const struct device *dev,
-			      uart_irq_callback_user_data_t cb,
-			      void *user_data)
-{
-	struct bflb_data *const data = dev->data;
-
-	data->user_cb = cb;
-	data->user_data = user_data;
-}
-
-static void uart_bl_isr(const struct device *dev)
-{
-	struct bflb_data *const data = dev->data;
-
-	if (data->user_cb) {
-		data->user_cb(dev, data->user_data);
-	}
-}
-#endif /* CONFIG_UART_INTERRUPT_DRIVEN */
 
 #ifdef CONFIG_PM_DEVICE
 static int uart_bl_pm_control(const struct device *dev,
 			      enum pm_device_action action)
 {
-	const struct bflb_config *cfg = dev->config;
+	const struct bl_config *cfg = dev->config;
 
 	switch (action) {
 	case PM_DEVICE_ACTION_RESUME:
-		(void)pinctrl_apply_state(cfg->pinctrl_cfg, PINCTRL_STATE_DEFAULT);
-		UART_Enable(cfg->periph_id, UART_TXRX);
+		(void)pinctrl_apply_state(cfg->pincfg, PINCTRL_STATE_DEFAULT);
+		const struct bflb_config *cfg = dev->config;
+		uint32_t tx_cfg;
+		uint32_t rx_cfg;
+
+		tx_cfg = sys_read32(cfg->base_reg + UART_UTX_CONFIG_OFFSET);
+		rx_cfg = sys_read32(cfg->base_reg + UART_URX_CONFIG_OFFSET);
+		tx_cfg |= UART_CR_UTX_EN;
+		rx_cfg |= UART_CR_URX_EN;
+		sys_write32(tx_cfg, cfg->base_reg + UART_UTX_CONFIG_OFFSET);
+		sys_write32(rx_cfg, cfg->base_reg + UART_URX_CONFIG_OFFSET);
 		break;
 	case PM_DEVICE_ACTION_SUSPEND:
-		if (pinctrl_apply_state(cfg->pinctrl_cfg, PINCTRL_STATE_SLEEP)) {
-			return -ENOTSUP;
+		if (pinctrl_apply_state(cfg->pincfg, PINCTRL_STATE_SLEEP)) {
+			return -134;
 		}
-		UART_Disable(cfg->periph_id, UART_TXRX);
+		const struct bflb_config *cfg = dev->config;
+		uint32_t tx_cfg;
+		uint32_t rx_cfg;
+
+		tx_cfg = sys_read32(cfg->base_reg + UART_UTX_CONFIG_OFFSET);
+		rx_cfg = sys_read32(cfg->base_reg + UART_URX_CONFIG_OFFSET);
+		tx_cfg &= ~UART_CR_UTX_EN;
+		rx_cfg &= ~UART_CR_URX_EN;
+		sys_write32(tx_cfg, cfg->base_reg + UART_UTX_CONFIG_OFFSET);
+		sys_write32(rx_cfg, cfg->base_reg + UART_URX_CONFIG_OFFSET);
 		break;
 	default:
-		return -ENOTSUP;
+		return -134;
 	}
 
 	return 0;
 }
 #endif /* CONFIG_PM_DEVICE */
 
-static const struct uart_driver_api uart_bl_driver_api = {
-	.poll_in = uart_bl_poll_in,
-	.poll_out = uart_bl_poll_out,
-#ifdef CONFIG_UART_INTERRUPT_DRIVEN
-	.err_check = uart_bl_err_check,
-	.fifo_fill = uart_bl_fifo_fill,
-	.fifo_read = uart_bl_fifo_read,
-	.irq_tx_enable = uart_bl_irq_tx_enable,
-	.irq_tx_disable = uart_bl_irq_tx_disable,
-	.irq_tx_ready = uart_bl_irq_tx_ready,
-	.irq_tx_complete = uart_bl_irq_tx_complete,
-	.irq_rx_enable = uart_bl_irq_rx_enable,
-	.irq_rx_disable = uart_bl_irq_rx_disable,
-	.irq_rx_ready = uart_bl_irq_rx_ready,
-	.irq_err_enable = uart_bl_irq_err_enable,
-	.irq_err_disable = uart_bl_irq_err_disable,
-	.irq_is_pending = uart_bl_irq_is_pending,
-	.irq_update = uart_bl_irq_update,
-	.irq_callback_set = uart_bl_irq_callback_set,
-#endif /* CONFIG_UART_INTERRUPT_DRIVEN */
+static const struct uart_driver_api uart_bflb_driver_api = {
+	.poll_in = uart_bflb_poll_in,
+	.poll_out = uart_bflb_poll_out,
 };
 
-#ifdef CONFIG_UART_INTERRUPT_DRIVEN
-#define BFLB_UART_IRQ_HANDLER_DECL(n)						\
-	static void uart_bl_config_func_##n(const struct device *dev);
-#define BFLB_UART_IRQ_HANDLER_FUNC(n)						\
-	.irq_config_func = uart_bl_config_func_##n
-#define BFLB_UART_IRQ_HANDLER(n)						\
-	static void uart_bl_config_func_##n(const struct device *dev)		\
-	{									\
-		IRQ_CONNECT(DT_INST_IRQN(n),					\
-			    DT_INST_IRQ(n, priority),				\
-			    uart_bl_isr,					\
-			    DEVICE_DT_INST_GET(n),				\
-			    0);							\
-		irq_enable(DT_INST_IRQN(n));					\
-	}
-#else /* CONFIG_UART_INTERRUPT_DRIVEN */
-#define BFLB_UART_IRQ_HANDLER_DECL(n)
-#define BFLB_UART_IRQ_HANDLER_FUNC(n)
-#define BFLB_UART_IRQ_HANDLER(n)
-#endif /* CONFIG_UART_INTERRUPT_DRIVEN */
-
-#define BFLB_UART_INIT(n)							\
-	PINCTRL_DT_INST_DEFINE(n);						\
+#define BL_UART_INIT(instance)							\
+	PINCTRL_DT_INST_DEFINE(instance);					\
+	static const struct bflb_config bl_uart##instance##_config = {		\
+		.pincfg = PINCTRL_DT_INST_DEV_CONFIG_GET(instance),		\
+		.base_reg = DT_INST_REG_ADDR(instance),				\
 										\
-	BFLB_UART_IRQ_HANDLER_DECL(n)						\
+		.baudrate = DT_INST_PROP(instance, current_speed),	\
+		.data_bits = UART_DATA_BITS_8,				\
+		.stop_bits = UART_STOP_BITS_1,				\
+		.parity = UART_PARITY_NONE,				\
+		.bit_order = UART_MSB_FIRST,				\
+		.flow_ctrl = UART_FLOWCTRL_NONE,			\
+		.tx_fifo_threshold = 15,					\
+		.rx_fifo_threshold = 15,					\
 										\
-	static struct bflb_data uart##n##_bl_data;				\
-	static const struct bflb_config uart##n##_bl_config = {			\
-		.reg = (uint32_t *)DT_INST_REG_ADDR(n),				\
-		.pinctrl_cfg = PINCTRL_DT_INST_DEV_CONFIG_GET(n),		\
-		.periph_id = DT_INST_PROP(n, peripheral_id),			\
-										\
-		.uart_cfg.baudRate = DT_INST_PROP(n, current_speed),		\
-		.uart_cfg.dataBits = UART_DATABITS_8,				\
-		.uart_cfg.stopBits = UART_STOPBITS_1,				\
-		.uart_cfg.parity = UART_PARITY_NONE,				\
-		.uart_cfg.uartClk = SOC_BOUFFALOLAB_BL_PLL160_FREQ_HZ,		\
-		.uart_cfg.ctsFlowControl = UART_CTS_FLOWCONTROL_ENABLE,		\
-		.uart_cfg.rtsSoftwareControl = UART_RTS_FLOWCONTROL_ENABLE,	\
-		.uart_cfg.byteBitInverse = UART_MSB_FIRST_ENABLE,		\
-										\
-		.fifo_cfg.txFifoDmaThreshold = 1,				\
-		.fifo_cfg.rxFifoDmaThreshold = 1,				\
-		.fifo_cfg.txFifoDmaEnable = 0,					\
-		.fifo_cfg.rxFifoDmaEnable = 0,					\
-										\
-		BFLB_UART_IRQ_HANDLER_FUNC(n)					\
 	};									\
-	DEVICE_DT_INST_DEFINE(n, &uart_bl_init,					\
+	DEVICE_DT_INST_DEFINE(instance, &uart_bflb_init,			\
 			      uart_bl_pm_control,				\
-			      &uart##n##_bl_data,				\
-			      &uart##n##_bl_config, PRE_KERNEL_1,		\
+			      NULL,						\
+			      &bl_uart##instance##_config, PRE_KERNEL_1,	\
 			      CONFIG_KERNEL_INIT_PRIORITY_DEVICE,		\
-			      &uart_bl_driver_api);				\
-										\
-	BFLB_UART_IRQ_HANDLER(n)
+			      &uart_bflb_driver_api);
 
-DT_INST_FOREACH_STATUS_OKAY(BFLB_UART_INIT)
+DT_INST_FOREACH_STATUS_OKAY(BL_UART_INIT)

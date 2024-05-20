@@ -4,7 +4,7 @@
 if SOC_SERIES_BL6
 
 config SYS_CLOCK_HW_CYCLES_PER_SEC
-	default 10000000
+	default 160000000
 
 config NUM_IRQS
 	default 64
