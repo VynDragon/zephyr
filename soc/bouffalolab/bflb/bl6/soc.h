@@ -51,6 +51,12 @@
 ulong_t __soc_get_gp_initial_value(void);
 #endif
 
+#ifdef CONFIG_BFLB_TO_ITCM
+#define ITCMF __attribute__((section(".itcm")))
+#else
+#define ITCMF
+#endif
+
 #endif /* !_ASMLANGUAGE */
 
 #endif /* _SOC__H_ */

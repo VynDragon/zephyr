@@ -37,7 +37,7 @@ struct bflb_config {
 };
 
 
-static void uart_bflb_enabled(const struct device *dev, uint32_t enable)
+static void ITCMF uart_bflb_enabled(const struct device *dev, uint32_t enable)
 {
 	const struct bflb_config *cfg = dev->config;
 	uint32_t rxt = 0;
@@ -56,7 +56,7 @@ static void uart_bflb_enabled(const struct device *dev, uint32_t enable)
 	sys_write32(txt, cfg->base_reg + UART_UTX_CONFIG_OFFSET);
 }
 
-static uint32_t uart_bflb_get_crystal_frequency(void)
+static uint32_t ITCMF uart_bflb_get_crystal_frequency(void)
 {
 	uint32_t tmpVal;
 
@@ -91,7 +91,7 @@ static uint32_t uart_bflb_get_crystal_frequency(void)
 	}
 }
 
-static uint32_t uart_bflb_get_PLL_frequency(void)
+static uint32_t ITCMF uart_bflb_get_PLL_frequency(void)
 {
 	uint32_t tmpVal;
 
@@ -115,7 +115,7 @@ static uint32_t uart_bflb_get_PLL_frequency(void)
 	}
 }
 
-static uint32_t uart_bflb_get_clock(void)
+static uint32_t ITCMF uart_bflb_get_clock(void)
 {
 	uint32_t tmpVal = 0;
 	uint32_t uart_divider = 0;
@@ -167,7 +167,7 @@ static uint32_t uart_bflb_get_clock(void)
 	return 0;
 }
 
-static int uart_bflb_configure(const struct device *dev)
+static int ITCMF uart_bflb_configure(const struct device *dev)
 {
 	const struct bflb_config *cfg = dev->config;
 	uint32_t tx_cfg = 0;
@@ -284,7 +284,7 @@ cfg->base_reg + UART_BIT_PRD_OFFSET);
 	return 0;
 }
 
-static int uart_bflb_init(const struct device *dev)
+static int ITCMF uart_bflb_init(const struct device *dev)
 {
 	const struct bflb_config *cfg = dev->config;
 
@@ -292,7 +292,7 @@ static int uart_bflb_init(const struct device *dev)
 	return uart_bflb_configure(dev);
 }
 
-static int uart_bflb_poll_in(const struct device *dev, unsigned char *c)
+static int ITCMF uart_bflb_poll_in(const struct device *dev, unsigned char *c)
 {
 	const struct bflb_config *cfg = dev->config;
 
@@ -304,7 +304,7 @@ static int uart_bflb_poll_in(const struct device *dev, unsigned char *c)
 	return -1;
 }
 
-static void uart_bflb_poll_out(const struct device *dev, unsigned char c)
+static void ITCMF uart_bflb_poll_out(const struct device *dev, unsigned char c)
 {
 	const struct bflb_config *cfg = dev->config;
 

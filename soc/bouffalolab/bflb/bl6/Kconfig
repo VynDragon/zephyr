@@ -22,3 +22,9 @@ config SOC_SERIES_BL6
 	select RISCV_ISA_EXT_C
 	select RISCV_ISA_EXT_ZICSR
 	select RISCV_ISA_EXT_ZIFENCEI
+
+config BFLB_TO_ITCM
+	bool "Link Code into ITCM Memory"
+	default y
+	depends on SOC_SERIES_BL6
+
