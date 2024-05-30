@@ -21,14 +21,14 @@ static void system_bor_init(void)
 {
 	uint32_t tmpVal = 0;
 
-	tmpVal = sys_read32(HBN_BASE + HBN_BOR_CFG_OFFSET);
+	tmpVal = sys_read32(HBN_BASE + HBN_MISC_OFFSET);
 	/* borThreshold = 1 */
 	tmpVal = (tmpVal & HBN_BOR_VTH_UMSK) | ((uint32_t)(1) << HBN_BOR_VTH_POS);
 	/* enablePorInBor true*/
 	tmpVal = (tmpVal & HBN_BOR_SEL_UMSK) | ((uint32_t)(1) << HBN_BOR_SEL_POS);
 	/* enableBor true*/
 	tmpVal = (tmpVal & HBN_PU_BOR_UMSK) | ((uint32_t)(1) << HBN_PU_BOR_POS);
-	sys_write32(tmpVal, HBN_BASE + HBN_BOR_CFG_OFFSET);
+	sys_write32(tmpVal, HBN_BASE + HBN_MISC_OFFSET);
 
 
 	/* enableBorInt false */
@@ -298,45 +298,27 @@ static void system_set_machine_timer_clock(uint32_t enable, uint32_t clock, uint
 	system_set_machine_timer_clock_enable(enable);
 }
 
-/* 0: RC32M
- * 1: Crystal */
-static void system_setup_PLL_set_reference(uint32_t ref)
-{
-	uint32_t tmpVal = 0;
-
-	tmpVal = sys_read32(PDS_BASE + PDS_CLKPLL_TOP_CTRL_OFFSET);
-	if (ref > 0)
-	{
-		tmpVal = (tmpVal & PDS_CLKPLL_REFCLK_SEL_UMSK) | ((uint32_t)(1) <<
-	PDS_CLKPLL_REFCLK_SEL_POS);
-		tmpVal = (tmpVal & PDS_CLKPLL_XTAL_RC32M_SEL_UMSK) | ((uint32_t)(0) <<
-	PDS_CLKPLL_XTAL_RC32M_SEL_POS);
-	}
-	else
-	{
-		tmpVal = (tmpVal & PDS_CLKPLL_REFCLK_SEL_UMSK) | ((uint32_t)(0) <<
-	PDS_CLKPLL_REFCLK_SEL_POS);
-		tmpVal = (tmpVal & PDS_CLKPLL_XTAL_RC32M_SEL_UMSK) | ((uint32_t)(1) <<
-	PDS_CLKPLL_XTAL_RC32M_SEL_POS);
-	}
-	sys_write32(tmpVal, PDS_BASE + PDS_CLKPLL_TOP_CTRL_OFFSET);
-}
 
 /* No Crystal: 0
- * 24M: 1
- * 26M: 2
- * 32M: 3
- * 38P4M: 4
- * 40M: 5
+ * 32M: 1
  * 32MHz Oscillator : 32
  */
 
 /* TODO: function is very long, consider splitting. pds power down and power up good candidate? */
-static void system_setup_PLL(uint32_t crystal)
+/* TODO: Is PLL just called DLL on BL702? Or is it actually a different system? Why even?
+ * at least it's simpler i guess */
+static void system_setup_DLL(uint32_t crystal)
 {
 	uint32_t tmpVal = 0;
 
-	/* TODO: if RC32M, use RC32M as PLL source */
+	/* DLL Off */
+
+	tmpVal = sys_read32(GLB_BASE + GLB_DLL_OFFSET);
+	tmpVal = (tmpVal & GLB_PPU_DLL_UMSK) | ((uint32_t)(0) << GLB_PPU_DLL_POS);
+	tmpVal = (tmpVal & GLB_PU_DLL_UMSK) | ((uint32_t)(0) << GLB_PU_DLL_POS);
+	tmpVal = (tmpVal & GLB_DLL_RESET_UMSK) | ((uint32_t)(1) << GLB_DLL_RESET_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_DLL_OFFSET);
+
 	if (crystal == 32)
 	{
 		/* make sure we are on RC32M before trim */
@@ -347,260 +329,71 @@ static void system_setup_PLL(uint32_t crystal)
 		/* Trim RC32M */
 		system_clock_trim_32M();
 
-		/* set PLL ref as RC32M */
-		system_setup_PLL_set_reference(0);
+		tmpVal = sys_read32(GLB_BASE + GLB_DLL_OFFSET);
+		tmpVal = (tmpVal & GLB_DLL_REFCLK_SEL_UMSK) | ((uint32_t)(0) <<
+GLB_DLL_REFCLK_SEL_POS);
+		sys_write32(tmpVal, GLB_BASE + GLB_DLL_OFFSET);
 
 	}
 	else
 	{
-		/* PLL ref is crystal */
-		system_setup_PLL_set_reference(1);
+		tmpVal = sys_read32(GLB_BASE + GLB_DLL_OFFSET);
+		tmpVal = (tmpVal & GLB_DLL_REFCLK_SEL_UMSK) | ((uint32_t)(1) <<
+GLB_DLL_REFCLK_SEL_POS);
+		sys_write32(tmpVal, GLB_BASE + GLB_DLL_OFFSET);
 	}
 
-	/* PLL Off */
 
-	tmpVal = sys_read32(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-	tmpVal = (tmpVal & PDS_PU_CLKPLL_SFREG_UMSK) | ((uint32_t)(0) <<
-PDS_PU_CLKPLL_SFREG_POS);
-	tmpVal = (tmpVal & PDS_PU_CLKPLL_UMSK) | ((uint32_t)(0) <<
-PDS_PU_CLKPLL_POS);
-	 sys_write32(tmpVal, PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
+	/* init sequence */
 
-	 /* needs 2 steps ? */
-	tmpVal = sys_read32(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-	tmpVal = (tmpVal & PDS_CLKPLL_PU_CP_UMSK) | ((uint32_t)(0) <<
-PDS_CLKPLL_PU_CP_POS);
-	tmpVal = (tmpVal & PDS_CLKPLL_PU_PFD_UMSK) | ((uint32_t)(0) <<
-PDS_CLKPLL_PU_PFD_POS);
-	tmpVal = (tmpVal & PDS_CLKPLL_PU_FBDV_UMSK) | ((uint32_t)(0) <<
-PDS_CLKPLL_PU_FBDV_POS);
-	tmpVal = (tmpVal & PDS_CLKPLL_PU_POSTDIV_UMSK) | ((uint32_t)(0) <<
-PDS_CLKPLL_PU_POSTDIV_POS);
-	 sys_write32(tmpVal, PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
+	tmpVal = sys_read32(GLB_BASE + GLB_DLL_OFFSET);
+	tmpVal = (tmpVal & GLB_DLL_PRECHG_SEL_UMSK) | ((uint32_t)(1) << GLB_DLL_PRECHG_SEL_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_DLL_OFFSET);
 
-	/* set PLL Parameters */
+	tmpVal = sys_read32(GLB_BASE + GLB_DLL_OFFSET);
+	tmpVal = (tmpVal & GLB_PPU_DLL_UMSK) | ((uint32_t)(1) << GLB_PPU_DLL_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_DLL_OFFSET);
 
-	/* TODO: Consider usefulness of supporting 26M crystal vs code length */
-	/* 26M special treatment */
-	tmpVal = sys_read32(PDS_BASE + PDS_CLKPLL_CP_OFFSET);
-	if (crystal == 2)
-	{
-		tmpVal = (tmpVal & PDS_CLKPLL_ICP_1U_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_ICP_1U_POS);
-		tmpVal = (tmpVal & PDS_CLKPLL_ICP_5U_UMSK) | ((uint32_t)(0) <<
-PDS_CLKPLL_ICP_5U_POS);
-		tmpVal = (tmpVal & PDS_CLKPLL_INT_FRAC_SW_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_INT_FRAC_SW_POS);
-	}
-	else
-	{
-		tmpVal = (tmpVal & PDS_CLKPLL_ICP_1U_UMSK) | ((uint32_t)(0) <<
-PDS_CLKPLL_ICP_1U_POS);
-		tmpVal = (tmpVal & PDS_CLKPLL_ICP_5U_UMSK) | ((uint32_t)(2) <<
-PDS_CLKPLL_ICP_5U_POS);
-		tmpVal = (tmpVal & PDS_CLKPLL_INT_FRAC_SW_UMSK) | ((uint32_t)(0) <<
-PDS_CLKPLL_INT_FRAC_SW_POS);
-	}
-	sys_write32(tmpVal, PDS_BASE + PDS_CLKPLL_CP_OFFSET);
+	tmpVal = sys_read32(GLB_BASE + GLB_DLL_OFFSET);
+	tmpVal = (tmpVal & GLB_PU_DLL_UMSK) | ((uint32_t)(1) << GLB_PU_DLL_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_DLL_OFFSET);
 
-	/* More 26M special treatment */
-	tmpVal = sys_read32(PDS_BASE + PDS_CLKPLL_RZ_OFFSET);
-	if (crystal == 2)
-	{
-		tmpVal = (tmpVal & PDS_CLKPLL_C3_UMSK) | ((uint32_t)(2) <<
-PDS_CLKPLL_C3_POS);
-		tmpVal = (tmpVal & PDS_CLKPLL_CZ_UMSK) | ((uint32_t)(2) <<
-PDS_CLKPLL_CZ_POS);
-		tmpVal = (tmpVal & PDS_CLKPLL_RZ_UMSK) | ((uint32_t)(5) <<
-PDS_CLKPLL_RZ_POS);
-		tmpVal = (tmpVal & PDS_CLKPLL_R4_SHORT_UMSK) | ((uint32_t)(0) <<
-PDS_CLKPLL_R4_SHORT_POS);
-	}
-	else
-	{
-		tmpVal = (tmpVal & PDS_CLKPLL_C3_UMSK) | ((uint32_t)(3) <<
-PDS_CLKPLL_C3_POS);
-		tmpVal = (tmpVal & PDS_CLKPLL_CZ_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_CZ_POS);
-		tmpVal = (tmpVal & PDS_CLKPLL_RZ_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_RZ_POS);
-		tmpVal = (tmpVal & PDS_CLKPLL_R4_SHORT_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_R4_SHORT_POS);
-	}
-	tmpVal = (tmpVal & PDS_CLKPLL_R4_UMSK) | ((uint32_t)(2) <<
-PDS_CLKPLL_R4_POS);
-	sys_write32(tmpVal, PDS_BASE + PDS_CLKPLL_RZ_OFFSET);
+	tmpVal = sys_read32(GLB_BASE + GLB_DLL_OFFSET);
+	tmpVal = (tmpVal & GLB_DLL_RESET_UMSK) | ((uint32_t)(0) << GLB_DLL_RESET_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_DLL_OFFSET);
 
-	/* set pll dividers */
-	tmpVal = sys_read32(PDS_BASE + PDS_CLKPLL_TOP_CTRL_OFFSET);
-	tmpVal = (tmpVal & PDS_CLKPLL_POSTDIV_UMSK) | ((uint32_t)(0x14) <<
-PDS_CLKPLL_POSTDIV_POS);
-	tmpVal = (tmpVal & PDS_CLKPLL_REFDIV_RATIO_UMSK) | ((uint32_t)(2) <<
-PDS_CLKPLL_REFDIV_RATIO_POS);
-	sys_write32(tmpVal, PDS_BASE + PDS_CLKPLL_TOP_CTRL_OFFSET);
+	system_clock_settle();
 
-	/* set PLL SDMIN */
-	/* Isnt this already set at boot by the rom settings and we can query the value? */
-	tmpVal = sys_read32(PDS_BASE + PDS_CLKPLL_SDM_OFFSET);
-	switch (crystal) {
-		case 0:
-			tmpVal = (tmpVal & PDS_CLKPLL_SDMIN_UMSK) | ((uint32_t)(0x3C0000) <<
-PDS_CLKPLL_SDMIN_POS);
-		break;
-
-		case 1:
-			tmpVal = (tmpVal & PDS_CLKPLL_SDMIN_UMSK) | ((uint32_t)(0x500000) <<
-PDS_CLKPLL_SDMIN_POS);
-		break;
-
-		case 3:
-			tmpVal = (tmpVal & PDS_CLKPLL_SDMIN_UMSK) | ((uint32_t)(0x3C0000) <<
-PDS_CLKPLL_SDMIN_POS);
-		break;
-
-		case 4:
-			tmpVal = (tmpVal & PDS_CLKPLL_SDMIN_UMSK) | ((uint32_t)(0x320000) <<
-PDS_CLKPLL_SDMIN_POS);
-		break;
-
-		case 5:
-			tmpVal = (tmpVal & PDS_CLKPLL_SDMIN_UMSK) | ((uint32_t)(0x300000) <<
-PDS_CLKPLL_SDMIN_POS);
-		break;
-
-		case 2:
-			tmpVal = (tmpVal & PDS_CLKPLL_SDMIN_UMSK) | ((uint32_t)(0x49D39D) <<
-PDS_CLKPLL_SDMIN_POS);
-		break;
-
-		case 32:
-			tmpVal = (tmpVal & PDS_CLKPLL_SDMIN_UMSK) | ((uint32_t)(0x3C0000) <<
-PDS_CLKPLL_SDMIN_POS);
-		break;
-
-		default:
-			tmpVal = (tmpVal & PDS_CLKPLL_SDMIN_UMSK) | ((uint32_t)(0x3C0000) <<
-PDS_CLKPLL_SDMIN_POS);
-		break;
-	}
-	sys_write32(tmpVal, PDS_BASE + PDS_CLKPLL_SDM_OFFSET);
-
-	/* phase comparator settings? */
-	tmpVal = sys_read32(PDS_BASE + PDS_CLKPLL_FBDV_OFFSET);
-	tmpVal = (tmpVal & PDS_CLKPLL_SEL_FB_CLK_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_SEL_FB_CLK_POS);
-	tmpVal = (tmpVal & PDS_CLKPLL_SEL_SAMPLE_CLK_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_SEL_SAMPLE_CLK_POS);
-	sys_write32(tmpVal, PDS_BASE + PDS_CLKPLL_FBDV_OFFSET);
-
-	 /* Turn PLL back ON */
-	 /* frequency stabilization ? */
-	tmpVal = sys_read32(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-	tmpVal = (tmpVal & PDS_PU_CLKPLL_SFREG_UMSK) | ((uint32_t)(1) <<
-PDS_PU_CLKPLL_SFREG_POS);
-	sys_write32(tmpVal, PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-
-	 /* let settle for a while (5 us in SDK), we may not be running at 32Mhz right now */
-	system_clock_delay_32M_ms(2);
-
-	 /* enable PPL clock actual? */
-	tmpVal = sys_read32(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-	tmpVal = (tmpVal & PDS_PU_CLKPLL_UMSK) | ((uint32_t)(1) <<
-PDS_PU_CLKPLL_POS);
-	sys_write32(tmpVal, PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-
-	/* More power up sequencing*/
-	tmpVal = sys_read32(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-	tmpVal = (tmpVal & PDS_CLKPLL_PU_CP_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_PU_CP_POS);
-	tmpVal = (tmpVal & PDS_CLKPLL_PU_PFD_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_PU_PFD_POS);
-	tmpVal = (tmpVal & PDS_CLKPLL_PU_FBDV_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_PU_FBDV_POS);
-	tmpVal = (tmpVal & PDS_CLKPLL_PU_POSTDIV_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_PU_POSTDIV_POS);
-	sys_write32(tmpVal, PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-
-	system_clock_delay_32M_ms(2);
-
-	/* reset couple things one by one? */
-	tmpVal = sys_read32(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-	tmpVal = (tmpVal & PDS_CLKPLL_SDM_RESET_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_SDM_RESET_POS);
-	sys_write32(tmpVal, PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-
-	tmpVal = sys_read32(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-	tmpVal = (tmpVal & PDS_CLKPLL_RESET_FBDV_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_RESET_FBDV_POS);
-	sys_write32(tmpVal, PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-
-	tmpVal = sys_read32(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-	tmpVal = (tmpVal & PDS_CLKPLL_RESET_FBDV_UMSK) | ((uint32_t)(0) <<
-PDS_CLKPLL_RESET_FBDV_POS);
-	sys_write32(tmpVal, PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-
-	tmpVal = sys_read32(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-	tmpVal = (tmpVal & PDS_CLKPLL_SDM_RESET_UMSK) | ((uint32_t)(0) <<
-PDS_CLKPLL_SDM_RESET_POS);
-	sys_write32(tmpVal, PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-
+	/* enable all DLL clocks*/
+	tmpVal = sys_read32(GLB_BASE + GLB_DLL_OFFSET);
+	tmpVal = (tmpVal & GLB_DLL_CLK_57P6M_EN_UMSK) | ((uint32_t)(1) << GLB_DLL_CLK_57P6M_EN_POS);
+	tmpVal = (tmpVal & GLB_DLL_CLK_96M_EN_UMSK) | ((uint32_t)(1) << GLB_DLL_CLK_96M_EN_POS);
+	tmpVal = (tmpVal & GLB_DLL_CLK_144M_EN_UMSK) | ((uint32_t)(1) << GLB_DLL_CLK_144M_EN_POS);
+	tmpVal = (tmpVal & GLB_DLL_CLK_288M_EN_UMSK) | ((uint32_t)(1) << GLB_DLL_CLK_288M_EN_POS);
+	tmpVal = (tmpVal & GLB_DLL_CLK_MMDIV_EN_UMSK) | ((uint32_t)(1) << GLB_DLL_CLK_MMDIV_EN_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_DLL_OFFSET);
 	return;
 }
 
 
-/* copied over from driver for convinience */
 static uint32_t system_uart_bflb_get_crystal_frequency(void)
 {
-	uint32_t tmpVal;
-
-	/* get clkpll_sdmin */
-	tmpVal = sys_read32(PDS_BASE + PDS_CLKPLL_SDM_OFFSET);
-	tmpVal = (tmpVal & PDS_CLKPLL_SDMIN_MSK) >> PDS_CLKPLL_SDMIN_POS;
-
-	switch (tmpVal) {
-		case 0x500000:
-		/* 24m */
-		return (24 * 1000 * 1000);
-
-		case 0x3C0000:
-		/* 32m */
-		return (32 * 1000 * 1000);
-
-		case 0x320000:
-		/* 38.4m */
-		return (384 * 100 * 1000);
-
-		case 0x300000:
-		/* 40m */
-		return (40 * 1000 * 1000);
-
-		case 0x49D39D:
-		/* 26m */
-		return (26 * 1000 * 1000);
-
-		default:
-		/* 32m */
-		return (32 * 1000 * 1000);
-	}
+	return (32 * 1000 * 1000);
 }
 
 /* Frequency Source:
  * No Crystal: 0
- * 24M: 1
- * 26M: 2
- * 32M: 3
- * 38P4M: 4
- * 40M: 5
+ * 32M: 1
  * 32MHz Oscillator: 32
  *
  * /!\ When Frequency Source is 32M, we do not power crystal
  *
  * Clock Frequency:
  * Crystal: 0
- * PLL 48MHz: 1
- * PLL 120Mhz: 2
- * PLL 160Mhz: 3
- * PLL 192Mhz: 4
+ * DLL 57.6MHz: 1
+ * DLL 96Mhz: 2
+ * DLL 144Mhz: 3
+ * ? DLL 288 Mhz: 4 ?
  * 32MHz Oscillator : 32
  *
  *  /!\ When Clock Frequency is 32M, we do not power crystal or PLL
@@ -622,8 +415,6 @@ static void system_init_root_clock(uint32_t crystal, uint32_t clock_frequency_so
 	system_set_root_clock(0);
 	system_set_root_clock_dividers(0, 0);
 	sys_write32(32 * 1000 * 1000, CORECLOCKREGISTER);
-
-	system_set_PKA_clock(0);
 
 	if (clock_frequency_source == 32)
 	{
@@ -651,14 +442,10 @@ AON_PU_XTAL_BUF_AON_POS);
 	/* power PLL
 	 * This code path only when PLL!
 	 */
-	system_setup_PLL(crystal);
+	system_setup_DLL(crystal);
 	/* Big settle, 55us in SDK */
 	system_clock_delay_32M_ms(10);
 
-	/* enable all 'PDS' clocks */
-	tmpVal = sys_read32(PDS_BASE + PDS_CLKPLL_OUTPUT_EN_OFFSET);
-	tmpVal |= 0x1FF;
-	sys_write32(tmpVal, PDS_BASE + PDS_CLKPLL_OUTPUT_EN_OFFSET);
 
 	/* glb enable pll actual? */
 	tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG0_OFFSET);
@@ -684,27 +471,27 @@ GLB_REG_PLL_SEL_POS);
 
 		case 1:
 			system_set_root_clock(crystal == 32? 2 : 3);
-			sys_write32(48 * 1000 * 1000, CORECLOCKREGISTER);
+			sys_write32(57 * 1000 * 1000 + 6 * 100 * 1000, CORECLOCKREGISTER);
 		break;
 
 		case 2:
 			system_set_root_clock_dividers(0, 1);
 			system_set_root_clock(crystal == 32? 2 : 3);
-			sys_write32(120 * 1000 * 1000, CORECLOCKREGISTER);
+			sys_write32(96 * 1000 * 1000, CORECLOCKREGISTER);
 		break;
 
 		case 3:
 			/* TODO: enable rom access 2T*/
 			system_set_root_clock_dividers(0, 1);
 			system_set_root_clock(crystal == 32? 2 : 3);
-			sys_write32(160 * 1000 * 1000, CORECLOCKREGISTER);
+			sys_write32(144 * 1000 * 1000, CORECLOCKREGISTER);
 		break;
 
 		case 4:
 			/* TODO: enable rom access 2T*/
 			system_set_root_clock_dividers(0, 1);
 			system_set_root_clock(crystal == 32? 2 : 3);
-			sys_write32(192 * 1000 * 1000, CORECLOCKREGISTER);
+			sys_write32(288 * 1000 * 1000, CORECLOCKREGISTER);
 		break;
 
 		default:
@@ -713,9 +500,6 @@ GLB_REG_PLL_SEL_POS);
 
 	/* settle */
 	system_clock_delay_32M_ms(10);
-
-	/* we have PLL now */
-	system_set_PKA_clock(1);
 
 	return;
 }
@@ -775,7 +559,7 @@ static void system_clock_init(void)
 	system_set_root_clock_dividers(0, 0);
 	system_clock_trim_32M();
 #else
-	system_init_root_clock(5, 3);
+	system_init_root_clock(1, 3);
 	system_set_root_clock_dividers(0, 1);
 #endif
 	system_set_machine_timer_clock(1, 0, mtimer_get_clk_src_div());
@@ -783,7 +567,11 @@ static void system_clock_init(void)
 
 static void peripheral_clock_init(void)
 {
-	uart_set_clock(1, 1, 0);
+	/* mistery undocumented function in 'cgen_cfg1' */
+	uint32_t regval = sys_read32(0x40000024);
+        regval |= (1 << 16);
+        sys_write32(regval, 0x40000024);
+	uart_set_clock(1, 0, 0);
 }
 
 
@@ -825,26 +613,11 @@ static int bl_riscv_init(void)
 	tmpVal = (tmpVal & GLB_EM_SEL_UMSK) | ((uint32_t)(0) << GLB_EM_SEL_POS);
 	sys_write32(tmpVal, GLB_BASE + GLB_SEAM_MISC_OFFSET);
 
-	/* Fix 26M xtal clkpll_sdmin */
-	tmpVal = sys_read32(PDS_BASE + PDS_CLKPLL_SDM_OFFSET);
 
-	if ((tmpVal & PDS_CLKPLL_SDMIN_MSK) == 0x49D39D) {
-		tmpVal = (tmpVal & PDS_CLKPLL_SDMIN_UMSK) | (uint32_t)(0x49D89E);
-		sys_write32(tmpVal, PDS_BASE + PDS_CLKPLL_SDM_OFFSET);
-	}
-
-
-
+	/* GLB_UART_Sig_Swap_Set(UART_SIG_SWAP_NONE); */
 	tmpVal = sys_read32(GLB_BASE + GLB_PARM_OFFSET);
-	/* GLB_UART_Sig_Swap_Set(UART_SIG_SWAP_NONE);
-	 * no swap = 0
-	 * see bl602_glb.h for other possible values
-	 */
 	tmpVal = (tmpVal & GLB_UART_SWAP_SET_UMSK) | ((uint32_t)(0) <<
 GLB_UART_SWAP_SET_POS);
-	/* GLB_JTAG_Sig_Swap_Set(JTAG_SIG_SWAP_NONE); */
-	tmpVal = (tmpVal & GLB_JTAG_SWAP_SET_UMSK) | ((uint32_t)(0) <<
-GLB_JTAG_SWAP_SET_POS);
 	sys_write32(tmpVal, GLB_BASE + GLB_PARM_OFFSET);
 
 	/* CLear all interrupt */
