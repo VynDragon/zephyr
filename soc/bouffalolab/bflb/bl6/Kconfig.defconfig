@@ -3,8 +3,13 @@
 
 if SOC_SERIES_BL6
 
+# on sifive e24, mtime is a fixed 1 000 000 per second rate.
+# riscv_machine_timer uses mtime as if it was mcycle and expects
 config SYS_CLOCK_HW_CYCLES_PER_SEC
-	default 160000000
+	default 1000000
+
+config SYS_CLOCK_TICKS_PER_SEC
+	default 1000
 
 config NUM_IRQS
 	default 80

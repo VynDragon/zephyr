@@ -112,6 +112,7 @@ static uint32_t system_efuse_read_32M(void)
 	}
 
 	/* Load efuse region0 */
+	/* not ahb clock setup */
 	tmpVal =	EF_CTRL_EFUSE_CTRL_PROTECT |
 			(EF_CTRL_OP_MODE_AUTO << EF_CTRL_EF_IF_0_MANUAL_EN_POS) |
 			(EF_CTRL_PARA_DFT << EF_CTRL_EF_IF_0_CYC_MODIFY_POS) |
@@ -123,6 +124,7 @@ static uint32_t system_efuse_read_32M(void)
 			(0 << EF_CTRL_EF_IF_0_TRIG_POS);
 	sys_write32(tmpVal, BFLB_EF_CTRL_BASE + EF_CTRL_EF_IF_CTRL_0_OFFSET);
 
+	/* trigger read */
 	tmpVal =	EF_CTRL_EFUSE_CTRL_PROTECT |
 			(EF_CTRL_OP_MODE_AUTO << EF_CTRL_EF_IF_0_MANUAL_EN_POS) |
 			(EF_CTRL_PARA_DFT << EF_CTRL_EF_IF_0_CYC_MODIFY_POS) |

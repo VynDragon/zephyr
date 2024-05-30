@@ -51,7 +51,7 @@
 ulong_t __soc_get_gp_initial_value(void);
 #endif
 
-#ifdef CONFIG_BFLB_TO_ITCM
+#ifdef CONFIG_CODE_DATA_RELOCATION
 #define ITCMF __attribute__((section(".itcm")))
 #else
 #define ITCMF
