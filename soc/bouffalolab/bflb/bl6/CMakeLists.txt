@@ -17,3 +17,6 @@ zephyr_include_directories(.)
 zephyr_sources(soc.c)
 
 set(SOC_LINKER_SCRIPT ${ZEPHYR_BASE}/include/zephyr/arch/riscv/common/linker.ld CACHE INTERNAL "")
+
+zephyr_code_relocate(LIBRARY drivers__serial LOCATION ITCM)
+zephyr_code_relocate(LIBRARY drivers__timer LOCATION ITCM)

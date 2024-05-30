@@ -47,7 +47,7 @@ struct bflb_data {
 #endif /* CONFIG_UART_INTERRUPT_DRIVEN */
 };
 
-static void ITCMF uart_bflb_enabled(const struct device *dev, uint32_t enable)
+static void uart_bflb_enabled(const struct device *dev, uint32_t enable)
 {
 	const struct bflb_config *cfg = dev->config;
 	uint32_t rxt = 0;
@@ -66,7 +66,7 @@ static void ITCMF uart_bflb_enabled(const struct device *dev, uint32_t enable)
 	sys_write32(txt, cfg->base_reg + UART_UTX_CONFIG_OFFSET);
 }
 
-static uint32_t ITCMF uart_bflb_get_crystal_frequency(void)
+static uint32_t uart_bflb_get_crystal_frequency(void)
 {
 	uint32_t tmpVal;
 
@@ -101,7 +101,7 @@ static uint32_t ITCMF uart_bflb_get_crystal_frequency(void)
 	}
 }
 
-static uint32_t ITCMF uart_bflb_get_PLL_frequency(void)
+static uint32_t uart_bflb_get_PLL_frequency(void)
 {
 	uint32_t tmpVal;
 
@@ -125,7 +125,7 @@ static uint32_t ITCMF uart_bflb_get_PLL_frequency(void)
 	}
 }
 
-static uint32_t ITCMF uart_bflb_get_clock(void)
+static uint32_t uart_bflb_get_clock(void)
 {
 	uint32_t tmpVal = 0;
 	uint32_t uart_divider = 0;
@@ -180,7 +180,7 @@ static uint32_t ITCMF uart_bflb_get_clock(void)
 
 #ifdef CONFIG_UART_INTERRUPT_DRIVEN
 
-static int ITCMF uart_bflb_err_check(const struct device *dev)
+static int uart_bflb_err_check(const struct device *dev)
 {
 	const struct bflb_config *const cfg = dev->config;
 	uint32_t status = 0;
@@ -209,7 +209,7 @@ static int ITCMF uart_bflb_err_check(const struct device *dev)
 	return errors;
 }
 
-int ITCMF uart_bflb_irq_tx_ready(const struct device *dev)
+int uart_bflb_irq_tx_ready(const struct device *dev)
 {
 	const struct bflb_config *const cfg = dev->config;
 	uint32_t tmpVal = 0;
@@ -218,7 +218,7 @@ int ITCMF uart_bflb_irq_tx_ready(const struct device *dev)
 	return (tmpVal & UART_TX_FIFO_CNT_MASK) > 0;
 }
 
-int ITCMF uart_bflb_irq_rx_ready(const struct device *dev)
+int uart_bflb_irq_rx_ready(const struct device *dev)
 {
 	const struct bflb_config *const cfg = dev->config;
 	uint32_t tmpVal = 0;
@@ -227,7 +227,7 @@ int ITCMF uart_bflb_irq_rx_ready(const struct device *dev)
 	return (tmpVal & UART_RX_FIFO_CNT_MASK) > 0;
 }
 
-int ITCMF uart_bflb_fifo_fill(const struct device *dev, const uint8_t *tx_data, int len)
+int uart_bflb_fifo_fill(const struct device *dev, const uint8_t *tx_data, int len)
 {
 	const struct bflb_config *const cfg = dev->config;
 	uint8_t num_tx = 0U;
@@ -239,7 +239,7 @@ int ITCMF uart_bflb_fifo_fill(const struct device *dev, const uint8_t *tx_data, 
 	return num_tx;
 }
 
-int ITCMF uart_bflb_fifo_read(const struct device *dev, uint8_t *rx_data, const int size)
+int uart_bflb_fifo_read(const struct device *dev, uint8_t *rx_data, const int size)
 {
 	const struct bflb_config *const cfg = dev->config;
 	uint8_t num_rx = 0U;
@@ -251,7 +251,7 @@ int ITCMF uart_bflb_fifo_read(const struct device *dev, uint8_t *rx_data, const 
 	return num_rx;
 }
 
-void ITCMF uart_bflb_irq_tx_enable(const struct device *dev)
+void uart_bflb_irq_tx_enable(const struct device *dev)
 {
 	const struct bflb_config *const cfg = dev->config;
 	uint32_t tmpVal = 0;
@@ -261,7 +261,7 @@ void ITCMF uart_bflb_irq_tx_enable(const struct device *dev)
 	sys_write32(tmpVal, cfg->base_reg + UART_INT_MASK_OFFSET);
 }
 
-void ITCMF uart_bflb_irq_tx_disable(const struct device *dev)
+void uart_bflb_irq_tx_disable(const struct device *dev)
 {
 	const struct bflb_config *const cfg = dev->config;
 	uint32_t tmpVal = 0;
@@ -272,7 +272,7 @@ void ITCMF uart_bflb_irq_tx_disable(const struct device *dev)
 }
 
 
-int ITCMF uart_bflb_irq_tx_complete(const struct device *dev)
+int uart_bflb_irq_tx_complete(const struct device *dev)
 {
 	const struct bflb_config *const cfg = dev->config;
 	uint32_t tmpVal = 0;
@@ -285,7 +285,7 @@ int ITCMF uart_bflb_irq_tx_complete(const struct device *dev)
 	return (rc > 0 ? 1 : 0);
 }
 
-void ITCMF uart_bflb_irq_rx_enable(const struct device *dev)
+void uart_bflb_irq_rx_enable(const struct device *dev)
 {
 	const struct bflb_config *const cfg = dev->config;
 	uint32_t tmpVal = 0;
@@ -295,7 +295,7 @@ void ITCMF uart_bflb_irq_rx_enable(const struct device *dev)
 	sys_write32(tmpVal, cfg->base_reg + UART_INT_MASK_OFFSET);
 }
 
-void ITCMF uart_bflb_irq_rx_disable(const struct device *dev)
+void uart_bflb_irq_rx_disable(const struct device *dev)
 {
 	const struct bflb_config *const cfg = dev->config;
 	uint32_t tmpVal = 0;
@@ -305,7 +305,7 @@ void ITCMF uart_bflb_irq_rx_disable(const struct device *dev)
 	sys_write32(tmpVal, cfg->base_reg + UART_INT_MASK_OFFSET);
 }
 
-void ITCMF uart_bflb_irq_err_enable(const struct device *dev)
+void uart_bflb_irq_err_enable(const struct device *dev)
 {
 	const struct bflb_config *const cfg = dev->config;
 	uint32_t tmpVal = 0;
@@ -317,7 +317,7 @@ void ITCMF uart_bflb_irq_err_enable(const struct device *dev)
 	sys_write32(tmpVal, cfg->base_reg + UART_INT_MASK_OFFSET);
 }
 
-void ITCMF uart_bflb_irq_err_disable(const struct device *dev)
+void uart_bflb_irq_err_disable(const struct device *dev)
 {
 	const struct bflb_config *const cfg = dev->config;
 	uint32_t tmpVal = 0;
@@ -329,7 +329,7 @@ void ITCMF uart_bflb_irq_err_disable(const struct device *dev)
 	sys_write32(tmpVal, cfg->base_reg + UART_INT_MASK_OFFSET);
 }
 
-int ITCMF uart_bflb_irq_is_pending(const struct device *dev)
+int uart_bflb_irq_is_pending(const struct device *dev)
 {
 	const struct bflb_config *const cfg = dev->config;
 	uint32_t tmpVal = sys_read32(cfg->base_reg + UART_INT_STS_OFFSET);
@@ -339,14 +339,14 @@ int ITCMF uart_bflb_irq_is_pending(const struct device *dev)
 	return (((tmpVal & ~maskVal) & 0xFF) != 0 ? 1 : 0);
 }
 
-int ITCMF uart_bflb_irq_update(const struct device *dev)
+int uart_bflb_irq_update(const struct device *dev)
 {
 	ARG_UNUSED(dev);
 
 	return 1;
 }
 
-void ITCMF uart_bflb_irq_callback_set(const struct device *dev,
+void uart_bflb_irq_callback_set(const struct device *dev,
 			      uart_irq_callback_user_data_t cb,
 			      void *user_data)
 {
@@ -356,7 +356,7 @@ void ITCMF uart_bflb_irq_callback_set(const struct device *dev,
 	data->user_data = user_data;
 }
 
-static void ITCMF uart_bflb_isr(const struct device *dev)
+static void uart_bflb_isr(const struct device *dev)
 {
 	struct bflb_data *const data = dev->data;
 	const struct bflb_config *const cfg = dev->config;
@@ -372,7 +372,7 @@ static void ITCMF uart_bflb_isr(const struct device *dev)
 }
 #endif /* CONFIG_UART_INTERRUPT_DRIVEN */
 
-static int ITCMF uart_bflb_configure(const struct device *dev)
+static int uart_bflb_configure(const struct device *dev)
 {
 	const struct bflb_config *cfg = dev->config;
 	uint32_t tx_cfg = 0;
@@ -484,7 +484,7 @@ cfg->base_reg + UART_BIT_PRD_OFFSET);
 	return 0;
 }
 
-static int ITCMF uart_bflb_init(const struct device *dev)
+static int uart_bflb_init(const struct device *dev)
 {
 	const struct bflb_config *cfg = dev->config;
 	int rc = 0;
@@ -509,7 +509,7 @@ static int ITCMF uart_bflb_init(const struct device *dev)
 	return rc;
 }
 
-static int ITCMF uart_bflb_poll_in(const struct device *dev, unsigned char *c)
+static int uart_bflb_poll_in(const struct device *dev, unsigned char *c)
 {
 	const struct bflb_config *cfg = dev->config;
 
@@ -521,7 +521,7 @@ static int ITCMF uart_bflb_poll_in(const struct device *dev, unsigned char *c)
 	return -1;
 }
 
-static void ITCMF uart_bflb_poll_out(const struct device *dev, unsigned char c)
+static void uart_bflb_poll_out(const struct device *dev, unsigned char c)
 {
 	const struct bflb_config *cfg = dev->config;
 
@@ -608,11 +608,11 @@ static const struct uart_driver_api uart_bflb_driver_api = {
 
 #ifdef CONFIG_UART_INTERRUPT_DRIVEN
 #define BFLB_UART_IRQ_HANDLER_DECL(instance)						\
-	static void ITCMF uart_bflb_config_func_##instance(const struct device *dev);
+	static void uart_bflb_config_func_##instance(const struct device *dev);
 #define BFLB_UART_IRQ_HANDLER_FUNC(instance)						\
 	.irq_config_func = uart_bflb_config_func_##instance
 #define BFLB_UART_IRQ_HANDLER(instance)							\
-	static void ITCMF uart_bflb_config_func_##instance(const struct device *dev)	\
+	static void uart_bflb_config_func_##instance(const struct device *dev)	\
 	{										\
 		IRQ_CONNECT(DT_INST_IRQN(instance),					\
 			    DT_INST_IRQ(instance, priority),				\
