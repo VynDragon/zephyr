@@ -142,5 +142,14 @@
 			interrupt-parent = <&clic>;
 			status = "disabled";
 		};
+		i2c0: i2c@4000a300 {
+			compatible = "bflb,i2c";
+			reg = <0x4000a300 0x100>;
+			interrupts = <48 0>;
+			interrupt-parent = <&clic>;
+			status = "disabled";
+			#address-cells = <1>;
+			#size-cells = <0>;
+		};
 	};
 };

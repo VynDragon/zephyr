@@ -567,9 +567,12 @@ static void system_clock_init(void)
 
 static void peripheral_clock_init(void)
 {
-	/* mistery undocumented function in 'cgen_cfg1' */
+
 	uint32_t regval = sys_read32(0x40000024);
+	/* enable UART0 clock routing */
         regval |= (1 << 16);
+	/* enable I2C0 clock routing */
+	regval |= (1 << 19);
         sys_write32(regval, 0x40000024);
 	uart_set_clock(1, 0, 0);
 }
