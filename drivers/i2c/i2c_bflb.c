@@ -33,6 +33,7 @@ struct i2c_bflb_cfg {
 	const struct pinctrl_dev_config *pincfg;
 	uint32_t base;
 	uint32_t dts_freq;
+	void (*irq_config_func)(const struct device *);
 };
 
 struct i2c_bflb_data {
@@ -43,6 +44,12 @@ struct i2c_bflb_data {
 
 static uint8_t i2c_bflb_temp_buf[4] = {0};
 static uint32_t i2c_bflb_temp_buf_cnt = 0;
+
+
+static uint8_t i2c_bflb_msg_stack[I2C_MAX_PACKET_LENGTH] = {0};
+static uint8_t *i2c_bflb_msg_stack_pointer = &(i2c_bflb_msg_stack[0]);
+static uint8_t *i2c_bflb_msg_stack_pointer_written = &(i2c_bflb_msg_stack[0]);
+static struct k_sem i2c_bflb_msg_stack_ready;
 
 /* Support Functions */
 
@@ -377,15 +384,23 @@ static int i2c_bflb_configure(const struct device *dev, uint32_t dev_config)
 	sys_write32(tmpVal, GLB_BASE + GLB_CLK_CFG3_OFFSET);
 
 
-	/* mask all interrupts */
 	tmpVal = sys_read32(config->base + I2C_INT_STS_OFFSET);
 
-	tmpVal |= (I2C_CR_I2C_END_MASK |
-		I2C_CR_I2C_TXF_MASK |
-		I2C_CR_I2C_RXF_MASK |
-		I2C_CR_I2C_NAK_MASK |
+	/* enable all interrupts */
+	tmpVal |= (I2C_CR_I2C_END_EN |
+		I2C_CR_I2C_TXF_EN |
+		I2C_CR_I2C_RXF_EN |
+		I2C_CR_I2C_NAK_EN |
+		I2C_CR_I2C_ARB_EN |
+		I2C_CR_I2C_FER_EN);
+	/* mask some interrupts */
+	tmpVal |= ( I2C_CR_I2C_NAK_MASK |
 		I2C_CR_I2C_ARB_MASK |
-		I2C_CR_I2C_FER_MASK);
+		I2C_CR_I2C_FER_MASK |
+		I2C_CR_I2C_TXF_MASK |
+		I2C_CR_I2C_RXF_MASK);
+	/* unmask some interrupts */
+	tmpVal &= ~I2C_CR_I2C_END_MASK;
 
 	sys_write32(tmpVal, config->base + I2C_INT_STS_OFFSET);
 
@@ -584,6 +599,55 @@ static void i2c_bflb_endint_clear(const struct device *dev)
 	sys_write32(tmpVal, config->base + I2C_INT_STS_OFFSET);
 }
 
+static void i2c_bflb_isr_END(const struct device *dev)
+{
+	const struct i2c_bflb_cfg *config = dev->config;
+	uint32_t tmpVal = 0;
+
+	/* transmit done */
+	/*if (i2c_bflb_msg_stack_pointer_written == i2c_bflb_msg_stack_pointer)
+	{*/
+		i2c_bflb_enabled(dev, false);
+		/* mask txf */
+		tmpVal = sys_read32(config->base + I2C_INT_STS_OFFSET);
+		tmpVal |= I2C_CR_I2C_TXF_MASK;
+		sys_write32(tmpVal, config->base + I2C_INT_STS_OFFSET);
+
+	/*}*/
+}
+
+static void i2c_bflb_isr_TXF(const struct device *dev)
+{
+	const struct i2c_bflb_cfg *config = dev->config;
+	uint32_t tmpVal = 0;
+	uint32_t i = 0;
+
+	k_sem_take(&i2c_bflb_msg_stack_ready, K_MSEC(50));
+
+
+	/* feed one */
+	while (i < 4 && i2c_bflb_msg_stack_pointer_written != i2c_bflb_msg_stack_pointer)
+	{
+		//printf("loaded value at %x into fifo\n", i2c_bflb_msg_stack_pointer_written);
+		tmpVal |= ((*i2c_bflb_msg_stack_pointer_written) << ((i % 4) * 8));
+		i++;
+		i2c_bflb_msg_stack_pointer_written = i2c_bflb_msg_stack_pointer_written + 1;
+		if (i2c_bflb_msg_stack_pointer_written >= i2c_bflb_msg_stack
++ I2C_MAX_PACKET_LENGTH)
+		{
+			i2c_bflb_msg_stack_pointer_written = i2c_bflb_msg_stack;
+		}
+	}
+	sys_write32(tmpVal, config->base + I2C_FIFO_WDATA_OFFSET);
+	i2c_bflb_trigger(dev);
+	k_sem_give(&i2c_bflb_msg_stack_ready);
+}
+
+
+static void i2c_bflb_isr_RXF(const struct device *dev)
+{
+
+}
 
 static int i2c_bflb_write_bits(const struct device *dev, uint8_t *buf, uint8_t num)
 {
@@ -707,6 +771,69 @@ static int i2c_bflb_transfer_finish(const struct device *dev)
 	}
 	i2c_bflb_enabled(dev, false);
 }
+
+
+static int i2c_bflb_fill(const struct device *dev,
+				struct i2c_msg *msgs,
+				uint8_t num_msgs)
+{
+	const struct i2c_bflb_cfg *config = dev->config;
+	uint32_t tmpVal = 0;
+	uint32_t total_len = 0;
+	uint32_t i = 0;
+
+	/* wait for transmission end*/
+	while ((sys_read32(config->base + I2C_CONFIG_OFFSET) & I2C_CR_I2C_M_EN) != 0)
+	{
+		k_sleep(K_MSEC(1));
+	}
+
+	for(i = 0; i < num_msgs; i++)
+	{
+		total_len = total_len + msgs[i].len;
+	}
+
+	if (total_len >= I2C_MAX_PACKET_LENGTH) {
+		return -EINVAL;
+	}
+
+	/* set message length */
+	tmpVal = sys_read32(config->base + I2C_CONFIG_OFFSET);
+	tmpVal &= ~I2C_CR_I2C_PKT_LEN_MASK;
+	tmpVal |= ((total_len - 1) << I2C_CR_I2C_PKT_LEN_SHIFT) & I2C_CR_I2C_PKT_LEN_MASK;
+	sys_write32(tmpVal, config->base + I2C_CONFIG_OFFSET);
+
+	/* set write direction */
+	tmpVal = sys_read32(config->base + I2C_CONFIG_OFFSET);
+	tmpVal &= ~I2C_CR_I2C_PKT_DIR;
+	sys_write32(tmpVal, config->base + I2C_CONFIG_OFFSET);
+
+	k_sem_take(&i2c_bflb_msg_stack_ready, K_MSEC(500));
+	for(i = 0; i < num_msgs; i++)
+	{
+		for(uint32_t j = 0; j < msgs[i].len; j++)
+		{
+			(*i2c_bflb_msg_stack_pointer) = msgs[i].buf[j];
+			i2c_bflb_msg_stack_pointer = i2c_bflb_msg_stack_pointer + 1;
+			if (i2c_bflb_msg_stack_pointer >=
+i2c_bflb_msg_stack + I2C_MAX_PACKET_LENGTH)
+			{
+				i2c_bflb_msg_stack_pointer = i2c_bflb_msg_stack;
+			}
+		}
+	}
+	/* let TXF cook */
+	k_sem_give(&i2c_bflb_msg_stack_ready);
+	/* unmask txf */
+	tmpVal = sys_read32(config->base + I2C_INT_STS_OFFSET);
+	tmpVal &= ~I2C_CR_I2C_TXF_MASK;
+	sys_write32(tmpVal, config->base + I2C_INT_STS_OFFSET);
+	/* write one to start process */
+	i2c_bflb_isr_TXF(dev);
+
+	return 0;
+}
+
 static int i2c_bflb_transfer(const struct device *dev,
 			       struct i2c_msg *msgs,
 			       uint8_t num_msgs,
@@ -732,19 +859,11 @@ static int i2c_bflb_transfer(const struct device *dev,
 		return -EINVAL;
 	}
 
-	//i2c_bflb_enabled(dev, false);
 	i2c_bflb_set_address(dev, addr);
 
 	 for (uint8_t i = 0; i < num_msgs; i++) {
 		if ((msgs[i].flags & I2C_MSG_RW_MASK) == I2C_MSG_READ) {
-			pass_num = 0;
-			while ((msgs[i + pass_num].flags & I2C_MSG_RW_MASK) == (msgs[i].flags &
-I2C_MSG_RW_MASK) && (msgs[i + pass_num].flags & I2C_MSG_STOP) == 0 && pass_num + i < num_msgs)
-			{
-				pass_num++;
-			}
-			rc = i2c_bflb_read_msgs(dev, &(msgs[i]), pass_num + 1, addr);
-			i = i + pass_num;
+			rc = i2c_bflb_read_msgs(dev, &(msgs[i]), 1, addr);
 		} else {
 			pass_num = 0;
 			while ((msgs[i + pass_num].flags & I2C_MSG_RW_MASK) == (msgs[i].flags &
@@ -752,12 +871,8 @@ I2C_MSG_RW_MASK) && (msgs[i + pass_num].flags & I2C_MSG_STOP) == 0 && pass_num +
 			{
 				pass_num++;
 			}
-			rc = i2c_bflb_write_msgs(dev, &(msgs[i]), pass_num + 1, addr);
+			rc = i2c_bflb_fill(dev, &(msgs[i]), pass_num + 1);
 			i = i + pass_num;
-			if ((msgs[i].flags & I2C_MSG_STOP) != 0)
-			{
-				i2c_bflb_transfer_finish(dev);
-			}
 		}
 
 		if (rc != 0) {
@@ -778,13 +893,41 @@ static int i2c_bflb_init(const struct device *dev)
 	pinctrl_apply_state(config->pincfg, PINCTRL_STATE_DEFAULT);
 	i2c_bflb_clock_enabled(dev, true);
 	dev_config = (I2C_MODE_CONTROLLER | i2c_map_dt_bitrate(config->dts_freq));
+	k_sem_init(&i2c_bflb_msg_stack_ready, 0, 1);
+	config->irq_config_func(dev);
 	rc = i2c_bflb_configure(dev, dev_config);
+	/* clear */
+	i2c_bflb_enabled(dev, false);
 	if (rc != 0) {
 		LOG_ERR("Failed to configure I2C on init");
 		return rc;
 	}
 
 	return 0;
+}
+
+
+static void i2c_bflb_isr(const struct device *dev)
+{
+	const struct i2c_bflb_cfg *config = dev->config;
+	uint32_t tmpVal = 0;
+
+	tmpVal = sys_read32(config->base + I2C_INT_STS_OFFSET);
+
+	if ((tmpVal & I2C_END_INT) != 0)
+	{
+		i2c_bflb_isr_END(dev);
+		tmpVal |= I2C_CR_I2C_END_CLR;
+	}
+	if ((tmpVal & I2C_TXF_INT) != 0)
+	{
+		i2c_bflb_isr_TXF(dev);
+	}
+	if ((tmpVal & I2C_RXF_INT) != 0)
+	{
+		i2c_bflb_isr_RXF(dev);
+	}
+	sys_write32(tmpVal, config->base + I2C_INT_STS_OFFSET);
 }
 
 
@@ -795,13 +938,30 @@ static const struct i2c_driver_api i2c_bflb_api = {
 
 /* Device instantiation */
 
+#define I2C_BFLB_IRQ_HANDLER_DECL(n)						\
+	static void i2c_bflb_config_func_##n(const struct device *dev);
+#define I2C_BFLB_IRQ_HANDLER_FUNC(n)						\
+	.irq_config_func = i2c_bflb_config_func_##n
+#define I2C_BFLB_IRQ_HANDLER(n)							\
+	static void i2c_bflb_config_func_##n(const struct device *dev)		\
+	{									\
+		IRQ_CONNECT(DT_INST_IRQN(n),					\
+			    DT_INST_IRQ(n, priority),				\
+			    i2c_bflb_isr,					\
+			    DEVICE_DT_INST_GET(n),				\
+			    0);							\
+		irq_enable(DT_INST_IRQN(n));					\
+	}
+
 #define I2C_BFLB_INIT(n) \
 	PINCTRL_DT_INST_DEFINE(n);					\
+	I2C_BFLB_IRQ_HANDLER_DECL(n)					\
 	static struct i2c_bflb_data i2c##n##_bflb_data;			\
 	static const struct i2c_bflb_cfg i2c_bflb_cfg_##n = {		\
 		.pincfg = PINCTRL_DT_INST_DEV_CONFIG_GET(n),		\
 		.base = DT_INST_REG_ADDR(n), 				\
 		.dts_freq = DT_INST_PROP(n, clock_frequency),		\
+		I2C_BFLB_IRQ_HANDLER_FUNC(n)				\
 	}; 								\
 	I2C_DEVICE_DT_INST_DEFINE(n,					\
 			    i2c_bflb_init,				\
@@ -810,6 +970,6 @@ static const struct i2c_driver_api i2c_bflb_api = {
 			    &i2c_bflb_cfg_##n,				\
 			    POST_KERNEL,				\
 			    CONFIG_I2C_INIT_PRIORITY,			\
-			    &i2c_bflb_api);
-
+			    &i2c_bflb_api);				\
+	I2C_BFLB_IRQ_HANDLER(n)
 DT_INST_FOREACH_STATUS_OKAY(I2C_BFLB_INIT)
