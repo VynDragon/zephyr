@@ -24,8 +24,8 @@ LOG_MODULE_REGISTER(i2c_bflb);
 
 /* defines */
 
-#define I2C_WAIT_TIMEOUT_MS 150
-#define I2C_MAX_PACKET_LENGTH 256
+#define I2C_WAIT_TIMEOUT_MS 100
+#define I2C_MAX_PACKET_LENGTH 512
 
 /* Structure declarations */
 
@@ -38,13 +38,9 @@ struct i2c_bflb_cfg {
 
 struct i2c_bflb_data {
 	bool is_10_bits_address;
+	/* bit 0: we are busy, bit 1: available rx data */
+	atomic_t atomic_data;
 };
-
-/* a buffer for when when dont get whole 32-bit words */
-
-static uint8_t i2c_bflb_temp_buf[4] = {0};
-static uint32_t i2c_bflb_temp_buf_cnt = 0;
-
 
 static uint8_t i2c_bflb_msg_stack[I2C_MAX_PACKET_LENGTH] = {0};
 static uint8_t *i2c_bflb_msg_stack_pointer = &(i2c_bflb_msg_stack[0]);
@@ -268,49 +264,6 @@ I2C_CR_I2C_PRD_D_PH_1_SHIFT;	/* data phase1 must not be 0 */
 	sys_write32(tmpVal, config->base + I2C_PRD_STOP_OFFSET);
 }
 
-static void i2c_bflb_clear_fifo(const struct device *dev)
-{
-	uint32_t tmpVal = 0;
-	const struct i2c_bflb_cfg *config = dev->config;
-
-
-	tmpVal = sys_read32(config->base + I2C_FIFO_CONFIG_0_OFFSET);
-	tmpVal |= I2C_TX_FIFO_CLR;
-	tmpVal |= I2C_RX_FIFO_CLR;
-	sys_write32(tmpVal, config->base + I2C_FIFO_CONFIG_0_OFFSET);
-}
-
-static void i2c_bflb_clear_int(const struct device *dev)
-{
-	uint32_t tmpVal = 0;
-	const struct i2c_bflb_cfg *config = dev->config;
-
-
-	tmpVal = sys_read32(config->base + I2C_INT_STS_OFFSET);
-	tmpVal |= I2C_CR_I2C_END_CLR;
-	tmpVal |= I2C_CR_I2C_NAK_CLR;
-	tmpVal |= I2C_CR_I2C_ARB_CLR;
-	sys_write32(tmpVal, config->base + I2C_INT_STS_OFFSET);
-}
-
-
-static void i2c_bflb_clock_enabled(const struct device *dev, bool enabled)
-{
-	uint32_t tmpVal = 0;
-	const struct i2c_bflb_cfg *config = dev->config;
-
-	tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG3_OFFSET);
-	if (enabled)
-	{
-		tmpVal |= (1 << GLB_I2C_CLK_EN_POS);
-	}
-	else
-	{
-		tmpVal &= ~(1 << GLB_I2C_CLK_EN_POS);
-	}
-	sys_write32(tmpVal, GLB_BASE + GLB_CLK_CFG3_OFFSET);
-}
-
 static void i2c_bflb_trigger(const struct device *dev)
 {
 	uint32_t tmpVal = 0;
@@ -321,25 +274,23 @@ static void i2c_bflb_trigger(const struct device *dev)
 	sys_write32(tmpVal, config->base + I2C_CONFIG_OFFSET);
 }
 
-static void i2c_bflb_enabled(const struct device *dev, bool enabled)
+static void i2c_bflb_detrigger(const struct device *dev)
 {
 	uint32_t tmpVal = 0;
 	const struct i2c_bflb_cfg *config = dev->config;
 
 	tmpVal = sys_read32(config->base + I2C_CONFIG_OFFSET);
-	if (enabled)
-	{
-		/* this is really more of a transaction trigger */
-		tmpVal |= I2C_CR_I2C_M_EN;
-	}
-	else
-	{
-		tmpVal &= ~I2C_CR_I2C_M_EN;
-		i2c_bflb_clear_fifo(dev);
-		i2c_bflb_clear_int(dev);
-	}
+	tmpVal &= ~I2C_CR_I2C_M_EN;
 	sys_write32(tmpVal, config->base + I2C_CONFIG_OFFSET);
 }
+
+static int i2c_bflb_triggered(const struct device *dev)
+{
+	const struct i2c_bflb_cfg *config = dev->config;
+
+	return(sys_read32(config->base + I2C_CONFIG_OFFSET) & I2C_CR_I2C_M_EN);
+}
+
 
 /* API Functions */
 
@@ -347,7 +298,6 @@ static int i2c_bflb_configure(const struct device *dev, uint32_t dev_config)
 {
 	const struct i2c_bflb_cfg *config = dev->config;
 	struct i2c_bflb_data *data = dev->data;
-	uint32_t speed_nb = I2C_SPEED_GET(dev_config);
 	uint32_t speed_freq = 0;
 	uint32_t mode = (dev_config & I2C_MODE_CONTROLLER) >> 4;
 	uint32_t tenbit_addr = dev_config & I2C_ADDR_10_BITS;
@@ -377,7 +327,13 @@ static int i2c_bflb_configure(const struct device *dev, uint32_t dev_config)
 			return -ENOTSUP;
 	}
 
-	i2c_bflb_enabled(dev, false);
+	/* clean*/
+	i2c_bflb_detrigger(dev);
+	tmpVal = sys_read32(config->base + I2C_FIFO_CONFIG_0_OFFSET);
+	tmpVal |= I2C_TX_FIFO_CLR;
+	tmpVal |= I2C_RX_FIFO_CLR;
+	sys_write32(tmpVal, config->base + I2C_FIFO_CONFIG_0_OFFSET);
+
 	tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG3_OFFSET);
 	/* set div to 0 */
 	tmpVal = tmpVal & GLB_I2C_CLK_DIV_UMSK;
@@ -420,7 +376,6 @@ static int i2c_bflb_configure(const struct device *dev, uint32_t dev_config)
 		LOG_ERR("Not Controller Mode unsupported");
 		return -EIO;
 	}
-//i2c_bflb_enabled(dev, true);
 	return 0;
 }
 
@@ -428,7 +383,6 @@ static void i2c_bflb_set_address(const struct device *dev, uint32_t address)
 {
 	uint32_t tmpVal = 0;
 	const struct i2c_bflb_cfg *config = dev->config;
-	struct i2c_bflb_data *data = dev->data;
 
 	tmpVal = sys_read32(config->base + I2C_CONFIG_OFFSET);
 	/* no sub addresses */
@@ -450,60 +404,20 @@ static void i2c_bflb_set_address(const struct device *dev, uint32_t address)
 	sys_write32(tmpVal, config->base + I2C_CONFIG_OFFSET);
 }
 
-static int i2c_bflb_busy(const struct device *dev)
-{
-	const struct i2c_bflb_cfg *config = dev->config;
-	uint32_t tmpVal = 0;
-	int rc = 0;
-
-	tmpVal = sys_read32(config->base + I2C_BUS_BUSY_OFFSET);
-	if (tmpVal & I2C_STS_I2C_BUS_BUSY)
-	{
-		rc += 1;
-	}
-	return rc;
-}
-
-static int i2c_bflb_txready(const struct device *dev)
-{
-	const struct i2c_bflb_cfg *config = dev->config;
-	uint32_t tmpVal = 0;
-	int rc = 1;
-
-	tmpVal = sys_read32(config->base + I2C_INT_STS_OFFSET);
-	if (tmpVal & I2C_TXF_INT)
-	{
-		rc -= 1;
-	}
-	return rc;
-}
-
-static int i2c_bflb_rxready(const struct device *dev)
-{
-	const struct i2c_bflb_cfg *config = dev->config;
-	uint32_t tmpVal = 0;
-	int rc = 0;
-
-	tmpVal = sys_read32(config->base + I2C_INT_STS_OFFSET);
-	if (tmpVal & I2C_RXF_INT > 0)
-	{
-		rc += 1;
-	}
-	return rc;
-}
 
 static int i2c_bflb_read_bits(const struct device *dev, uint8_t *buf, uint8_t num)
 {
 	const struct i2c_bflb_cfg *config = dev->config;
+	struct i2c_bflb_data *data = dev->data;
 	uint32_t timeout = 0;
 	uint32_t tmpVal = 0;
 
 	timeout = 0;
-	while (i2c_bflb_rxready(dev) == 0 && timeout < I2C_WAIT_TIMEOUT_MS) {
-		k_sleep(K_MSEC(1));
+	while (!atomic_test_bit(&(data->atomic_data), 1) && timeout < I2C_WAIT_TIMEOUT_MS * 200) {
+		k_sleep(K_USEC(5));
 		timeout++;
 	}
-	if (timeout >= I2C_WAIT_TIMEOUT_MS)
+	if (timeout >= I2C_WAIT_TIMEOUT_MS * 200)
 	{
 		return -ETIMEDOUT;
 	}
@@ -511,25 +425,34 @@ static int i2c_bflb_read_bits(const struct device *dev, uint8_t *buf, uint8_t nu
 	tmpVal = sys_read32(config->base + I2C_FIFO_RDATA_OFFSET);
 
 	for (uint8_t i = 0; i < num; i++) {
-		buf[i] |= (tmpVal >> ((i % 4) * 8)) & 0xFF;
+		buf[i] = (tmpVal >> ((i % 4) * 8)) & 0xFF;
 	}
 	return 0;
 }
 
 static int i2c_bflb_read_msgs(const struct device *dev,
 				struct i2c_msg *msgs,
-				uint8_t num_msgs,
-				uint16_t addr)
+				uint8_t num_msgs)
 {
 	const struct i2c_bflb_cfg *config = dev->config;
+	struct i2c_bflb_data *data = dev->data;
 	uint32_t tmpVal = 0;
-	uint32_t curByte = 0;
 	uint32_t timeout = 0;
 	uint32_t total_len = 0;
 	uint32_t i = 0;
 	uint32_t z = 0;
-	uint32_t buffered = 0;
 
+	/* wait for transmission end*/
+	while (atomic_test_bit(&(data->atomic_data), 0) && timeout < I2C_WAIT_TIMEOUT_MS * 200)
+	{
+		k_sleep(K_USEC(5));
+		timeout++;
+	}
+	if (timeout >= I2C_WAIT_TIMEOUT_MS * 200)
+	{
+		return -ETIMEDOUT;
+	}
+	atomic_set_bit(&(data->atomic_data), 0);
 	for(i = 0; i < num_msgs; i++)
 	{
 		total_len = total_len + msgs[i].len;
@@ -538,7 +461,6 @@ static int i2c_bflb_read_msgs(const struct device *dev,
 	if (total_len > I2C_MAX_PACKET_LENGTH) {
 		return -EINVAL;
 	}
-
 
 	/* set message length */
 	tmpVal = sys_read32(config->base + I2C_CONFIG_OFFSET);
@@ -551,8 +473,13 @@ static int i2c_bflb_read_msgs(const struct device *dev,
 	tmpVal |= I2C_CR_I2C_PKT_DIR;
 	sys_write32(tmpVal, config->base + I2C_CONFIG_OFFSET);
 
+	atomic_clear_bit(&(data->atomic_data), 1);
+	/* unmask rxf */
+	tmpVal = sys_read32(config->base + I2C_INT_STS_OFFSET);
+	tmpVal &= ~I2C_CR_I2C_RXF_MASK;
+	sys_write32(tmpVal, config->base + I2C_INT_STS_OFFSET);
+
 	i2c_bflb_trigger(dev);
-	//i2c_bflb_enabled(dev, true);
 	for(i = 0; i < num_msgs; i++)
 	{
 		
@@ -565,55 +492,44 @@ static int i2c_bflb_read_msgs(const struct device *dev,
 		}
 		if (z % 4 > 0)
 		{
-			i2c_bflb_read_bits(dev, &(msgs[i].buf[z - z % 4 + 1]), z % 4);
+			i2c_bflb_read_bits(dev, &(msgs[i].buf[z - z % 4]), z % 4);
 		}
 	}
-	//i2c_bflb_enabled(dev, false);
 
+	/* clean up RX */
+	tmpVal = sys_read32(config->base + I2C_FIFO_CONFIG_0_OFFSET);
+	tmpVal |= I2C_RX_FIFO_CLR;
+	sys_write32(tmpVal, config->base + I2C_FIFO_CONFIG_0_OFFSET);
 	return 0;
 }
 
-
-static uint32_t i2c_bflb_txfifo_available(const struct device *dev)
-{
-	const struct i2c_bflb_cfg *config = dev->config;
-	return ((sys_read32(config->base + I2C_FIFO_CONFIG_1_OFFSET) & I2C_TX_FIFO_CNT_MASK) >>
-I2C_TX_FIFO_CNT_SHIFT);
-
-}
-
-static uint32_t i2c_bflb_endint(const struct device *dev)
-{
-	const struct i2c_bflb_cfg *config = dev->config;
-	return (sys_read32(config->base + I2C_INT_STS_OFFSET) & I2C_END_INT);
-
-}
-
-static void i2c_bflb_endint_clear(const struct device *dev)
-{
-	const struct i2c_bflb_cfg *config = dev->config;
-	uint32_t tmpVal = 0;
-
-	tmpVal = sys_read32(config->base + I2C_INT_STS_OFFSET);
-	tmpVal &= ~I2C_CR_I2C_END_CLR;
-	sys_write32(tmpVal, config->base + I2C_INT_STS_OFFSET);
-}
-
+/* happens when we have sent I2C_CR_I2C_PKT_LEN bytes */
 static void i2c_bflb_isr_END(const struct device *dev)
 {
 	const struct i2c_bflb_cfg *config = dev->config;
+	struct i2c_bflb_data *data = dev->data;
 	uint32_t tmpVal = 0;
 
 	/* transmit done */
-	/*if (i2c_bflb_msg_stack_pointer_written == i2c_bflb_msg_stack_pointer)
-	{*/
-		i2c_bflb_enabled(dev, false);
+	i2c_bflb_detrigger(dev);
+	if((sys_read32(config->base + I2C_CONFIG_OFFSET) & I2C_CR_I2C_PKT_DIR) == 0)
+	{
 		/* mask txf */
 		tmpVal = sys_read32(config->base + I2C_INT_STS_OFFSET);
 		tmpVal |= I2C_CR_I2C_TXF_MASK;
 		sys_write32(tmpVal, config->base + I2C_INT_STS_OFFSET);
-
-	/*}*/
+	}
+	/* receive done */
+	else if((sys_read32(config->base + I2C_CONFIG_OFFSET) & I2C_CR_I2C_PKT_DIR) == 1)
+	{
+		/*hardware indicator dont work right, we use our own */
+		atomic_set_bit(&(data->atomic_data), 1);
+		/* mask rxf */
+		tmpVal = sys_read32(config->base + I2C_INT_STS_OFFSET);
+		tmpVal |= I2C_CR_I2C_RXF_MASK;
+		sys_write32(tmpVal, config->base + I2C_INT_STS_OFFSET);
+	}
+	atomic_clear_bit(&(data->atomic_data), 0);
 }
 
 static void i2c_bflb_isr_TXF(const struct device *dev)
@@ -621,14 +537,17 @@ static void i2c_bflb_isr_TXF(const struct device *dev)
 	const struct i2c_bflb_cfg *config = dev->config;
 	uint32_t tmpVal = 0;
 	uint32_t i = 0;
+	bool fed = false;
 
-	k_sem_take(&i2c_bflb_msg_stack_ready, K_MSEC(50));
-
+	if (k_sem_take(&i2c_bflb_msg_stack_ready, K_MSEC(50)) != 0)
+	{
+		return;
+	}
 
 	/* feed one */
 	while (i < 4 && i2c_bflb_msg_stack_pointer_written != i2c_bflb_msg_stack_pointer)
 	{
-		//printf("loaded value at %x into fifo\n", i2c_bflb_msg_stack_pointer_written);
+		fed = true;
 		tmpVal |= ((*i2c_bflb_msg_stack_pointer_written) << ((i % 4) * 8));
 		i++;
 		i2c_bflb_msg_stack_pointer_written = i2c_bflb_msg_stack_pointer_written + 1;
@@ -639,154 +558,44 @@ static void i2c_bflb_isr_TXF(const struct device *dev)
 		}
 	}
 	sys_write32(tmpVal, config->base + I2C_FIFO_WDATA_OFFSET);
-	i2c_bflb_trigger(dev);
+	if (fed)
+	{
+		i2c_bflb_trigger(dev);
+	}
 	k_sem_give(&i2c_bflb_msg_stack_ready);
 }
 
 
 static void i2c_bflb_isr_RXF(const struct device *dev)
 {
+	struct i2c_bflb_data *data = dev->data;
 
+	/*hardware indicator dont work right, we use our own */
+	atomic_set_bit(&(data->atomic_data), 1);
 }
-
-static int i2c_bflb_write_bits(const struct device *dev, uint8_t *buf, uint8_t num)
-{
-	const struct i2c_bflb_cfg *config = dev->config;
-	uint32_t timeout = 0;
-	uint32_t tmpVal = 0;
-
-	/* Wait for a previous transfer */
-	if (i2c_bflb_txfifo_available(dev) < 1)
-	{
-		timeout = 0;
-		while (i2c_bflb_endint(dev) == 0 && timeout < I2C_WAIT_TIMEOUT_MS)
-		{
-			k_sleep(K_MSEC(1));
-			timeout++;
-		}
-		if (timeout >= I2C_WAIT_TIMEOUT_MS)
-		{
-			return -ETIMEDOUT;
-		}
-
-	}
-	//i2c_bflb_clear_fifo(dev);
-	for (uint8_t i = 0; i < num; i++) {
-		tmpVal |= (buf[i] << ((i % 4) * 8));
-	}
-
-	i2c_bflb_endint_clear(dev);
-	sys_write32(tmpVal, config->base + I2C_FIFO_WDATA_OFFSET);
-	i2c_bflb_trigger(dev);
-	return 0;
-}
-
-static int i2c_bflb_write_msgs(const struct device *dev,
-				struct i2c_msg *msgs,
-				uint8_t num_msgs,
-				uint16_t addr)
-{
-	const struct i2c_bflb_cfg *config = dev->config;
-	uint32_t tmpVal = 0;
-	uint32_t curByte = 0;
-	uint32_t timeout = 0;
-	uint32_t total_len = 0;
-	uint32_t i = 0;
-	uint32_t z = 0;
-
-	for(i = 0; i < num_msgs; i++)
-	{
-		total_len = total_len + msgs[i].len;
-	}
-
-	if (total_len > I2C_MAX_PACKET_LENGTH) {
-		return -EINVAL;
-	}
-
-	/* set message length */
-	tmpVal = sys_read32(config->base + I2C_CONFIG_OFFSET);
-	tmpVal &= ~I2C_CR_I2C_PKT_LEN_MASK;
-	tmpVal |= ((total_len - 1) << I2C_CR_I2C_PKT_LEN_SHIFT) & I2C_CR_I2C_PKT_LEN_MASK;
-	sys_write32(tmpVal, config->base + I2C_CONFIG_OFFSET);
-
-	/* set write direction */
-	tmpVal = sys_read32(config->base + I2C_CONFIG_OFFSET);
-	tmpVal &= ~I2C_CR_I2C_PKT_DIR;
-	sys_write32(tmpVal, config->base + I2C_CONFIG_OFFSET);
-
-	for(i = 0; i < num_msgs; i++)
-	{
-		for(z = 0; z < msgs[i].len; z++)
-		{
-			i2c_bflb_temp_buf[i2c_bflb_temp_buf_cnt % 4] = msgs[i].buf[z];
-			i2c_bflb_temp_buf_cnt++;
-			if (i2c_bflb_temp_buf_cnt % 4 == 0 && i2c_bflb_temp_buf_cnt > 1)
-			{
-				i2c_bflb_write_bits(dev, i2c_bflb_temp_buf, 4);
-			}
-		}
-	}
-	i2c_bflb_temp_buf_cnt = i2c_bflb_temp_buf_cnt % 4;
-
-	/*if (i2c_bflb_txfifo_available(dev) < 2)
-	{
-		timeout = 0;
-		while (i2c_bflb_endint(dev) == 0 && timeout < I2C_WAIT_TIMEOUT_MS)
-		{
-			k_sleep(K_MSEC(1));
-			timeout++;
-		}
-		if (timeout >= I2C_WAIT_TIMEOUT_MS)
-		{
-			return -ETIMEDOUT;
-		}
-	}*/
-
-
-
-	return 0;
-}
-
-static int i2c_bflb_transfer_finish(const struct device *dev)
-{
-	uint32_t timeout = 0;
-
-	if (i2c_bflb_temp_buf_cnt != 0)
-	{
-		i2c_bflb_write_bits(dev, i2c_bflb_temp_buf, i2c_bflb_temp_buf_cnt + 1);
-		i2c_bflb_temp_buf_cnt = 0;
-	}
-	if (i2c_bflb_txfifo_available(dev) < 2)
-	{
-		timeout = 0;
-		while (i2c_bflb_endint(dev) == 0 && timeout < I2C_WAIT_TIMEOUT_MS)
-		{
-			k_sleep(K_MSEC(1));
-			timeout++;
-		}
-		if (timeout >= I2C_WAIT_TIMEOUT_MS)
-		{
-			return -ETIMEDOUT;
-		}
-	}
-	i2c_bflb_enabled(dev, false);
-}
-
 
 static int i2c_bflb_fill(const struct device *dev,
 				struct i2c_msg *msgs,
 				uint8_t num_msgs)
 {
 	const struct i2c_bflb_cfg *config = dev->config;
+	struct i2c_bflb_data *data = dev->data;
 	uint32_t tmpVal = 0;
 	uint32_t total_len = 0;
+	uint32_t timeout = 0;
 	uint32_t i = 0;
 
 	/* wait for transmission end*/
-	while ((sys_read32(config->base + I2C_CONFIG_OFFSET) & I2C_CR_I2C_M_EN) != 0)
+	while (atomic_test_bit(&(data->atomic_data), 0) && timeout < I2C_WAIT_TIMEOUT_MS * 200)
 	{
-		k_sleep(K_MSEC(1));
+		k_sleep(K_USEC(5));
+		timeout++;
 	}
+	if (timeout >= I2C_WAIT_TIMEOUT_MS * 200)
+	{
+		return -ETIMEDOUT;
+	}
+	atomic_set_bit(&(data->atomic_data), 0);
 
 	for(i = 0; i < num_msgs; i++)
 	{
@@ -797,6 +606,12 @@ static int i2c_bflb_fill(const struct device *dev,
 		return -EINVAL;
 	}
 
+	i2c_bflb_detrigger(dev);
+	/* clean up TX */
+	tmpVal = sys_read32(config->base + I2C_FIFO_CONFIG_0_OFFSET);
+	tmpVal |= I2C_TX_FIFO_CLR;
+	sys_write32(tmpVal, config->base + I2C_FIFO_CONFIG_0_OFFSET);
+
 	/* set message length */
 	tmpVal = sys_read32(config->base + I2C_CONFIG_OFFSET);
 	tmpVal &= ~I2C_CR_I2C_PKT_LEN_MASK;
@@ -808,7 +623,7 @@ static int i2c_bflb_fill(const struct device *dev,
 	tmpVal &= ~I2C_CR_I2C_PKT_DIR;
 	sys_write32(tmpVal, config->base + I2C_CONFIG_OFFSET);
 
-	k_sem_take(&i2c_bflb_msg_stack_ready, K_MSEC(500));
+	k_sem_take(&i2c_bflb_msg_stack_ready, K_MSEC(I2C_WAIT_TIMEOUT_MS));
 	for(i = 0; i < num_msgs; i++)
 	{
 		for(uint32_t j = 0; j < msgs[i].len; j++)
@@ -863,13 +678,34 @@ static int i2c_bflb_transfer(const struct device *dev,
 
 	 for (uint8_t i = 0; i < num_msgs; i++) {
 		if ((msgs[i].flags & I2C_MSG_RW_MASK) == I2C_MSG_READ) {
-			rc = i2c_bflb_read_msgs(dev, &(msgs[i]), 1, addr);
+			pass_num = 0;
+			while ((msgs[i + pass_num].flags & I2C_MSG_RW_MASK) == (msgs[i].flags &
+I2C_MSG_RW_MASK) && (msgs[i + pass_num].flags & I2C_MSG_STOP) == 0 && pass_num + i < num_msgs)
+			{
+				pass_num++;
+			}
+			if ((msgs[i + pass_num].flags & I2C_MSG_RW_MASK) != I2C_MSG_READ &&
+pass_num > 0)
+			{
+				pass_num--;
+			}
+			rc = i2c_bflb_read_msgs(dev, &(msgs[i]), pass_num + 1);
+			/*if ((msgs[i + pass_num].flags & I2C_MSG_STOP) != 0)
+			{
+				i2c_bflb_detrigger(dev);
+			}*/
+			i = i + pass_num;
 		} else {
 			pass_num = 0;
 			while ((msgs[i + pass_num].flags & I2C_MSG_RW_MASK) == (msgs[i].flags &
 I2C_MSG_RW_MASK) && (msgs[i + pass_num].flags & I2C_MSG_STOP) == 0 && pass_num + i < num_msgs)
 			{
 				pass_num++;
+			}
+			if ((msgs[i + pass_num].flags & I2C_MSG_RW_MASK) != I2C_MSG_WRITE &&
+pass_num > 0)
+			{
+				pass_num--;
 			}
 			rc = i2c_bflb_fill(dev, &(msgs[i]), pass_num + 1);
 			i = i + pass_num;
@@ -887,17 +723,25 @@ I2C_MSG_RW_MASK) && (msgs[i + pass_num].flags & I2C_MSG_STOP) == 0 && pass_num +
 static int i2c_bflb_init(const struct device *dev)
 {
 	const struct i2c_bflb_cfg *config = dev->config;
+	struct i2c_bflb_data *data = dev->data;
 	int rc = 0;
 	uint32_t dev_config = 0;
+	uint32_t tmpVal = 0;
 
+	/* pin control */
 	pinctrl_apply_state(config->pincfg, PINCTRL_STATE_DEFAULT);
-	i2c_bflb_clock_enabled(dev, true);
+	/* init */
 	dev_config = (I2C_MODE_CONTROLLER | i2c_map_dt_bitrate(config->dts_freq));
 	k_sem_init(&i2c_bflb_msg_stack_ready, 0, 1);
+	data->atomic_data = ATOMIC_INIT(0);
 	config->irq_config_func(dev);
+	/* clean*/
+	i2c_bflb_detrigger(dev);
+	tmpVal = sys_read32(config->base + I2C_FIFO_CONFIG_0_OFFSET);
+	tmpVal |= I2C_TX_FIFO_CLR;
+	tmpVal |= I2C_RX_FIFO_CLR;
+	sys_write32(tmpVal, config->base + I2C_FIFO_CONFIG_0_OFFSET);
 	rc = i2c_bflb_configure(dev, dev_config);
-	/* clear */
-	i2c_bflb_enabled(dev, false);
 	if (rc != 0) {
 		LOG_ERR("Failed to configure I2C on init");
 		return rc;
