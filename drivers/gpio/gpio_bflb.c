@@ -12,6 +12,9 @@
 #include <zephyr/irq.h>
 #include <hardware/glb_reg.h>
 
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(gpio_bflb);
+
 #include <zephyr/drivers/gpio/gpio_utils.h>
 
 /* this driver supports only 32 GPIO, which happens to be the maximum on BL6 and 7 serie.
@@ -184,17 +187,33 @@ static int gpio_bflb_config(const struct device *dev, gpio_pin_t pin,
 
 
 	/* Disable output anyway */
-	tmpVal_a = sys_read32(GLB_BASE + GLB_GPIO_CFGCTL34_OFFSET + ((pin >> 5) << 2));
+	tmpVal_a = sys_read32(cfg->base_reg + GLB_GPIO_CFGCTL34_OFFSET + ((pin >> 5) << 2));
 	tmpVal_a &= ~(1 << (pin & 0x1f));
-	sys_write32(tmpVal_a, GLB_BASE + GLB_GPIO_CFGCTL34_OFFSET + ((pin >> 5) << 2));
+	sys_write32(tmpVal_a, cfg->base_reg + GLB_GPIO_CFGCTL34_OFFSET + ((pin >> 5) << 2));
 
+
+#ifdef CONFIG_SOC_SERIES_BL7
 	is_odd = pin & 1;
-
-	cfg_address = GLB_BASE + GLB_GPIO_CFGCTL0_OFFSET + (pin / 2 * 4);
+	cfg_address = cfg->base_reg + GLB_GPIO_CFGCTL0_OFFSET + (pin / 2 * 4);
+	if (pin >= 23 && pin <= 28) {
+		if ((flags & GPIO_INPUT) != 0)
+		{
+			LOG_ERR("BL70x pins 23 to 28 are not capable of input");
+			return -EINVAL;
+		}
+		if (sys_read32(GLB_BASE + GLB_GPIO_USE_PSRAM__IO_OFFSET) & (1 << (pin - 23))) {
+			cfg_address = cfg->base_reg + GLB_GPIO_CFGCTL0_OFFSET + ((pin + 9) / 2 * 4);
+			is_odd = (pin + 9) & 1;
+		}
+	}
+#else
+	is_odd = pin & 1;
+	cfg_address = cfg->base_reg + GLB_GPIO_CFGCTL0_OFFSET + (pin / 2 * 4);
+#endif
 	tmpVal_b = sys_read32(cfg_address);
 	//cfg &= ~(0xffff << (16 * is_odd));
 
-	tmpVal_a = sys_read32(GLB_BASE + GLB_GPIO_CFGCTL34_OFFSET + ((pin >> 5) << 2));
+	tmpVal_a = sys_read32(cfg->base_reg + GLB_GPIO_CFGCTL34_OFFSET + ((pin >> 5) << 2));
 
 
 	if ((flags & GPIO_INPUT) != 0) {
@@ -225,7 +244,7 @@ static int gpio_bflb_config(const struct device *dev, gpio_pin_t pin,
 	}
 
 
-	sys_write32(tmpVal_a, GLB_BASE + GLB_GPIO_CFGCTL34_OFFSET + ((pin >> 5) << 2));
+	sys_write32(tmpVal_a, cfg->base_reg + GLB_GPIO_CFGCTL34_OFFSET + ((pin >> 5) << 2));
 
 	if ((flags & GPIO_PULL_UP) != 0) {
 		tmpVal_b |= (1 << (is_odd * 16 + 4));
