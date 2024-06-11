@@ -259,8 +259,18 @@ static int gpio_bflb_config(const struct device *dev, gpio_pin_t pin,
 	}
 
 	/* GPIO mode */
+#ifdef CONFIG_SOC_SERIES_BL7
+	/* but function goes in the right place */
+	if (pin >= 23 && pin <= 28) {
+		tmpVal = sys_read32(cfg->base_reg + GLB_GPIO_CFGCTL0_OFFSET + (pin / 2 * 4));
+		tmpVal &= ~(0x1f << ((pin & 1) * 16 + 8));
+		tmpVal |= (11 << ((pin & 1) * 16 + 8));
+		sys_write32(tmpVal, cfg->base_reg + GLB_GPIO_CFGCTL0_OFFSET + (pin / 2 * 4));
+	}
+#else
+	tmpVal_b &= ~(0x1f << (is_odd * 16 + 8));
 	tmpVal_b |= (11 << (is_odd * 16 + 8));
-
+#endif
 	/* enabled SMT in GPIO mode */
 	tmpVal_b |= (1 << (is_odd * 16 + 1));
 
