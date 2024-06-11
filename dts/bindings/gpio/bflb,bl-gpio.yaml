@@ -19,16 +19,7 @@ properties:
     "#gpio-cells":
       const: 2
 
-    "#bflb,pin-cells":
-      type: int
-      required: true
-      const: 2
-      description: Number of items to expect in a bflb,pins specifier
-
 gpio-cells:
   - pin
   - flags
 
-bflb,pin-cells:
-  - pin
-  - peripheral
