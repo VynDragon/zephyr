@@ -267,6 +267,11 @@ static int gpio_bflb_config(const struct device *dev, gpio_pin_t pin,
 		tmpVal |= (11 << ((pin & 1) * 16 + 8));
 		sys_write32(tmpVal, cfg->base_reg + GLB_GPIO_CFGCTL0_OFFSET + (pin / 2 * 4));
 	}
+	else
+	{
+		tmpVal_b &= ~(0x1f << (is_odd * 16 + 8));
+		tmpVal_b |= (11 << (is_odd * 16 + 8));
+	}
 #else
 	tmpVal_b &= ~(0x1f << (is_odd * 16 + 8));
 	tmpVal_b |= (11 << (is_odd * 16 + 8));
