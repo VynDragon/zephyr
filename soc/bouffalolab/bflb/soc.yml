@@ -14,3 +14,8 @@ family:
     - name: bl706c10q2i
     - name: bl706s10q2i
     - name: bl706c22q2i
+  - name: bl61
+    socs:
+    - name: bl616c50q2i
+    - name: bl616s50q2i
+    - name: bl618m05q2i

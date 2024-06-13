@@ -1,0 +1,80 @@
+/*
+ * Copyright (c) 2024 MASSDRIVER EI (massdriver.space)
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/dts-v1/;
+
+#include <bouffalolab/bl616.dtsi>
+#include <zephyr/dt-bindings/gpio/gpio.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+#include "ai_m62_12f-pinctrl.dtsi"
+
+/ {
+	model = "bl616 ai_m62_12f";
+	compatible = "bflb,bl616";
+
+	chosen {
+		zephyr,flash = &flash0;
+		zephyr,itcm = &itcm;
+		zephyr,dtcm = &dtcm;
+		zephyr,sram = &sram0;
+		zephyr,console = &uart0;
+		zephyr,shell-uart = &uart0;
+		//led0 = &blue_led;
+		//sw0 = &button_0;
+	};
+
+	/*aliases {
+		led0 = &blue_led;
+		sw0 = &button_0;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		blue_led: led_0 {
+			gpios =  <&gpio0 7 GPIO_ACTIVE_HIGH>;
+			label = "Blue - LED0";
+		};
+	};
+
+	buttons {
+		compatible = "gpio-keys";
+		button_0: sw0 {
+			gpios = <&gpio0 28 (GPIO_ACTIVE_HIGH)>;
+			zephyr,code = <INPUT_KEY_0>;
+		};
+	};*/
+
+};
+
+&cpu0 {
+	clock-frequency = <320000000>;
+};
+
+&spi1 {
+	reg = <0x4000b000 0x1000 0x23000000 0xc00000>;
+	flash0: flash@0 {
+		compatible = "jedec,spi-nor";
+		size = <DT_SIZE_M(4)>;
+		label = "FLASH0";
+		reg = <0>;
+		// Dummy entry
+		spi-max-frequency = <0>;
+	};
+};
+
+&uart0 {
+	status = "okay";
+	current-speed = <115200>;
+
+	pinctrl-0 = <&uart0_default>;
+	pinctrl-1 = <&uart0_sleep>;
+	pinctrl-names = "default", "sleep";
+};
+
+/*&gpio0 {
+	status = "okay";
+};*/
+
