@@ -1,11 +1,11 @@
 # Copyright (c) 2024 MASSDRIVER EI (massdriver.space)
 # SPDX-License-Identifier: Apache-2.0
 
-identifier: xt_bl_zb1
-name: bl702 module
+identifier: ai_m62_12f
+name: bl616 module
 type: mcu
 arch: riscv32
-ram: 132
+ram: 480
 toolchain:
   - zephyr
 testing:
