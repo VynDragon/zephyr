@@ -147,36 +147,44 @@ static uint32_t i2c_bflb_get_bclk_clk(void)
 	uint32_t tmpVal = 0;
 	uint32_t i2c_divider = 0;
 	uint32_t hclk_divider = 0;
+	uint32_t bclk_divider = 0;
 
-	/* FCLK -> BCLK */
+	/* root -> HCLK */
 	tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG0_OFFSET);
 	hclk_divider = (tmpVal & GLB_REG_HCLK_DIV_MSK) >> GLB_REG_HCLK_DIV_POS;
+
+	/* HCLK -> BCLK */
+	tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG0_OFFSET);
+	bclk_divider = (tmpVal & GLB_REG_BCLK_DIV_MSK) >> GLB_REG_BCLK_DIV_POS;
 
 	/* bclk -> i2cclk */
 	tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG3_OFFSET);
 	i2c_divider = (tmpVal & GLB_I2C_CLK_DIV_MSK) >> GLB_I2C_CLK_DIV_POS;
 
-	/* what is fclk */
+	/* what is root */
 	tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG0_OFFSET);
 	tmpVal = (tmpVal & GLB_HBN_ROOT_CLK_SEL_MSK) >> GLB_HBN_ROOT_CLK_SEL_POS;
 
 	if (tmpVal == 0)
 	{
 		/* RC32M clock */
-		tmpVal = (32 * 1000 * 1000) / (hclk_divider + 1);
-		return (tmpVal / (i2c_divider + 1));
+		tmpVal = (32 * 1000 * 1000) / (hclk_divider + 1)
+		/ (bclk_divider + 1) / (i2c_divider + 1);
+		return tmpVal;
 	}
 	else if (tmpVal == 1)
 	{
 		/* Crystal clock */
-		tmpVal = uart_bflb_get_crystal_frequency() / (hclk_divider + 1);
-		return (tmpVal / (i2c_divider + 1));
+		tmpVal = uart_bflb_get_crystal_frequency() / (hclk_divider + 1)
+		/ (bclk_divider + 1) / (i2c_divider + 1);
+		return tmpVal;
 	}
 	else if (tmpVal > 1)
 	{
 		/* PLL Clock */
-		tmpVal = uart_bflb_get_PLL_frequency() / (hclk_divider + 1);
-		return (tmpVal / (i2c_divider + 1));
+		tmpVal = uart_bflb_get_PLL_frequency() / (hclk_divider + 1)
+		/ (bclk_divider + 1) / (i2c_divider + 1);
+		return tmpVal;
 
 	}
 	return 0;
