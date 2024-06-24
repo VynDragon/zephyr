@@ -100,7 +100,6 @@
 		spi0: spi@2000a200 {
 			compatible = "bflb,bl-spi";
 			reg = <0x2000a200 0x100>;
-			peripheral-id = <0>;
 			interrupts = <43 0>;
 			interrupt-parent = <&clic>;
 			status = "disabled";
