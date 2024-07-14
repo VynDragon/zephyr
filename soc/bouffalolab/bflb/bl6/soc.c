@@ -775,8 +775,8 @@ static void system_clock_init(void)
 	system_set_root_clock_dividers(0, 0);
 	system_clock_trim_32M();
 #else
-	system_init_root_clock(5, 3);
-	system_set_root_clock_dividers(0, 1);
+	system_init_root_clock(5, 4);
+	system_set_root_clock_dividers(0, 2);
 #endif
 	system_set_machine_timer_clock(1, 0, mtimer_get_clk_src_div());
 }

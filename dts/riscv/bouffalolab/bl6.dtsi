@@ -53,10 +53,7 @@
 
 		sram0: memory@42020000 {
 			compatible = "mmio-sram";
-		};
-		sram1: memory@42030000 {
-			compatible = "mmio-sram";
-			reg = <0x42030000 DT_SIZE_K(112)>;
+			reg = <0x42020000 DT_SIZE_K(176)>;
 		};
 
 		clint: clint@2000000 {

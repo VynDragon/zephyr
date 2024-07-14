@@ -14,4 +14,7 @@ testing:
     - bluetooth
 supported:
   - uart
+  - i2c
+  - spi
+  - gpio
 vendor: bouffalolab

@@ -25,13 +25,13 @@ LOG_MODULE_REGISTER(i2c_bflb);
 
 /* defines */
 
-#define I2C_WAIT_TIMEOUT_MS 10000
+#define I2C_WAIT_TIMEOUT_MS 100
 #define I2C_MAX_PACKET_LENGTH 0xFF
 
 /* dependant on frequency, if you run at low frequencies, reduce this for more
  * performance, if you are having issues sporadically (like addresswrite and then no data), increase
  * it */
-#define I2C_DUMMY_WAIT __asm__ volatile (".rept 160 ; nop ; .endr");
+#define I2C_DUMMY_WAIT __asm__ volatile (".rept 200 ; nop ; .endr");
 
 /* Structure declarations */
 

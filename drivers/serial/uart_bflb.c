@@ -730,7 +730,7 @@ static const struct uart_driver_api uart_bflb_driver_api = {
 		.flow_ctrl = UART_FLOWCTRL_NONE,				\
 		/* overflow interupt thresold, size is 32 bytes*/		\
 		.tx_fifo_threshold = 8,						\
-		.rx_fifo_threshold = 1,						\
+		.rx_fifo_threshold = 0,						\
 		BFLB_UART_IRQ_HANDLER_FUNC(instance)				\
 	};									\
 	DEVICE_DT_INST_DEFINE(instance, &uart_bflb_init,			\
