@@ -100,6 +100,7 @@ bbc	BBC
 bcdevices	Blue Clover Devices
 beacon	Compass Electronics Group, LLC
 beagle	BeagleBoard.org Foundation
+bflb	Bouffalo Lab (Nanjing) Co., Ltd.
 bhf	Beckhoff Automation GmbH & Co. KG
 bitmain	Bitmain Technologies
 blues	Blues Wireless
@@ -765,6 +766,7 @@ yones-toptech	Yones Toptech Co., Ltd.
 ys	Shenzhen Yashi Changhua Intelligent Technology Co., Ltd.
 ysoft	Y Soft Corporation a.s.
 zarlink	Zarlink Semiconductor
+zb	Zbit Semiconductor, Inc.
 zealz	Zealz
 zeitec	ZEITEC Semiconductor Co., LTD.
 zephyr	Zephyr-specific binding
