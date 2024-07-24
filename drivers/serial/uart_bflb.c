@@ -18,8 +18,8 @@
 
 
 #include <soc.h>
-#include <common_hardware/uart_reg.h>
-#include <bflb_uart.h>
+#include <bouffalolab/common/uart_reg.h>
+#include <bouffalolab/common/bflb_uart.h>
 
 
 
@@ -66,7 +66,7 @@ static void uart_bflb_enabled(const struct device *dev, uint32_t enable)
 	sys_write32(txt, cfg->base_reg + UART_UTX_CONFIG_OFFSET);
 }
 
-#ifdef CONFIG_SOC_SERIES_BL6
+#ifdef CONFIG_SOC_SERIES_BL60X
 
 static uint32_t uart_bflb_get_crystal_frequency(void)
 {
@@ -180,7 +180,7 @@ static uint32_t uart_bflb_get_clock(void)
 	return 0;
 }
 
-#elif defined( CONFIG_SOC_SERIES_BL7 )
+#elif defined( CONFIG_SOC_SERIES_BL70X )
 
 
 static uint32_t uart_bflb_get_crystal_frequency(void)
@@ -529,7 +529,7 @@ cfg->base_reg + UART_BIT_PRD_OFFSET);
 	sys_write32(rx_cfg, cfg->base_reg + UART_URX_CONFIG_OFFSET);
 
 	/* enable hardware control RTS */
-	#if defined(CONFIG_SOC_SERIES_BL6)
+	#if defined(CONFIG_SOC_SERIES_BL60X)
 	tmpVal = sys_read32(cfg->base_reg + UART_URX_CONFIG_OFFSET);
 	tmpVal &= ~UART_CR_URX_RTS_SW_MODE;
 	sys_write32(tmpVal, cfg->base_reg + UART_URX_CONFIG_OFFSET);

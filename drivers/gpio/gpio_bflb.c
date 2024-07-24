@@ -192,7 +192,7 @@ static int gpio_bflb_config(const struct device *dev, gpio_pin_t pin,
 	sys_write32(tmpVal_a, cfg->base_reg + GLB_GPIO_CFGCTL34_OFFSET + ((pin >> 5) << 2));
 
 
-#ifdef CONFIG_SOC_SERIES_BL7
+#ifdef CONFIG_SOC_SERIES_BL70X
 	is_odd = pin & 1;
 	cfg_address = cfg->base_reg + GLB_GPIO_CFGCTL0_OFFSET + (pin / 2 * 4);
 	if (pin >= 23 && pin <= 28) {
@@ -259,7 +259,7 @@ static int gpio_bflb_config(const struct device *dev, gpio_pin_t pin,
 	}
 
 	/* GPIO mode */
-#ifdef CONFIG_SOC_SERIES_BL7
+#ifdef CONFIG_SOC_SERIES_BL70X
 	/* but function goes in the right place */
 	if (pin >= 23 && pin <= 28) {
 		tmpVal = sys_read32(cfg->base_reg + GLB_GPIO_CFGCTL0_OFFSET + (pin / 2 * 4));

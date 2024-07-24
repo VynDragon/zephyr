@@ -24,9 +24,9 @@ LOG_MODULE_REGISTER(spi_bflb);
 #include <soc.h>
 #include <common_hardware/spi_reg.h>
 
-#if defined(CONFIG_SOC_SERIES_BL6) || defined(CONFIG_SOC_SERIES_BL7)
+#if defined(CONFIG_SOC_SERIES_BL60X) || defined(CONFIG_SOC_SERIES_BL70X)
 #define GLB_SPI_MODE_ADDRESS 0x40000080
-#elif defined(CONFIG_SOC_SERIES_BL61)
+#elif defined(CONFIG_SOC_SERIES_BL61X)
 #define GLB_SPI_MODE_ADDRESS 0x20000510
 #endif
 
@@ -54,7 +54,7 @@ static uint8_t *spi_bflb_buffer_pointer_written = &(spi_bflb_buffer[0]);
 
 
 /* this will go in clock driver when clock driver is a thing */
-#ifdef CONFIG_SOC_SERIES_BL6
+#ifdef CONFIG_SOC_SERIES_BL60X
 
 static uint32_t uart_bflb_get_crystal_frequency(void)
 {
@@ -115,7 +115,7 @@ static uint32_t uart_bflb_get_PLL_frequency(void)
 	}
 }
 
-#elif defined( CONFIG_SOC_SERIES_BL7 )
+#elif defined( CONFIG_SOC_SERIES_BL70X )
 
 
 static uint32_t uart_bflb_get_crystal_frequency(void)

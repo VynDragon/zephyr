@@ -1,10 +1,11 @@
 /*
- * Copyright (c) 2021 ATL Electronics
+ * Copyright (c) 2024 MASSDRIVER EI (massdriver.space)
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <bouffalolab/bl7.dtsi>
+#include <bouffalolab/bl70x.dtsi>
+#include <dt-bindings/pinctrl/bl702x-pinctrl.h>
 
 / {
 	soc {

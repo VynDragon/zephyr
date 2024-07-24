@@ -9,7 +9,7 @@
 #include <zephyr/drivers/pinctrl.h>
 #include <zephyr/dt-bindings/pinctrl/bflb-common-pinctrl.h>
 #include <zephyr/dt-bindings/pinctrl/bl60x-pinctrl.h>
-#include <hardware/glb_reg.h>
+#include <glb_reg.h>
 
 
 void pinctrl_configure_uart(uint8_t pin, uint8_t func)

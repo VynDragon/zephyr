@@ -53,7 +53,7 @@ struct i2c_bflb_data {
 /* Support Functions */
 
 /* this will go in clock driver when clock driver is a thing */
-#ifdef CONFIG_SOC_SERIES_BL6
+#ifdef CONFIG_SOC_SERIES_BL60X
 
 static uint32_t uart_bflb_get_crystal_frequency(void)
 {
@@ -114,7 +114,7 @@ static uint32_t uart_bflb_get_PLL_frequency(void)
 	}
 }
 
-#elif defined( CONFIG_SOC_SERIES_BL7 )
+#elif defined( CONFIG_SOC_SERIES_BL70X )
 
 
 static uint32_t uart_bflb_get_crystal_frequency(void)
@@ -374,7 +374,7 @@ static int i2c_bflb_configure(const struct device *dev, uint32_t dev_config)
 	sys_write32(tmpVal, config->base + I2C_INT_STS_OFFSET);
 
 	i2c_bflb_set_start_stop(dev, speed_freq);
-#if !(defined(CONFIG_SOC_SERIES_BL6) || defined(CONFIG_SOC_SERIES_BL7))
+#if !(defined(CONFIG_SOC_SERIES_BL60X) || defined(CONFIG_SOC_SERIES_BL70X))
 	data->is_10_bits_address = tenbit_addr > 0 ? true: false;
 #else
 	if (tenbit_addr > 0)
@@ -401,7 +401,7 @@ static void i2c_bflb_set_address(const struct device *dev, uint32_t address)
 	/* no sub addresses */
 	tmpVal &= ~I2C_CR_I2C_SUB_ADDR_EN;
 	tmpVal &= ~I2C_CR_I2C_SLV_ADDR_MASK;
-#if !(defined(CONFIG_SOC_SERIES_BL6) || defined(CONFIG_SOC_SERIES_BL7))
+#if !(defined(CONFIG_SOC_SERIES_BL60X) || defined(CONFIG_SOC_SERIES_BL70X))
 	if (data->is_10_bits_address)
 	{
 		tmpVal |= I2C_CR_I2C_10B_ADDR_EN;
