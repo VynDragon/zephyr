@@ -12,6 +12,7 @@
 #include <zephyr/device.h>
 #include <zephyr/init.h>
 #include <zephyr/irq.h>
+#include <zephyr/kernel.h>
 
 #include <soc.h>
 #include <clic.h>
@@ -643,6 +644,12 @@ GLB_UART_SWAP_SET_POS);
 	peripheral_clock_init();
 
 	irq_unlock(key);
+
+	/* wait 10 ms for peripherals to be ready */
+	k_timepoint_t end_timeout = sys_timepoint_calc(K_MSEC(10));
+	while (!sys_timepoint_expired(end_timeout))
+	{
+	}
 
 	return 0;
 }

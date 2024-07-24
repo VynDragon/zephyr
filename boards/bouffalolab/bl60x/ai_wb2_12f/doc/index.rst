@@ -94,6 +94,16 @@ USB Serial converter and port is used for both program and console.
 Programming and Debugging
 *************************
 
+Debugging
+=========
+
+#. Jtag defaults for BL702 are as follow:
+GPIO12 TMS
+GPIO17 TDI
+GPIO14 TCK
+GPIO11 TDO
+
+
 BL Flash tool
 =============
 

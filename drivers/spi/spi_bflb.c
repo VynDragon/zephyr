@@ -22,7 +22,7 @@ LOG_MODULE_REGISTER(spi_bflb);
 
 /* Register Offsets */
 #include <soc.h>
-#include <common_hardware/spi_reg.h>
+#include <bouffalolab/common/spi_reg.h>
 
 #if defined(CONFIG_SOC_SERIES_BL60X) || defined(CONFIG_SOC_SERIES_BL70X)
 #define GLB_SPI_MODE_ADDRESS 0x40000080

@@ -10,7 +10,8 @@
 #include <zephyr/dt-bindings/pinctrl/bflb-common-pinctrl.h>
 #include <zephyr/dt-bindings/pinctrl/bl60x-pinctrl.h>
 #include <zephyr/irq.h>
-#include <hardware/glb_reg.h>
+
+#include <soc.h>
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(gpio_bflb);

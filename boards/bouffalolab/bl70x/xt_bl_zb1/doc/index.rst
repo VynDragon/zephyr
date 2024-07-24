@@ -68,7 +68,7 @@ Programming and Debugging
 
 
 Debugging
-=======
+=========
 
 #. Jtag defaults for BL702 are as follow:
 GPIO0 TMS

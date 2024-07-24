@@ -24,15 +24,15 @@
 
 /* Addresses */
 
-#include <hardware/bflb_soc.h>
-#include <hardware/aon_reg.h>
-#include <hardware/glb_reg.h>
-#include <hardware/hbn_reg.h>
-#include <hardware/l1c_reg.h>
-#include <hardware/pds_reg.h>
-#include <hardware/tzc_sec_reg.h>
-#include <hardware/ef_ctrl_reg.h>
-#include <extra_defines.h>
+#include <bouffalolab/bl70x/bflb_soc.h>
+#include <bouffalolab/bl70x/aon_reg.h>
+#include <bouffalolab/bl70x/glb_reg.h>
+#include <bouffalolab/bl70x/hbn_reg.h>
+#include <bouffalolab/bl70x/l1c_reg.h>
+#include <bouffalolab/bl70x/pds_reg.h>
+#include <bouffalolab/bl70x/tzc_sec_reg.h>
+#include <bouffalolab/bl70x/ef_ctrl_reg.h>
+#include <bouffalolab/bl70x/extra_defines.h>
 
 /* RISC-V Machine Timer configuration */
 #define RISCV_MTIME_BASE             0x0200BFF8

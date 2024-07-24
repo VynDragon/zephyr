@@ -18,8 +18,8 @@
 LOG_MODULE_REGISTER(i2c_bflb);
 
 /* Register Offsets */
-#include <hardware/glb_reg.h>
-#include <common_hardware/i2c_reg.h>
+#include <soc.h>
+#include <bouffalolab/common/i2c_reg.h>
 
 #include "i2c-priv.h"
 
