@@ -23,6 +23,8 @@ manifest:
       url-base: https://github.com/zephyrproject-rtos
     - name: babblesim
       url-base: https://github.com/BabbleSim
+    - name: VynDragon
+      url-base: https://github.com/VynDragon
 
   group-filter: [-babblesim, -optional]
 
@@ -159,6 +161,12 @@ manifest:
     - name: hal_atmel
       revision: ca7e4c6920f44b9d677ed5995ffa169f18a54cdf
       path: modules/hal/atmel
+      groups:
+        - hal
+    - name: hal_bouffalolab
+      revision: zephyr
+      path: modules/hal/bouffalolab
+      remote: VynDragon
       groups:
         - hal
     - name: hal_espressif
