@@ -54,3 +54,5 @@ zephyr_library_sources_ifdef(CONFIG_ADC_MCUX_GAU	adc_mcux_gau_adc.c)
 zephyr_library_sources_ifdef(CONFIG_ADC_AMBIQ           adc_ambiq.c)
 zephyr_library_sources_ifdef(CONFIG_ADC_RENESAS_RA	adc_renesas_ra.c)
 zephyr_library_sources_ifdef(CONFIG_ADC_MAX32		adc_max32.c)
+zephyr_library_sources_ifdef(CONFIG_ADC_BFLB	adc_bflb.c)
+
