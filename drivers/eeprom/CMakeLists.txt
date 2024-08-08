@@ -8,6 +8,7 @@ zephyr_library_sources_ifdef(CONFIG_USERSPACE eeprom_handlers.c)
 zephyr_library_sources_ifdef(CONFIG_EEPROM_SHELL eeprom_shell.c)
 
 zephyr_library_sources_ifdef(CONFIG_EEPROM_AT2X eeprom_at2x.c)
+zephyr_library_sources_ifdef(CONFIG_EEPROM_BFLB eeprom_bflb.c)
 zephyr_library_sources_ifdef(CONFIG_EEPROM_LPC11U6X eeprom_lpc11u6x.c)
 zephyr_library_sources_ifdef(CONFIG_EEPROM_STM32 eeprom_stm32.c)
 if(CONFIG_EEPROM_SIMULATOR)
