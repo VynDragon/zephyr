@@ -449,6 +449,8 @@ static void peripheral_clock_init(void)
 {
 
 	uint32_t regval = sys_read32(0x40000024);
+	/* enable ADC clock routing */
+	regval |= (1 << 2);
 	/* enable UART0 clock routing */
 	regval |= (1 << 16);
 	/* enable I2C0 clock routing */
