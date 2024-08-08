@@ -8,4 +8,7 @@ rsource "*/Kconfig.defconfig"
 config PINCTRL
 	default y
 
+config EEPROM
+	default y
+
 endif # SOC_FAMILY_BFLB

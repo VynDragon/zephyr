@@ -13,6 +13,7 @@
 #include <zephyr/init.h>
 #include <zephyr/irq.h>
 #include <zephyr/kernel.h>
+#include <zephyr/drivers/eeprom.h>
 
 #include <soc.h>
 #include <clic.h>
@@ -63,128 +64,20 @@ static void system_clock_delay_32M_ms(uint32_t ms)
 	} while (count < ms);
 }
 
-static uint32_t is_pds_busy(void)
-{
-	uint32_t tmpVal = 0;
-
-	tmpVal = sys_read32(BFLB_EF_CTRL_BASE + EF_CTRL_EF_IF_CTRL_0_OFFSET);
-	if (tmpVal & EF_CTRL_EF_IF_0_BUSY_MSK) {
-		return 1;
-	}
-	return 0;
-}
-
-/* /!\ only use when running on 32Mhz Oscillator Clock
- * (system_set_root_clock(0);
- * system_set_root_clock_dividers(0, 0);
- * sys_write32(32 * 1000 * 1000, CORECLOCKREGISTER);)
- * Only Use with IRQs off
- * returns 0 when error
- */
-static uint32_t system_efuse_read_32M(void)
-{
-	uint32_t tmpVal = 0;
-	uint32_t tmpVal2 = 0;
-	uint32_t *pefuse_start = (uint32_t *)(BFLB_EF_CTRL_BASE);
-	uint32_t timeout = 0;
-
-	do {
-		system_clock_delay_32M_ms(1);
-		timeout++;
-	} while (timeout < EF_CTRL_DFT_TIMEOUT_VAL && is_pds_busy() > 0);
-
-	/* do a 'ahb clock' setup */
-	tmpVal =	EF_CTRL_EFUSE_CTRL_PROTECT |
-			(EF_CTRL_OP_MODE_AUTO << EF_CTRL_EF_IF_0_MANUAL_EN_POS) |
-			(EF_CTRL_PARA_DFT << EF_CTRL_EF_IF_0_CYC_MODIFY_POS) |
-			(EF_CTRL_SAHB_CLK << EF_CTRL_EF_CLK_SAHB_DATA_SEL_POS) |
-			(1 << EF_CTRL_EF_IF_AUTO_RD_EN_POS) |
-			(0 << EF_CTRL_EF_IF_POR_DIG_POS) |
-			(1 << EF_CTRL_EF_IF_0_INT_CLR_POS) |
-			(0 << EF_CTRL_EF_IF_0_RW_POS) |
-			(0 << EF_CTRL_EF_IF_0_TRIG_POS);
-
-	sys_write32(tmpVal, BFLB_EF_CTRL_BASE + EF_CTRL_EF_IF_CTRL_0_OFFSET);
-	system_clock_settle();
-
-	/* clear PDS cache registry */
-	for (uint32_t i = 0; i < EF_CTRL_EFUSE_R0_SIZE / 4; i++) {
-		pefuse_start[i] = 0;
-	}
-
-	/* Load efuse region0 */
-	/* not ahb clock setup */
-	tmpVal =	EF_CTRL_EFUSE_CTRL_PROTECT |
-			(EF_CTRL_OP_MODE_AUTO << EF_CTRL_EF_IF_0_MANUAL_EN_POS) |
-			(EF_CTRL_PARA_DFT << EF_CTRL_EF_IF_0_CYC_MODIFY_POS) |
-			(EF_CTRL_EF_CLK << EF_CTRL_EF_CLK_SAHB_DATA_SEL_POS) |
-			(1 << EF_CTRL_EF_IF_AUTO_RD_EN_POS) |
-			(0 << EF_CTRL_EF_IF_POR_DIG_POS) |
-			(1 << EF_CTRL_EF_IF_0_INT_CLR_POS) |
-			(0 << EF_CTRL_EF_IF_0_RW_POS) |
-			(0 << EF_CTRL_EF_IF_0_TRIG_POS);
-	sys_write32(tmpVal, BFLB_EF_CTRL_BASE + EF_CTRL_EF_IF_CTRL_0_OFFSET);
-
-	/* trigger read */
-	tmpVal =	EF_CTRL_EFUSE_CTRL_PROTECT |
-			(EF_CTRL_OP_MODE_AUTO << EF_CTRL_EF_IF_0_MANUAL_EN_POS) |
-			(EF_CTRL_PARA_DFT << EF_CTRL_EF_IF_0_CYC_MODIFY_POS) |
-			(EF_CTRL_EF_CLK << EF_CTRL_EF_CLK_SAHB_DATA_SEL_POS) |
-			(1 << EF_CTRL_EF_IF_AUTO_RD_EN_POS) |
-			(0 << EF_CTRL_EF_IF_POR_DIG_POS) |
-			(1 << EF_CTRL_EF_IF_0_INT_CLR_POS) |
-			(0 << EF_CTRL_EF_IF_0_RW_POS) |
-			(1 << EF_CTRL_EF_IF_0_TRIG_POS);
-	sys_write32(tmpVal, BFLB_EF_CTRL_BASE + EF_CTRL_EF_IF_CTRL_0_OFFSET);
-	system_clock_delay_32M_ms(5);
-
-	/* wait for read to complete */
-	do {
-		system_clock_delay_32M_ms(1);
-		tmpVal = sys_read32(BFLB_EF_CTRL_BASE + EF_CTRL_EF_IF_CTRL_0_OFFSET);
-	} while ((tmpVal & EF_CTRL_EF_IF_0_BUSY_MSK) ||
-		!(tmpVal && EF_CTRL_EF_IF_0_AUTOLOAD_DONE_MSK));
-
-	/* do a 'ahb clock' setup */
-	tmpVal =	EF_CTRL_EFUSE_CTRL_PROTECT |
-			(EF_CTRL_OP_MODE_AUTO << EF_CTRL_EF_IF_0_MANUAL_EN_POS) |
-			(EF_CTRL_PARA_DFT << EF_CTRL_EF_IF_0_CYC_MODIFY_POS) |
-			(EF_CTRL_SAHB_CLK << EF_CTRL_EF_CLK_SAHB_DATA_SEL_POS) |
-			(1 << EF_CTRL_EF_IF_AUTO_RD_EN_POS) |
-			(0 << EF_CTRL_EF_IF_POR_DIG_POS) |
-			(1 << EF_CTRL_EF_IF_0_INT_CLR_POS) |
-			(0 << EF_CTRL_EF_IF_0_RW_POS) |
-			(0 << EF_CTRL_EF_IF_0_TRIG_POS);
-
-	sys_write32(tmpVal, BFLB_EF_CTRL_BASE + EF_CTRL_EF_IF_CTRL_0_OFFSET);
-
-	/* get trim
-	 * .name = "rc32m",
-	 * .en_addr = 0x0C * 8 + 19,
-	 * .parity_addr = 0x0C * 8 + 18,
-	 * .value_addr = 0x0C * 8 + 10,
-	 * .value_len = 8,
-	 */
-	tmpVal2 = 0x0c * 8 + 19;
-	tmpVal = sys_read32(BFLB_EF_CTRL_BASE + (tmpVal2 / 32) * 4);
-	if (!(tmpVal & (1 << (tmpVal2 % 32)))) {
-		return 0;
-	}
-	tmpVal2 = 0x0C * 8 + 10;
-	tmpVal = sys_read32(BFLB_EF_CTRL_BASE + (tmpVal2 / 32) * 4);
-	tmpVal = tmpVal >> (tmpVal2 % 32);
-	return tmpVal & ((1 << 8) - 1);
-	/* TODO: check trim parity */
-}
-
-/* /!\ only use when running on 32Mhz Oscillator Clock
- */
 static void system_clock_trim_32M(void)
 {
 	uint32_t tmpVal = 0;
 	uint32_t trim = 0;
+	const struct device *efuse = DEVICE_DT_GET(DT_NODELABEL(efuse));
 
-	trim = system_efuse_read_32M();
+
+	tmpVal = eeprom_read(efuse, 0xC, &trim, 4);
+	if (tmpVal < 0) {
+		printk("Error: Couldn't read efuses: err: %d.\n", tmpVal);
+		return;
+	}
+	/* TODO: check trim parity */
+	trim = (trim & 0x3FC00) >> 10;
 	tmpVal = sys_read32(PDS_BASE + PDS_RC32M_CTRL0_OFFSET);
 	tmpVal = (tmpVal & PDS_RC32M_EXT_CODE_EN_UMSK) | 1 << PDS_RC32M_EXT_CODE_EN_POS;
 	tmpVal = (tmpVal & PDS_RC32M_CODE_FR_EXT_UMSK) | trim << PDS_RC32M_CODE_FR_EXT_POS;
