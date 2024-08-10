@@ -158,5 +158,12 @@
 			#io-channel-cells = <1>;
 			status = "disabled";
 		};
+		dac0: dac@40002000 {
+			compatible = "bflb,dac";
+			/* GPIP reg, GLB REG */
+			reg = <0x40002000 0x1000 0x40000000 0x1000>;
+			#io-channel-cells = <1>;
+			status = "disabled";
+		};
 	};
 };
