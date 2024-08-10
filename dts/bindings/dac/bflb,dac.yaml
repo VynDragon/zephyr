@@ -1,0 +1,29 @@
+# Copyright (c) 2022 Espressif Systems (Shanghai) Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+    Two GPIO pads are capable of being DACs
+
+    bl60x pads
+      - GPIO13 as DAC channel 1
+      - GPIO14 as DAC channel 2
+
+    bl70x pads
+      - GPIO11 as DAC channel 1
+      - GPIO17 as DAC channel 2
+    bl61x pads
+      - GPIO3 as DAC channel 1
+      - GPIO2 as DAC channel 2
+
+compatible: "bflb,dac"
+
+include: [dac-controller.yaml, pinctrl-device.yaml]
+
+properties:
+
+  "#io-channel-cells":
+    const: 1
+
+
+io-channel-cells:
+  - output
