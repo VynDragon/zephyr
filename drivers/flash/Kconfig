@@ -208,4 +208,6 @@ module = FLASH
 module-str = flash
 source "subsys/logging/Kconfig.template.log_config"
 
+source "drivers/flash/Kconfig.bflb"
+
 endif # FLASH
