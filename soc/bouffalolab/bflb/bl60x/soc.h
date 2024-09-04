@@ -32,6 +32,7 @@
 #include <bouffalolab/bl60x/pds_reg.h>
 #include <bouffalolab/bl60x/tzc_sec_reg.h>
 #include <bouffalolab/bl60x/ef_ctrl_reg.h>
+#include <bouffalolab/bl60x/sf_ctrl_reg.h>
 #include <bouffalolab/bl60x/extra_defines.h>
 
 /* RISC-V Machine Timer configuration */
