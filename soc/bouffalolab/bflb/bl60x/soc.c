@@ -461,6 +461,21 @@ static uint32_t system_uart_bflb_get_crystal_frequency(void)
 	}
 }
 
+static void system_cache_2T(bool yes)
+{
+	uint32_t tmpVal = 0;
+
+	tmpVal = sys_read32(L1C_BASE + L1C_CONFIG_OFFSET);
+
+	if (yes) {
+		tmpVal |= L1C_IROM_2T_ACCESS_MSK;
+	} else {
+		tmpVal &= ~L1C_IROM_2T_ACCESS_MSK;
+	}
+
+	sys_write32(tmpVal, L1C_BASE + L1C_CONFIG_OFFSET);
+}
+
 /* Frequency Source:
  * No Crystal: 0
  * 24M: 1
@@ -569,14 +584,14 @@ GLB_REG_PLL_SEL_POS);
 	break;
 
 	case 3:
-		/* TODO: enable rom access 2T*/
+		system_cache_2T(true);
 		system_set_root_clock_dividers(0, 1);
 		system_set_root_clock(crystal == 32 ? 2 : 3);
 		sys_write32(160 * 1000 * 1000, CORECLOCKREGISTER);
 	break;
 
 	case 4:
-		/* TODO: enable rom access 2T*/
+		system_cache_2T(true);
 		system_set_root_clock_dividers(0, 1);
 		system_set_root_clock(crystal == 32 ? 2 : 3);
 		sys_write32(192 * 1000 * 1000, CORECLOCKREGISTER);
