@@ -14,6 +14,7 @@
 
 	chosen {
 		zephyr,flash = &flash0;
+		zephyr,code-partition = &main_partition;
 		zephyr,itcm = &itcm;
 		zephyr,dtcm = &dtcm;
 		zephyr,sram = &sram0;
@@ -26,15 +27,30 @@
 	clock-frequency = <144000000>;
 };
 
-&spi1 {
-	reg = <0x4000b000 0x1000 0x23000000 0xc00000>;
-	flash0: flash@0 {
-		compatible = "jedec,spi-nor";
-		size = <1048576>;
-		label = "FLASH0";
-		reg = <0>;
-		// Dummy entry
-		spi-max-frequency = <0>;
+&flashctrl {
+	flash0: flash@23000000 {
+		compatible = "soc-nv-flash", "mxic,kh25v80";
+		reg = <0x23000000 (0x100000 - 0x2000)>;
+		write-block-size = <256>;
+		erase-block-size = <DT_SIZE_K(4)>;
+		/* jedec-id = [c2 20 14]; */
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			main_partition: partition@0 {
+				label = "code";
+				reg = <0x00000000 0x00080000>;
+				read-only;
+			};
+
+			storage_partition: partition@80000 {
+				label = "storage";
+				reg = <0x00080000 (0x00080000 - 0x2000)>;
+			};
+		};
 	};
 };
 
