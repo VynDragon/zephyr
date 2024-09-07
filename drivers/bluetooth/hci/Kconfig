@@ -109,6 +109,14 @@ config BT_ESP32
 	help
 	  Espressif HCI bluetooth interface
 
+config BT_BFLB
+	bool "Bouffalolab HCI driver"
+	default y
+	depends on DT_HAS_BFLB_BT_HCI_ENABLED
+	help
+	  Bouffalolab HCI bluetooth interface
+
+
 config BT_PSOC6_BLESS
 	bool "PSOC6 BLESS driver"
 	default y

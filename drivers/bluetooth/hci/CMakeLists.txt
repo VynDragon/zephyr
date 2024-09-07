@@ -14,6 +14,7 @@ if(CONFIG_BT_HCI_IPC)
 endif()
 
 zephyr_library_sources_ifdef(CONFIG_BT_ESP32       hci_esp32.c)
+zephyr_library_sources_ifdef(CONFIG_BT_BFLB        hci_bflb.c)
 zephyr_library_sources_ifdef(CONFIG_BT_H4          h4.c)
 zephyr_library_sources_ifdef(CONFIG_BT_H5          h5.c)
 zephyr_library_sources_ifdef(CONFIG_BT_HCI_IPC     ipc.c)

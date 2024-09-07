@@ -166,5 +166,13 @@
 			interrupt-parent = <&clic>;
 			status = "okay";
 		};
+		wifi: wifi {
+			compatible = "bflb,wifi";
+			status = "disabled";
+		};
+		bflb_bt_hci: bflb_bt_hci {
+			compatible = "bflb,bt-hci";
+			status = "disabled";
+		};
 	};
 };

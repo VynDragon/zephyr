@@ -19,3 +19,11 @@ endif()
 
 zephyr_include_directories(${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/include)
 zephyr_include_directories(${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/include/bouffalolab/${SOC_SERIES})
+
+if (CONFIG_WIFI_BFLB OR CONFIG_BT_BFLB)
+if (CONFIG_SOC_SERIES_BL60X)
+zephyr_include_directories(${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/blob/${SOC_SERIES}/include)
+zephyr_link_libraries(${ZEPHYR_HAL_BOUFFALOLAB_MODULE_DIR}/blob/${SOC_SERIES}/lib/all.a)
+
+endif()
+endif()

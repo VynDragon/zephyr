@@ -26,6 +26,7 @@
 		led0 = &blue_led;
 		led1 = &green_led;
 		led2 = &red_led;
+		zephyr,bt-hci = &bflb_bt_hci;
 	};
 
 	aliases {
@@ -103,5 +104,9 @@
 };
 
 &gpio0 {
+	status = "okay";
+};
+
+&bflb_bt_hci {
 	status = "okay";
 };

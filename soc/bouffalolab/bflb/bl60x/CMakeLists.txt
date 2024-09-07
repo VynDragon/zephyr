@@ -14,7 +14,19 @@ zephyr_compile_definitions(BL602)
 zephyr_include_directories(.)
 zephyr_sources(soc.c)
 
-set(SOC_LINKER_SCRIPT ${ZEPHYR_BASE}/include/zephyr/arch/riscv/common/linker.ld CACHE INTERNAL "")
+set(SOC_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/linker.ld CACHE INTERNAL "")
+
+if (CONFIG_BFLB_WIFI)
+zephyr_linker_sources_ifdef(CONFIG_BFLB_WIFI ROM_SECTIONS wifi_ram.ld)
+zephyr_linker_sources_ifdef(CONFIG_BFLB_WIFI RODATA wifi_cfg.ld)
+zephyr_linker_sources_ifdef(CONFIG_BFLB_WIFI ROM_START tlv.ld)
+zephyr_sources(bflb_rf_hal.c)
+endif()
+
+if (CONFIG_BT_BFLB)
+zephyr_linker_sources_ifdef(CONFIG_BFLB_WIFI ROM_START tlv.ld)
+zephyr_sources(bflb_rf_hal.c)
+endif()
 
 zephyr_code_relocate_ifdef(CONFIG_UART_BFLB LIBRARY drivers__serial LOCATION ITCM NOKEEP)
 zephyr_code_relocate_ifdef(CONFIG_RISCV_MACHINE_TIMER LIBRARY drivers__timer LOCATION ITCM NOKEEP)
