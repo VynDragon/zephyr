@@ -12,7 +12,10 @@ zephyr_compile_definitions(bl602)
 zephyr_compile_definitions(BL602)
 
 zephyr_include_directories(.)
-zephyr_sources(soc.c)
+zephyr_sources(
+soc.c
+soc_irq_privileged.c
+)
 
 set(SOC_LINKER_SCRIPT ${ZEPHYR_BASE}/include/zephyr/arch/riscv/common/linker.ld CACHE INTERNAL "")
 
