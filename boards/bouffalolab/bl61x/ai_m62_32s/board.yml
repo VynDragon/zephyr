@@ -1,0 +1,5 @@
+board:
+  name: ai_m62_32s
+  vendor: bflb
+  socs:
+    - name: bl616c50q2i
