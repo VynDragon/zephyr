@@ -147,6 +147,12 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 		};
+		efuse: efuse@20056000 {
+			compatible = "bflb,efuse";
+			reg = <0x20056000 0x1000>;
+			status = "okay";
+			size = <512>;
+		};
 		flashctrl: flash-controller@2000b000 {
 			compatible = "bflb,flash-controller";
 			reg = <0x2000b000 0x1000>;

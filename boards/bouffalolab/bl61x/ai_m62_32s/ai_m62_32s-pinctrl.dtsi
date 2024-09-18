@@ -23,4 +23,22 @@
 			bias-high-impedance;
 		};
 	};
+
+	uart1_default: uart1_default {
+		group1 {
+			pinmux = <GPIO28_UART1_RX>,
+				 <GPIO27_UART1_TX>;
+			bias-pull-up;
+			input-schmitt-enable;
+			drive-strength = <1>;
+		};
+	};
+
+	uart1_sleep: uart1_sleep {
+		group1 {
+			pinmux = <GPIO28_UART1_RX>,
+				 <GPIO27_UART1_TX>;
+			bias-high-impedance;
+		};
+	};
 };
