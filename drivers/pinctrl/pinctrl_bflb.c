@@ -256,7 +256,7 @@ int pinctrl_configure_pins(const pinctrl_soc_pin_t *pins, uint8_t pin_cnt,
 
 		if (BFLB_PINMUX_GET_FUN(pins[i]) == BFLB_PINMUX_FUN_INST_uart0) {
 			pinctrl_configure_uart(BFLB_PINMUX_GET_PIN(pins[i]),
-BFLB_PINMUX_GET_SIGNAL(pins[i]));
+			BFLB_PINMUX_GET_SIGNAL(pins[i]) + 4 * BFLB_PINMUX_GET_INST(pins[i]));
 		}
 
 		/* gpio init*/
