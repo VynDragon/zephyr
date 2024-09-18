@@ -31,6 +31,7 @@
 #include <bouffalolab/bl61x/tzc_sec_reg.h>
 #include <bouffalolab/bl61x/ef_ctrl_reg.h>
 #include <bouffalolab/bl61x/sf_ctrl_reg.h>
+#include <bouffalolab/bl61x/mcu_misc_reg.h>
 
 #define RISCV_MSIP			0xE0000000
 
