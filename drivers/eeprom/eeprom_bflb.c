@@ -14,6 +14,12 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(eeprom_bflb);
 
+#define EF_CTRL_DFT_TIMEOUT_VAL 160*1000
+#define EF_CTRL_EFUSE_CYCLE_PROTECT (0xbf << 24)
+#define EF_CTRL_EFUSE_CTRL_PROTECT  (0xbf << 8)
+#define EF_CTRL_OP_MODE_AUTO        0
+#define EF_CTRL_PARA_DFT            0
+
 struct eeprom_bflb_data {
 	uint8_t cache[DT_INST_PROP(0, size)];
 	bool cached;
@@ -60,11 +66,12 @@ static void system_clock_delay_32M_ms(uint32_t ms)
 	} while (count < ms);
 }
 
-static uint32_t is_pds_busy(void)
+static uint32_t is_pds_busy(const struct device *dev)
 {
 	uint32_t tmpVal = 0;
+	const struct eeprom_bflb_config *config = dev->config;
 
-	tmpVal = sys_read32(BFLB_EF_CTRL_BASE + EF_CTRL_EF_IF_CTRL_0_OFFSET);
+	tmpVal = sys_read32(config->addr + EF_CTRL_EF_IF_CTRL_0_OFFSET);
 	if (tmpVal & EF_CTRL_EF_IF_0_BUSY_MSK) {
 		return 1;
 	}
@@ -78,33 +85,36 @@ static uint32_t is_pds_busy(void)
  * Only Use with IRQs off
  * returns 0 when error
  */
-static void system_efuse_read(void)
+static void system_efuse_read(const struct device *dev)
 {
+	const struct eeprom_bflb_config *config = dev->config;
 	uint32_t tmpVal = 0;
-	uint32_t *pefuse_start = (uint32_t *)(BFLB_EF_CTRL_BASE);
+	uint32_t *pefuse_start = (uint32_t *)(config->addr);
 	uint32_t timeout = 0;
 
 	do {
 		system_clock_delay_32M_ms(1);
 		timeout++;
-	} while (timeout < EF_CTRL_DFT_TIMEOUT_VAL && is_pds_busy() > 0);
+	} while (timeout < EF_CTRL_DFT_TIMEOUT_VAL && is_pds_busy(dev) > 0);
 
 	/* do a 'ahb clock' setup */
 	tmpVal =	EF_CTRL_EFUSE_CTRL_PROTECT |
 			(EF_CTRL_OP_MODE_AUTO << EF_CTRL_EF_IF_0_MANUAL_EN_POS) |
 			(EF_CTRL_PARA_DFT << EF_CTRL_EF_IF_0_CYC_MODIFY_POS) |
+#if defined(CONFIG_SOC_SERIES_BL70X) || defined(CONFIG_SOC_SERIES_BL60X)
 			(EF_CTRL_SAHB_CLK << EF_CTRL_EF_CLK_SAHB_DATA_SEL_POS) |
+#endif
 			(1 << EF_CTRL_EF_IF_AUTO_RD_EN_POS) |
 			(0 << EF_CTRL_EF_IF_POR_DIG_POS) |
 			(1 << EF_CTRL_EF_IF_0_INT_CLR_POS) |
 			(0 << EF_CTRL_EF_IF_0_RW_POS) |
 			(0 << EF_CTRL_EF_IF_0_TRIG_POS);
 
-	sys_write32(tmpVal, BFLB_EF_CTRL_BASE + EF_CTRL_EF_IF_CTRL_0_OFFSET);
+	sys_write32(tmpVal, config->addr + EF_CTRL_EF_IF_CTRL_0_OFFSET);
 	system_clock_settle();
 
 	/* clear PDS cache registry */
-	for (uint32_t i = 0; i < EF_CTRL_EFUSE_R0_SIZE / 4; i++) {
+	for (uint32_t i = 0; i < config->size / 4; i++) {
 		pefuse_start[i] = 0;
 	}
 
@@ -113,31 +123,35 @@ static void system_efuse_read(void)
 	tmpVal =	EF_CTRL_EFUSE_CTRL_PROTECT |
 			(EF_CTRL_OP_MODE_AUTO << EF_CTRL_EF_IF_0_MANUAL_EN_POS) |
 			(EF_CTRL_PARA_DFT << EF_CTRL_EF_IF_0_CYC_MODIFY_POS) |
+#if defined(CONFIG_SOC_SERIES_BL70X) || defined(CONFIG_SOC_SERIES_BL60X)
 			(EF_CTRL_EF_CLK << EF_CTRL_EF_CLK_SAHB_DATA_SEL_POS) |
+#endif
 			(1 << EF_CTRL_EF_IF_AUTO_RD_EN_POS) |
 			(0 << EF_CTRL_EF_IF_POR_DIG_POS) |
 			(1 << EF_CTRL_EF_IF_0_INT_CLR_POS) |
 			(0 << EF_CTRL_EF_IF_0_RW_POS) |
 			(0 << EF_CTRL_EF_IF_0_TRIG_POS);
-	sys_write32(tmpVal, BFLB_EF_CTRL_BASE + EF_CTRL_EF_IF_CTRL_0_OFFSET);
+	sys_write32(tmpVal, config->addr + EF_CTRL_EF_IF_CTRL_0_OFFSET);
 
 	/* trigger read */
 	tmpVal =	EF_CTRL_EFUSE_CTRL_PROTECT |
 			(EF_CTRL_OP_MODE_AUTO << EF_CTRL_EF_IF_0_MANUAL_EN_POS) |
 			(EF_CTRL_PARA_DFT << EF_CTRL_EF_IF_0_CYC_MODIFY_POS) |
+#if defined(CONFIG_SOC_SERIES_BL70X) || defined(CONFIG_SOC_SERIES_BL60X)
 			(EF_CTRL_EF_CLK << EF_CTRL_EF_CLK_SAHB_DATA_SEL_POS) |
+#endif
 			(1 << EF_CTRL_EF_IF_AUTO_RD_EN_POS) |
 			(0 << EF_CTRL_EF_IF_POR_DIG_POS) |
 			(1 << EF_CTRL_EF_IF_0_INT_CLR_POS) |
 			(0 << EF_CTRL_EF_IF_0_RW_POS) |
 			(1 << EF_CTRL_EF_IF_0_TRIG_POS);
-	sys_write32(tmpVal, BFLB_EF_CTRL_BASE + EF_CTRL_EF_IF_CTRL_0_OFFSET);
+	sys_write32(tmpVal, config->addr + EF_CTRL_EF_IF_CTRL_0_OFFSET);
 	system_clock_delay_32M_ms(5);
 
 	/* wait for read to complete */
 	do {
 		system_clock_delay_32M_ms(1);
-		tmpVal = sys_read32(BFLB_EF_CTRL_BASE + EF_CTRL_EF_IF_CTRL_0_OFFSET);
+		tmpVal = sys_read32(config->addr + EF_CTRL_EF_IF_CTRL_0_OFFSET);
 	} while ((tmpVal & EF_CTRL_EF_IF_0_BUSY_MSK) ||
 		!(tmpVal && EF_CTRL_EF_IF_0_AUTOLOAD_DONE_MSK));
 
@@ -145,14 +159,16 @@ static void system_efuse_read(void)
 	tmpVal =	EF_CTRL_EFUSE_CTRL_PROTECT |
 			(EF_CTRL_OP_MODE_AUTO << EF_CTRL_EF_IF_0_MANUAL_EN_POS) |
 			(EF_CTRL_PARA_DFT << EF_CTRL_EF_IF_0_CYC_MODIFY_POS) |
+#if defined(CONFIG_SOC_SERIES_BL70X) || defined(CONFIG_SOC_SERIES_BL60X)
 			(EF_CTRL_SAHB_CLK << EF_CTRL_EF_CLK_SAHB_DATA_SEL_POS) |
+#endif
 			(1 << EF_CTRL_EF_IF_AUTO_RD_EN_POS) |
 			(0 << EF_CTRL_EF_IF_POR_DIG_POS) |
 			(1 << EF_CTRL_EF_IF_0_INT_CLR_POS) |
 			(0 << EF_CTRL_EF_IF_0_RW_POS) |
 			(0 << EF_CTRL_EF_IF_0_TRIG_POS);
 
-	sys_write32(tmpVal, BFLB_EF_CTRL_BASE + EF_CTRL_EF_IF_CTRL_0_OFFSET);
+	sys_write32(tmpVal, config->addr + EF_CTRL_EF_IF_CTRL_0_OFFSET);
 }
 
 static void eeprom_bflb_cache(const struct device *dev)
@@ -168,10 +184,10 @@ static void eeprom_bflb_cache(const struct device *dev)
 	system_set_root_clock(0);
 	system_clock_settle();
 
-	system_efuse_read();
+	system_efuse_read(dev);
 	/* reads *must* be 32-bits aligned AND does not work with the method memcpy uses */
 	for (int i = 0; i < config->size / sizeof(uint32_t); i++) {
-		tmpVal = sys_read32(BFLB_EF_CTRL_BASE + i * 4);
+		tmpVal = sys_read32(config->addr + i * 4);
 		data->cache[i * sizeof(uint32_t) + 3] = (tmpVal & 0xFF000000) >> 24;
 		data->cache[i * sizeof(uint32_t) + 2] = (tmpVal & 0x00FF0000) >> 16;
 		data->cache[i * sizeof(uint32_t) + 1] = (tmpVal & 0x0000FF00) >> 8;
