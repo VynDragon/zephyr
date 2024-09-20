@@ -181,7 +181,6 @@ void pinctrl_init_pin(pinctrl_soc_pin_t pin)
 	uint8_t drive;
 	uint8_t function;
 	uint16_t mode;
-	uint32_t regval;
 	uint8_t real_pin;
 	uint32_t cfg = 0;
 
