@@ -92,7 +92,7 @@
 			status = "okay";
 
 			gpio0: gpio@20000000 {
-				compatible = "bflb,bl-gpio";
+				compatible = "bflb,bl61x-gpio";
 				reg = <0x20000000 0x1000>;
 				interrupts = <60 0>;
 				interrupt-parent = <&clic>;

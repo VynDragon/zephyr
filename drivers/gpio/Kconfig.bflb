@@ -7,3 +7,10 @@ config GPIO_BFLB
 	default y
 	help
 	  Bouffalo Lab GPIO driver
+
+config GPIO_BFLB_BL61X
+	bool "Bouffalo Lab BL61X GPIO driver"
+	depends on DT_HAS_BFLB_BL61X_GPIO_ENABLED
+	default y
+	help
+	  Bouffalo Lab BL61X GPIO driver
