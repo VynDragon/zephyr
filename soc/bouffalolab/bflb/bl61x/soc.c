@@ -18,6 +18,8 @@
 #include <soc.h>
 #include <clic.h>
 
+#include "pll_data.h"
+
 #define CLOCK_TIMEOUT 1024
 
 /* brown out detection */
@@ -47,6 +49,16 @@ void bl61x_BOD_init(void)
 static void system_clock_settle(void)
 {
 	__asm__ volatile (".rept 15 ; nop ; .endr");
+}
+
+/* this imagines we are at 320M clock */
+static void system_clock_at_least_us(uint32_t us)
+{
+	uint32_t i = 0;
+
+	for(i = 0; i < us * 32; i++) {
+		__asm__ volatile (".rept 10 ; nop ; .endr");
+	}
 }
 
 static void system_clock_trim_32M(void)
@@ -366,6 +378,137 @@ static void system_set_crystal_PLL_reference(uint32_t ref)
 }
 
 
+static void system_init_WIFIPLL_setup(const bl61x_pll_config *const config)
+{
+	uint32_t tmpVal = 0;
+
+	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG1_OFFSET);
+	tmpVal = (tmpVal & GLB_WIFIPLL_REFDIV_RATIO_UMSK)
+	| (config->pllRefdivRatio << GLB_WIFIPLL_REFDIV_RATIO_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG1_OFFSET);
+
+	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG2_OFFSET);
+	tmpVal = (tmpVal & GLB_WIFIPLL_INT_FRAC_SW_UMSK)
+	| (config->pllIntFracSw << GLB_WIFIPLL_INT_FRAC_SW_POS);
+	tmpVal = (tmpVal & GLB_WIFIPLL_ICP_1U_UMSK)
+	| (config->pllIcp1u << GLB_WIFIPLL_ICP_1U_POS);
+	tmpVal = (tmpVal & GLB_WIFIPLL_ICP_5U_UMSK)
+	| (config->pllIcp5u << GLB_WIFIPLL_ICP_5U_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG2_OFFSET);
+
+	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG3_OFFSET);
+	tmpVal = (tmpVal & GLB_WIFIPLL_RZ_UMSK)
+	| (config->pllRz << GLB_WIFIPLL_RZ_POS);
+	tmpVal = (tmpVal & GLB_WIFIPLL_CZ_UMSK)
+	| (config->pllCz << GLB_WIFIPLL_CZ_POS);
+	tmpVal = (tmpVal & GLB_WIFIPLL_C3_UMSK)
+	| (config->pllC3 << GLB_WIFIPLL_C3_POS);
+	tmpVal = (tmpVal & GLB_WIFIPLL_R4_SHORT_UMSK)
+	| (config->pllR4Short << GLB_WIFIPLL_R4_SHORT_POS);
+	tmpVal = (tmpVal & GLB_WIFIPLL_C4_EN_UMSK)
+	| (config->pllC4En << GLB_WIFIPLL_C4_EN_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG3_OFFSET);
+
+	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG4_OFFSET);
+	tmpVal = (tmpVal & GLB_WIFIPLL_SEL_SAMPLE_CLK_UMSK)
+	| (config->pllSelSampleClk << GLB_WIFIPLL_SEL_SAMPLE_CLK_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG4_OFFSET);
+
+	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG5_OFFSET);
+	tmpVal = (tmpVal & GLB_WIFIPLL_VCO_SPEED_UMSK)
+	| (config->pllVcoSpeed << GLB_WIFIPLL_VCO_SPEED_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG5_OFFSET);
+
+	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG6_OFFSET);
+	tmpVal = (tmpVal & GLB_WIFIPLL_SDM_CTRL_HW_UMSK)
+	| (config->pllSdmCtrlHw << GLB_WIFIPLL_SDM_CTRL_HW_POS);
+	tmpVal = (tmpVal & GLB_WIFIPLL_SDM_BYPASS_UMSK)
+	| (config->pllSdmBypass << GLB_WIFIPLL_SDM_BYPASS_POS);
+	tmpVal = (tmpVal & GLB_WIFIPLL_SDMIN_UMSK)
+	| (config->pllSdmin << GLB_WIFIPLL_SDMIN_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG6_OFFSET);
+
+	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG10_OFFSET);
+	tmpVal = (tmpVal & GLB_USBPLL_SDMIN_UMSK)
+	| (0x28000 << GLB_USBPLL_SDMIN_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG10_OFFSET);
+
+	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG12_OFFSET);
+	tmpVal = (tmpVal & GLB_SSCDIV_SDMIN_UMSK)
+	| (0x28000 << GLB_SSCDIV_SDMIN_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG12_OFFSET);
+
+	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
+	tmpVal = (tmpVal & GLB_PU_WIFIPLL_SFREG_UMSK)
+	| (1 << GLB_PU_WIFIPLL_SFREG_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
+
+	system_clock_at_least_us(5);
+
+	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
+	tmpVal = (tmpVal & GLB_PU_WIFIPLL_UMSK)
+	| (1 << GLB_PU_WIFIPLL_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
+
+	system_clock_at_least_us(5);
+
+	/* 'SDM reset' */
+	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
+	tmpVal = (tmpVal & GLB_WIFIPLL_SDM_RSTB_UMSK)
+	| (1 << GLB_WIFIPLL_SDM_RSTB_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
+	system_clock_at_least_us(5);
+	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
+	tmpVal = (tmpVal & GLB_WIFIPLL_SDM_RSTB_UMSK)
+	| (0 << GLB_WIFIPLL_SDM_RSTB_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
+	system_clock_at_least_us(5);
+	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
+	tmpVal = (tmpVal & GLB_WIFIPLL_SDM_RSTB_UMSK)
+	| (1 << GLB_WIFIPLL_SDM_RSTB_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
+
+	/* 'pll reset' */
+	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
+	tmpVal = (tmpVal & GLB_WIFIPLL_FBDV_RSTB_UMSK)
+	| (1 << GLB_WIFIPLL_FBDV_RSTB_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
+	system_clock_at_least_us(5);
+	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
+	tmpVal = (tmpVal & GLB_WIFIPLL_FBDV_RSTB_UMSK)
+	| (0 << GLB_WIFIPLL_FBDV_RSTB_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
+	system_clock_at_least_us(5);
+	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
+	tmpVal = (tmpVal & GLB_WIFIPLL_FBDV_RSTB_UMSK)
+	| (1 << GLB_WIFIPLL_FBDV_RSTB_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
+
+	/* enable PLL outputs */
+	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG8_OFFSET);
+	tmpVal = (tmpVal & GLB_WIFIPLL_EN_DIV3_UMSK)
+	| (1 << GLB_WIFIPLL_EN_DIV3_POS);
+	tmpVal = (tmpVal & GLB_WIFIPLL_EN_DIV4_UMSK)
+	| (1 << GLB_WIFIPLL_EN_DIV4_POS);
+	tmpVal = (tmpVal & GLB_WIFIPLL_EN_DIV5_UMSK)
+	| (1 << GLB_WIFIPLL_EN_DIV5_POS);
+	tmpVal = (tmpVal & GLB_WIFIPLL_EN_DIV6_UMSK)
+	| (1 << GLB_WIFIPLL_EN_DIV6_POS);
+	tmpVal = (tmpVal & GLB_WIFIPLL_EN_DIV8_UMSK)
+	| (1 << GLB_WIFIPLL_EN_DIV8_POS);
+	tmpVal = (tmpVal & GLB_WIFIPLL_EN_DIV10_UMSK)
+	| (1 << GLB_WIFIPLL_EN_DIV10_POS);
+	tmpVal = (tmpVal & GLB_WIFIPLL_EN_DIV12_UMSK)
+	| (1 << GLB_WIFIPLL_EN_DIV12_POS);
+	tmpVal = (tmpVal & GLB_WIFIPLL_EN_DIV20_UMSK)
+	| (1 << GLB_WIFIPLL_EN_DIV20_POS);
+	tmpVal = (tmpVal & GLB_WIFIPLL_EN_DIV30_UMSK)
+	| (1 << GLB_WIFIPLL_EN_DIV30_POS);
+	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG8_OFFSET);
+
+	system_clock_at_least_us(50);
+}
+
 /* No Crystal / RC32M : 0
  * 24M: 1
  * 26M: 5
@@ -396,8 +539,7 @@ static void system_init_WIFIPLL(uint32_t crystal)
 		system_set_crystal_PLL_reference(1);
 	}
 
-	/*TODO do the init*/
-
+	system_init_WIFIPLL_setup(bl61x_pll_configs[crystal]);
 
 	/* enable PLL clock */
 	tmpVal = sys_read32(GLB_BASE + GLB_SYS_CFG0_OFFSET);
@@ -453,7 +595,7 @@ static void system_ungate_pll(uint8_t pll)
 }
 
 /* Frequency Source:
- * No Crystal: 0
+ * No Crystal/ RC32M: 0
  * 24M: 1
  * 26M: 5
  * 32M: 2
@@ -478,6 +620,14 @@ static int system_init_root_clock(uint32_t crystal, uint32_t clock_frequency_sou
 
 	if (clock_frequency_source == 1 || clock_frequency_source == 2) {
 		return -ENOTSUP;
+	}
+
+	if (crystal > 5) {
+		return -EINVAL;
+	}
+
+	if (clock_frequency_source > 4 && clock_frequency_source != 32) {
+		return -EINVAL;
 	}
 
 	/* make sure all clocks are enabled */
