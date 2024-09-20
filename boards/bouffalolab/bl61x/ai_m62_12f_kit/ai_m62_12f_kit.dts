@@ -8,10 +8,10 @@
 #include <bouffalolab/bl616.dtsi>
 #include <zephyr/dt-bindings/gpio/gpio.h>
 #include <zephyr/dt-bindings/input/input-event-codes.h>
-#include "ai_m62_32s-pinctrl.dtsi"
+#include "ai_m62_12f_kit-pinctrl.dtsi"
 
 / {
-	model = "bl616 ai_m62_32s";
+	model = "bl616 ai_m62_12f";
 	compatible = "bflb,bl616";
 
 	chosen {
@@ -20,6 +20,50 @@
 		zephyr,sram = &sram0;
 		zephyr,console = &uart0;
 		zephyr,shell-uart = &uart0;
+		led0 = &blue_led;
+		sw0 = &button_0;
+	};
+
+	aliases {
+		led0 = &blue_led;
+		sw0 = &button_0;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		blue_led: led_0 {
+			gpios =  <&gpio0 0 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+			label = "Blue - LED0";
+		};
+
+		green_led: led_1 {
+			gpios =  <&gpio0 30 GPIO_ACTIVE_HIGH>;
+			label = "Green - LED1";
+		};
+
+		red_led: led_2 {
+			gpios =  <&gpio0 1 GPIO_ACTIVE_HIGH>;
+			label = "Red - LED2";
+		};
+
+		white_led: led_3 {
+			gpios =  <&gpio0 29 GPIO_ACTIVE_HIGH>;
+			label = "White - LED3";
+		};
+
+		warmwhite_led: led_4 {
+			gpios =  <&gpio0 27 GPIO_ACTIVE_HIGH>;
+			label = "Warm White - LED4";
+		};
+	};
+
+	buttons {
+		compatible = "gpio-keys";
+		button_0: sw0 {
+			gpios = <&gpio0 2 (GPIO_ACTIVE_HIGH)>;
+			zephyr,code = <INPUT_KEY_0>;
+		};
 	};
 
 };
@@ -61,15 +105,6 @@
 
 	pinctrl-0 = <&uart0_default>;
 	pinctrl-1 = <&uart0_sleep>;
-	pinctrl-names = "default", "sleep";
-};
-
-&uart1 {
-	status = "disabled";
-	current-speed = <115200>;
-
-	pinctrl-0 = <&uart1_default>;
-	pinctrl-1 = <&uart1_sleep>;
 	pinctrl-names = "default", "sleep";
 };
 
