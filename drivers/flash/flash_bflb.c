@@ -23,6 +23,12 @@ LOG_MODULE_REGISTER(flash_bflb, CONFIG_FLASH_LOG_LEVEL);
 #define ERASE_SIZE DT_PROP(DT_CHOSEN(zephyr_flash), erase_block_size)
 #define TOTAL_SIZE DT_REG_SIZE(DT_CHOSEN(zephyr_flash))
 
+#if defined(CONFIG_SOC_SERIES_BL70X) || defined(CONFIG_SOC_SERIES_BL60X)
+#define BL_XIP_BASE 0x23000000
+#elif defined(CONFIG_SOC_SERIES_BL61X)
+#define BL_XIP_BASE 0xA0000000
+#endif
+
 #define BFLB_FLASH_CONTROLLER_BUSY_TIMEOUT_MS 200
 #define BFLB_FLASH_CHIP_BUSY_TIMEOUT_MS 5000
 
@@ -211,6 +217,7 @@ struct flash_bflb_data {
 	bflb_flash_cfg flash_cfg_backup;
 	uint32_t last_flash_offset;
 	uint32_t reg_copy;
+	uint32_t jedec_id;
 };
 
 
@@ -219,14 +226,14 @@ struct flash_bflb_data {
 /* will using function cause error ? */
 static bool flash_bflb_guard(void *func)
 {
-	if ((uint32_t)func > 0x23000000 && (uint32_t)func < 0x24000000) {
+	if ((uint32_t)func > BL_XIP_BASE && (uint32_t)func < 0x24000000) {
 		LOG_ERR("function at %d is in XIP and will crash the device", (uint32_t)func);
 		return true;
 	}
 	return false;
 }
 
-static void flash_bflb_l1c_invalidate2(void)
+static void flash_bflb_cache_invalidate(void)
 {
 	uint32_t tmpVal = 0;
 
@@ -299,12 +306,45 @@ static void flash_bflb_l1c_wrap(bool yes)
 
 static bool flash_bflb_guard(void *func)
 {
-	if ((uint32_t)func > 0xA0000000 && (uint32_t)func < 0xA8000000) {
+	if ((uint32_t)func > BL_XIP_BASE && (uint32_t)func < 0xA8000000) {
 		LOG_ERR("function at %d is in XIP and will crash the device", (uint32_t)func);
 		return true;
 	}
 	return false;
 }
+
+static void clean_dcache(void)
+{
+	__asm__ volatile (
+		"fence\n"
+		/* th.dcache.ciall*/
+		".insn 0x30000B\n"
+		"fence\n"
+	);
+}
+
+static void clean_icache(void)
+{
+	__asm__ volatile (
+		"fence\n"
+		"fence.i\n"
+		/* th.icache.iall */
+		".insn 0x100000B\n"
+		"fence\n"
+		"fence.i\n"
+	);
+}
+
+static void flash_bflb_cache_invalidate(void)
+{
+	clean_dcache();
+	clean_icache();
+}
+
+static void flash_bflb_l1c_wrap(bool yes)
+{
+}
+
 
 #endif
 
@@ -845,7 +885,7 @@ static int flash_bflb_save_xip_state(const struct device *dev)
 	}
 
 	data->last_flash_offset = flash_bflb_get_offset(data->reg_copy);
-	flash_bflb_l1c_invalidate2();
+	flash_bflb_cache_invalidate();
 	flash_bflb_set_offset(data->reg_copy, 0);
 
 	return 0;
@@ -945,7 +985,7 @@ static int flash_bflb_restore_xip_state(struct flash_bflb_data *data)
 {
 	int ret = 0;
 
-	flash_bflb_l1c_invalidate2();
+	flash_bflb_cache_invalidate();
 	flash_bflb_set_offset(data->reg_copy, data->last_flash_offset);
 
 	/* reenable burt read */
@@ -1100,20 +1140,20 @@ static int flash_bflb_read(const struct device *dev, off_t address, void *buffer
 	/* need set offset to 0 to access? */
 	if (address < img_offset) {
 
-		flash_bflb_l1c_invalidate2();
+		flash_bflb_cache_invalidate();
 
 		/* set offset to 0 to access first (likely)0x2000 of flash */
 		flash_bflb_set_offset(data->reg_copy, 0);
 
 		/* copy data we need */
-		flash_bflb_xip_memcpy((uint8_t *)(address + 0x23000000), (uint8_t *)buffer, length);
+		flash_bflb_xip_memcpy((uint8_t *)(address + BL_XIP_BASE), (uint8_t *)buffer, length);
 
-		flash_bflb_l1c_invalidate2();
+		flash_bflb_cache_invalidate();
 
 		flash_bflb_set_offset(data->reg_copy, img_offset);
 	} else {
 		/* copy data we need */
-		flash_bflb_xip_memcpy((uint8_t *)(address + 0x23000000 - img_offset),
+		flash_bflb_xip_memcpy((uint8_t *)(address + BL_XIP_BASE - img_offset),
 		(uint8_t *)buffer, length);
 	}
 
@@ -1166,8 +1206,6 @@ flash_bflb_admode_to_spimode(data->flash_cfg.qpp_addr_mode, 2);
 	}
 	write_cmd.rw = 1;
 	write_cmd.addr_size = 3;
-
-	/* TODO 32 bits address stuffs here (not e24 platforms) */
 
 	i = 0;
 	while (i < length) {
@@ -1239,8 +1277,6 @@ static int flash_bflb_erase(const struct device *dev, off_t start, size_t len)
 
 	erase_cmd.rw = 0;
 	erase_cmd.addr_size = 3;
-
-	/* TODO 32 bits address stuffs here (not e24 platforms) */
 
 	for (uint32_t i = start / ERASE_SIZE; i < ((len / ERASE_SIZE) + start / ERASE_SIZE); i++) {
 		/* Write enable is needed for every write */
@@ -1355,15 +1391,85 @@ static int flash_bflb_config_init_e24(const struct device *dev)
 	/* get XIP offset / where code really is in flash, usually 0x2000 */
 	img_offset = flash_bflb_get_offset(data->reg_copy);
 
-	flash_bflb_l1c_invalidate2();
+	flash_bflb_cache_invalidate();
 
 	/* set offset to 0 to access first (likely)0x2000 of flash */
 	flash_bflb_set_offset(data->reg_copy, 0);
 
 	/* copy data we need */
-	flash_bflb_xip_memcpy((uint8_t *)(8 + 0x23000000), buff, sizeof(bflb_flash_cfg) + 8);
+	flash_bflb_xip_memcpy((uint8_t *)(8 + BL_XIP_BASE), buff, sizeof(bflb_flash_cfg) + 8);
 
-	flash_bflb_l1c_invalidate2();
+	flash_bflb_cache_invalidate();
+
+	flash_bflb_set_offset(data->reg_copy, img_offset);
+
+	/* done with interrupt breaking stuffs */
+	irq_unlock(locker);
+
+	/* magic */
+	if (!(buffchar[0] == 'F' && buffchar[1] == 'C' && buffchar[2] == 'F'
+	&& buffchar[3] == 'G')) {
+		LOG_ERR("Flash data magic is incorrect");
+		return -EINVAL;
+	}
+
+	tmpVal = *((uint32_t *)(buff + 4 + sizeof(bflb_flash_cfg)));
+	img_offset = bflb_soft_crc32(0, (uint8_t *)(buff + 4), sizeof(bflb_flash_cfg));
+	if (tmpVal != img_offset) {
+		LOG_ERR("Flash data crc is incorrect %d vs %d", tmpVal, img_offset);
+		return -EINVAL;
+	}
+	flash_bflb_xip_memcpy(buff + 4, (uint8_t *)&(data->flash_cfg), sizeof(bflb_flash_cfg));
+
+	return 0;
+}
+#elif defined(CONFIG_SOC_SERIES_BL61X)
+
+static uint32_t flash_bflb_get_jedecid_glb(void)
+{
+    uint32_t tmpVal = 0;
+
+    tmpVal = sys_read32(GLB_BASE + GLB_HW_RSV1_OFFSET);
+    if ((tmpVal & 0x7F000000) == 0x5A000000) {
+        return (tmpVal & 0x00FFFFFF);
+    }
+    return 0x00000000;
+}
+
+/* /!\ this function cannot run from XIP! */
+static int flash_bflb_config_init_e907(const struct device *dev)
+{
+	struct flash_bflb_data *data = dev->data;
+	const struct flash_bflb_config *cfg = dev->config;
+	uint32_t	tmpVal = 0;
+	uint32_t	img_offset;
+	unsigned int	locker;
+	uint8_t		buff[sizeof(bflb_flash_cfg) + 8] = {0};
+	char		*buffchar = buff;
+
+	if (flash_bflb_guard(&flash_bflb_config_init_e907)) {
+		return -ENOTSUP;
+	}
+
+	/* copy cfg reg to memory as cfg will not be in it and inaccessible */
+	data->reg_copy = cfg->reg;
+
+	/* get flash config using xip access */
+
+	/* interrupting would break, likely to access XIP*/
+	locker = irq_lock();
+	/* get XIP offset / where code really is in flash, usually 0x2000 */
+	img_offset = flash_bflb_get_offset(data->reg_copy);
+
+	flash_bflb_cache_invalidate();
+
+	/* set offset to 0 to access first (likely)0x2000 of flash */
+	flash_bflb_set_offset(data->reg_copy, 0);
+
+	/* copy data we need */
+	flash_bflb_xip_memcpy((uint8_t *)(8 + BL_XIP_BASE), buff, sizeof(bflb_flash_cfg) + 8);
+
+	flash_bflb_cache_invalidate();
 
 	flash_bflb_set_offset(data->reg_copy, img_offset);
 
@@ -1412,7 +1518,6 @@ static int flash_bflb_init(const struct device *dev)
 {
 	const struct flash_bflb_config *cfg = dev->config;
 	struct flash_bflb_data *data = dev->data;
-	uint32_t jedecid = 0;
 	unsigned int	locker;
 	int ret = 0;
 
@@ -1428,7 +1533,7 @@ static int flash_bflb_init(const struct device *dev)
 	}
 	locker = irq_lock();
 	/* TODO: AES flash support goes here */
-	jedecid = flash_bflb_get_jedecid_live(data);
+	data->jedec_id = flash_bflb_get_jedecid_live(data);
 
 	/* operations done here in bflb driver but not here:
 	 * - reenable qspi (already done in flash_bflb_save_xip_state in bflb driver too)
