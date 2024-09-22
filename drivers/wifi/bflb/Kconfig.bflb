@@ -1,0 +1,62 @@
+# Copyright 2024 MASSDRIVER EI
+
+config WIFI_BFLB
+	bool "Bouffalolab SoC WiFi support"
+	default n
+
+menuconfig WIFI_BFLB_BL60X
+	bool "Bouffalolab bl60x SoC WiFi support"
+	default y
+	depends on DT_HAS_BFLB_BL60X_WIFI_ENABLED
+	select NET_L2_WIFI_MGMT
+	select WIFI_USE_NATIVE_NETWORKING
+	select WIFI_BFLB
+	help
+	  Enable Bouffalolab bl60x SoC WiFi support
+
+if WIFI_BFLB_BL60X
+
+config NET_TCP_WORKQ_STACK_SIZE
+	default 2048
+
+config NET_RX_STACK_SIZE
+	default 2048
+
+config NET_MGMT_EVENT_STACK_SIZE
+	default 2048
+
+endif # WIFI_BFLB_BL60X
+
+menuconfig WIFI_BFLB_BL61X
+	bool "Bouffalolab bl61x SoC WiFi support"
+	default y
+	depends on DT_HAS_BFLB_BL61X_WIFI_ENABLED
+	select NET_L2_WIFI_MGMT
+	select WIFI_USE_NATIVE_NETWORKING
+	select WIFI_BFLB
+	select THREAD_CUSTOM_DATA
+	select DYNAMIC_THREAD
+	select MBEDTLS
+	help
+	  Enable Bouffalolab bl61x SoC WiFi support
+
+if WIFI_BFLB_BL61X
+
+config NET_TCP_WORKQ_STACK_SIZE
+	default 2048
+
+config NET_RX_STACK_SIZE
+	default 2048
+
+config NET_MGMT_EVENT_STACK_SIZE
+	default 2048
+
+config WIFI_BFLB_BL61X_HEAP_SIZE
+	hex "Size of the HAL heap for bl61x wifi"
+	default 0x8000
+
+config WIFI_BFLB_BL61X_STACK_SIZE
+	hex "Size of the HAL stack for bl61x wifi"
+	default 0x2000
+
+endif # WIFI_BFLB_BL61X

@@ -108,3 +108,6 @@
 	pinctrl-names = "default", "sleep";
 };
 
+&wifi {
+	status = "okay";
+};

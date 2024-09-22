@@ -159,7 +159,7 @@ manifest:
       groups:
         - hal
     - name: hal_bouffalolab
-      revision: zephyr
+      revision: zephyr_upstreaming_bl61x
       path: modules/hal/bouffalolab
       remote: VynDragon
       groups:

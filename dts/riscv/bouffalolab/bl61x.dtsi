@@ -163,5 +163,9 @@
 			interrupt-parent = <&clic>;
 			status = "okay";
 		};
+		wifi: wifi {
+			compatible = "bflb,bl61x-wifi";
+			status = "disabled";
+		};
 	};
 };
