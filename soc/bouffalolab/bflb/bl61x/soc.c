@@ -443,26 +443,26 @@ static void system_init_WIFIPLL_setup(const bl61x_pll_config *const config)
 	| (1 << GLB_PU_WIFIPLL_SFREG_POS);
 	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
 
-	system_clock_at_least_us(5);
+	system_clock_at_least_us(8);
 
 	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
 	tmpVal = (tmpVal & GLB_PU_WIFIPLL_UMSK)
 	| (1 << GLB_PU_WIFIPLL_POS);
 	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
 
-	system_clock_at_least_us(5);
+	system_clock_at_least_us(8);
 
 	/* 'SDM reset' */
 	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
 	tmpVal = (tmpVal & GLB_WIFIPLL_SDM_RSTB_UMSK)
 	| (1 << GLB_WIFIPLL_SDM_RSTB_POS);
 	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
-	system_clock_at_least_us(5);
+	system_clock_at_least_us(8);
 	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
 	tmpVal = (tmpVal & GLB_WIFIPLL_SDM_RSTB_UMSK)
 	| (0 << GLB_WIFIPLL_SDM_RSTB_POS);
 	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
-	system_clock_at_least_us(5);
+	system_clock_at_least_us(8);
 	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
 	tmpVal = (tmpVal & GLB_WIFIPLL_SDM_RSTB_UMSK)
 	| (1 << GLB_WIFIPLL_SDM_RSTB_POS);
@@ -473,12 +473,12 @@ static void system_init_WIFIPLL_setup(const bl61x_pll_config *const config)
 	tmpVal = (tmpVal & GLB_WIFIPLL_FBDV_RSTB_UMSK)
 	| (1 << GLB_WIFIPLL_FBDV_RSTB_POS);
 	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
-	system_clock_at_least_us(5);
+	system_clock_at_least_us(8);
 	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
 	tmpVal = (tmpVal & GLB_WIFIPLL_FBDV_RSTB_UMSK)
 	| (0 << GLB_WIFIPLL_FBDV_RSTB_POS);
 	sys_write32(tmpVal, GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
-	system_clock_at_least_us(5);
+	system_clock_at_least_us(8);
 	tmpVal = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
 	tmpVal = (tmpVal & GLB_WIFIPLL_FBDV_RSTB_UMSK)
 	| (1 << GLB_WIFIPLL_FBDV_RSTB_POS);
@@ -550,6 +550,40 @@ static void system_init_WIFIPLL(uint32_t crystal)
 	system_clock_settle();
 }
 
+static void system_init_WIFIPLL_custom(uint32_t crystal, const bl61x_pll_config *const *config)
+{
+	uint32_t tmpVal = 0;
+	uint32_t old_rootclk = 0;
+	int count = CLOCK_TIMEOUT;
+
+	old_rootclk = system_get_root_clock();
+
+	/* security RC32M */
+	if (old_rootclk > 1) {
+		system_set_root_clock(0);
+	}
+
+	system_set_crystal(crystal);
+
+	system_deinit_WIFIPLL();
+
+	if (crystal == 0) {
+		system_set_crystal_PLL_reference(0);
+	} else {
+		system_set_crystal_PLL_reference(1);
+	}
+
+	system_init_WIFIPLL_setup(config[crystal]);
+
+	/* enable PLL clock */
+	tmpVal = sys_read32(GLB_BASE + GLB_SYS_CFG0_OFFSET);
+	tmpVal |= GLB_REG_PLL_EN_MSK;
+	sys_write32(tmpVal, GLB_BASE + GLB_SYS_CFG0_OFFSET);
+
+	system_set_root_clock(old_rootclk);
+	system_clock_settle();
+}
+
 
 static void system_init_AUPLL(uint32_t crystal)
 {
@@ -610,6 +644,9 @@ static void system_ungate_pll(uint8_t pll)
  * AUPLL   DIV2: 2
  * WIFIPLL 240Mhz: 3
  * WIFIPLL 320Mhz: 4
+ * WIFIPLL Overclock 400M: 5
+ * WIFIPLL Overclock 480M: 6
+ * WIFIPLL Overclock 520M: 7
  * 32MHz Oscillator : 32
  *
  *  /!\ When Clock Frequency is 32M, we do not power crystal or PLL
@@ -622,11 +659,7 @@ static int system_init_root_clock(uint32_t crystal, uint32_t clock_frequency_sou
 		return -ENOTSUP;
 	}
 
-	if (crystal > 5) {
-		return -EINVAL;
-	}
-
-	if (clock_frequency_source > 4 && clock_frequency_source != 32) {
+	if (clock_frequency_source > 7 && clock_frequency_source != 32) {
 		return -EINVAL;
 	}
 
@@ -714,6 +747,48 @@ static int system_init_root_clock(uint32_t crystal, uint32_t clock_frequency_sou
 			system_set_root_clock(3);
 		}
 		break;
+	case 5:
+		system_init_WIFIPLL_custom(crystal, bl61x_pll_configs_O400M);
+		system_set_PLL(3);
+		if (system_set_root_clock_dividers(0, 4) != 0) {
+			return -1;
+		}
+		/* 2T rom access goes here */
+		system_ungate_pll(14);
+		if (crystal == 0) {
+			system_set_root_clock(2);
+		} else {
+			system_set_root_clock(3);
+		}
+		break;
+	case 6:
+		system_init_WIFIPLL_custom(crystal, bl61x_pll_configs_O480M);
+		system_set_PLL(3);
+		if (system_set_root_clock_dividers(0, 5) != 0) {
+			return -1;
+		}
+		/* 2T rom access goes here */
+		system_ungate_pll(14);
+		if (crystal == 0) {
+			system_set_root_clock(2);
+		} else {
+			system_set_root_clock(3);
+		}
+		break;
+	case 7:
+		system_init_WIFIPLL_custom(crystal, bl61x_pll_configs_O520M);
+		system_set_PLL(3);
+		if (system_set_root_clock_dividers(0, 5) != 0) {
+			return -1;
+		}
+		/* 2T rom access goes here */
+		system_ungate_pll(14);
+		if (crystal == 0) {
+			system_set_root_clock(2);
+		} else {
+			system_set_root_clock(3);
+		}
+		break;
 	default:
 		break;
 	}
@@ -777,16 +852,20 @@ static void system_uart_set_clock(uint32_t enable, uint32_t clock, uint32_t divi
 	system_uart_set_clock_enable(enable);
 }
 
-/* TODO: should take crystal type, defaults to 40Mhz crystal for BL616 as seems the most common */
+/* TODO: should take crystal type */
 static void system_clock_init(void)
 {
 #if 1
-	system_init_root_clock(0, 32);
-	system_set_root_clock_dividers(0, 0);
-	system_clock_trim_32M();
+	/* safe mode: 320M clock and 32M Oscillator XCLK */
+	system_init_root_clock(0, 4);
+#elif 1
+	/* Time for some super sonic speed! 1.5x320M = 480M, 40M crystal */
+	system_init_root_clock(4, 6);
 #else
-	system_init_root_clock(4, 4);
+	/* super safe mode: 32M oscillator, XCLK */
+	system_init_root_clock(0, 32);
 #endif
+	system_clock_trim_32M();
 	system_set_machine_timer_clock(1, 0, mtimer_get_xclk_src_div());
 }
 
