@@ -143,8 +143,107 @@ static uint32_t uart_bflb_get_PLL_frequency(void)
 	}
 }
 
+#elif defined(CONFIG_SOC_SERIES_BL61X)
+
+static uint32_t system_get_xtal(void)
+{
+	uint32_t tmpVal;
+	tmpVal = sys_read32(HBN_BASE + HBN_RSV3_OFFSET);
+	tmpVal &= 0xF;
+
+	switch (tmpVal) {
+	case 0:
+		return 0;
+	case 1:
+		return 24 * 1000 * 1000;
+	case 2:
+		return 32 * 1000 * 1000;
+	case 3:
+		return 38.4 * 1000 * 1000;
+	case 4:
+		return 40 * 1000 * 1000;
+	case 5:
+		return 26 * 1000 * 1000;
+	case 6:
+		return 32 * 1000 * 1000;
+	default:
+		return 0;
+	}
+}
+
+/* source for most clocks, either XTAL or RC32M */
+static uint32_t system_get_xclk(void)
+{
+	uint32_t tmpVal = 0;
+	tmpVal = sys_read32(HBN_BASE + HBN_GLB_OFFSET);
+	tmpVal &= HBN_ROOT_CLK_SEL_MSK;
+	tmpVal = tmpVal >> HBN_ROOT_CLK_SEL_POS;
+	tmpVal &= 1;
+	if (tmpVal == 0) {
+		return (32 * 1000 * 1000);
+	} else if (tmpVal == 1) {
+		return system_get_xtal();
+	} else {
+		return 0;
+	}
+}
+
+
+/* Almost always CPU, AXI bus, SRAM Memory, Cache, use HCLK query instead */
+static uint32_t system_get_fclk(void)
+{
+	uint32_t tmpVal = 0;
+
+	tmpVal = sys_read32(HBN_BASE + HBN_GLB_OFFSET);
+	tmpVal &= HBN_ROOT_CLK_SEL_MSK;
+	tmpVal = (tmpVal >> HBN_ROOT_CLK_SEL_POS) >> 1;
+	tmpVal &= 1;
+
+	if (tmpVal == 0) {
+		return system_get_xclk();
+	} else if (tmpVal == 1) {
+		tmpVal = sys_read32(PDS_BASE + PDS_CPU_CORE_CFG1_OFFSET);
+		tmpVal = (tmpVal & PDS_REG_PLL_SEL_MSK) >> PDS_REG_PLL_SEL_POS;
+		if (tmpVal == 3) {
+			return 320 * 1000 * 1000;
+		} else if (tmpVal == 2) {
+			return 240 * 1000 * 1000;
+		} else if (tmpVal == 1) {
+			/* TODO AUPLL DIV 1 */
+		} else if (tmpVal == 0) {
+			/* TODO AUPLL DIV 2 */
+		}
+	}
+	return 0;
+}
+
+/* also CPU, AXI bus, SRAM Memory, Cache */
+static uint32_t system_get_hclk(void)
+{
+	uint32_t tmpVal = 0;
+	uint32_t clock = 0;
+
+	tmpVal = sys_read32(GLB_BASE + GLB_SYS_CFG0_OFFSET);
+	tmpVal = (tmpVal & GLB_REG_HCLK_DIV_MSK) >> GLB_REG_HCLK_DIV_POS;
+	clock = system_get_fclk();
+	return clock / (tmpVal + 1);
+}
+
+/* most peripherals clock */
+static uint32_t system_get_bclk(void)
+{
+	uint32_t tmpVal = 0;
+	uint32_t clock = 0;
+
+	tmpVal = sys_read32(GLB_BASE + GLB_SYS_CFG0_OFFSET);
+	tmpVal = (tmpVal & GLB_REG_BCLK_DIV_MSK) >> GLB_REG_BCLK_DIV_POS;
+	clock = system_get_hclk();
+	return clock / (tmpVal + 1);
+}
+
 #endif
 
+#if defined(CONFIG_SOC_SERIES_BL70X) || defined(CONFIG_SOC_SERIES_BL60X)
 
 static uint32_t i2c_bflb_get_bclk_clk(void)
 {
@@ -188,6 +287,13 @@ static uint32_t i2c_bflb_get_bclk_clk(void)
 	}
 	return 0;
 }
+
+#elif defined(CONFIG_SOC_SERIES_BL61X)
+static uint32_t i2c_bflb_get_bclk_clk(void)
+{
+	return system_get_bclk();
+}
+#endif
 
 static int32_t i2c_bflb_clamp_phase(int32_t phase)
 {
@@ -339,11 +445,19 @@ static int i2c_bflb_configure(const struct device *dev, uint32_t dev_config)
 	tmpVal |= I2C_RX_FIFO_CLR;
 	sys_write32(tmpVal, config->base + I2C_FIFO_CONFIG_0_OFFSET);
 
+#if defined(CONFIG_SOC_SERIES_BL61X)
+	tmpVal = sys_read32(GLB_BASE + GLB_I2C_CFG0_OFFSET);
+	/* set div to 1 (2) */
+	tmpVal = tmpVal & GLB_I2C_CLK_DIV_UMSK;
+	tmpVal |= 1 << GLB_I2C_CLK_DIV_POS;
+	sys_write32(tmpVal, GLB_BASE + GLB_I2C_CFG0_OFFSET);
+#else
 	tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG3_OFFSET);
 	/* set div to 1 (2) */
 	tmpVal = tmpVal & GLB_I2C_CLK_DIV_UMSK;
 	tmpVal |= 1 << GLB_I2C_CLK_DIV_POS;
 	sys_write32(tmpVal, GLB_BASE + GLB_CLK_CFG3_OFFSET);
+#endif
 
 
 	tmpVal = sys_read32(config->base + I2C_INT_STS_OFFSET);
@@ -391,7 +505,8 @@ static void i2c_bflb_set_address(const struct device *dev, uint32_t address)
 	/* no sub addresses */
 	tmpVal &= ~I2C_CR_I2C_SUB_ADDR_EN;
 	tmpVal &= ~I2C_CR_I2C_SLV_ADDR_MASK;
-#if !(defined(CONFIG_SOC_SERIES_BL60X) || defined(CONFIG_SOC_SERIES_BL70X))
+#if !(defined(CONFIG_SOC_SERIES_BL60X) && !defined(CONFIG_SOC_SERIES_BL70X))
+	struct i2c_bflb_data *data = dev->data;
 	if (data->is_10_bits_address) {
 		tmpVal |= I2C_CR_I2C_10B_ADDR_EN;
 		tmpVal |= ((address & 0x3FF) << I2C_CR_I2C_SLV_ADDR_SHIFT);
