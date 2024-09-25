@@ -6,6 +6,8 @@ config SOC_SERIES_BL61X
 	select RISCV_MACHINE_TIMER
 	select ATOMIC_OPERATIONS_C
 	select CPU_HAS_FPU
+	select FPU
+	select FLOAT_HARD
 	select INCLUDE_RESET_VECTOR
 	select XIP
 	select RISCV_PRIVILEGED
@@ -21,9 +23,18 @@ config SOC_SERIES_BL61X
 	select RISCV_ISA_EXT_P
 	select RISCV_ISA_EXT_ZICSR
 	select RISCV_ISA_EXT_ZIFENCEI
-	select RISCV_ISA_EXT_XTHEADCMO
 
-	# other extensions: _xtheade, zpsfoperand
+#	select RISCV_ISA_EXT_XTHEADBA
+#	select RISCV_ISA_EXT_XTHEADBB
+#	select RISCV_ISA_EXT_XTHEADBS
+#	select RISCV_ISA_EXT_XTHEADCMO
+#	select RISCV_ISA_EXT_XTHEADCONDMOV
+#	select RISCV_ISA_EXT_XTHEADINT
+#	select RISCV_ISA_EXT_XTHEADMAC
+#	select RISCV_ISA_EXT_XTHEADMEMIDX
+#	select RISCV_ISA_EXT_XTHEADSYNC
+
+	# other extensions: zpsfoperand
 
 	select CODE_DATA_RELOCATION
 
