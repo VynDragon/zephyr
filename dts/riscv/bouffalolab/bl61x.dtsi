@@ -163,5 +163,14 @@
 			interrupt-parent = <&clic>;
 			status = "okay";
 		};
+		adc0: adc@40002000 {
+			compatible = "bflb,adc";
+			/* GPIP reg, AON REG */
+			reg = <0x20002000 0x1000 0x2000F000 0x1000>;
+			interrupts = <41 0>;
+			interrupt-parent = <&clic>;
+			#io-channel-cells = <1>;
+			status = "disabled";
+		};
 	};
 };
