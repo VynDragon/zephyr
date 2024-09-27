@@ -880,6 +880,10 @@ static void peripheral_clock_init(void)
 	regval |= (1 << 17);
 	/* enable I2C0 clock routing */
 	regval |= (1 << 19);
+	/* enable I2C1 clock routing */
+	regval |= (1 << 25);
+	/* enable SPI0 clock routing */
+	regval |= (1 << 18);
 	sys_write32(regval, GLB_BASE + GLB_CGEN_CFG1_OFFSET);
 	system_uart_set_clock(1, 2, 0);
 }
@@ -1036,7 +1040,7 @@ static int bl61x_riscv_init(void)
 	irq_unlock(key);
 
 	/* wait 10 ms for peripherals to be ready */
-	k_timepoint_t end_timeout = sys_timepoint_calc(K_MSEC(10));
+	k_timepoint_t end_timeout = sys_timepoint_calc(K_MSEC(5));
 
 	while (!sys_timepoint_expired(end_timeout)) {
 	}
