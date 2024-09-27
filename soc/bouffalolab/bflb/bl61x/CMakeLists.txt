@@ -27,3 +27,4 @@ zephyr_code_relocate_ifdef(CONFIG_I2C_BFLB LIBRARY drivers__i2c LOCATION ITCM)
 zephyr_code_relocate_ifdef(CONFIG_GPIO_BFLB LIBRARY drivers__gpio LOCATION ITCM)
 zephyr_code_relocate_ifdef(CONFIG_SOC_FLASH_BFLB FILES ${ZEPHYR_BASE}/drivers/flash/flash_bflb.c
 LOCATION ITCM NOKEEP)
+zephyr_code_relocate_ifdef(CONFIG_SPI_BFLB LIBRARY drivers__spi LOCATION ITCM)
