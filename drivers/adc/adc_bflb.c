@@ -286,6 +286,8 @@ static void adc_bflb_isr(const struct device *dev)
 {
 }
 
+
+#if defined(CONFIG_SOC_SERIES_BL60X)
 static void adc_bflb_calibrate(const struct device *dev)
 {
 	const struct adc_bflb_config *const cfg = dev->config;
@@ -346,6 +348,7 @@ static void adc_bflb_calibrate(const struct device *dev)
 	sys_write32(tmpVal, cfg->reg_AON + AON_GPADC_REG_CONFIG2_OFFSET);
 }
 
+#elif defined(CONFIG_SOC_SERIES_BL70X)
 /* this is how it is calibrated from SDK, it gives bad results for BL60x, even when using the SDK */
 static int adc_bflb_trim2(const struct device *dev)
 {
@@ -376,6 +379,37 @@ static int adc_bflb_trim2(const struct device *dev)
 	}
 	return 0;
 }
+#elif defined(CONFIG_SOC_SERIES_BL61X)
+static int adc_bflb_trim_bl61x(const struct device *dev)
+{
+	uint32_t tmpVal = 0;
+	uint32_t trim = 0;
+	float coe = 0.0;
+	const struct device *efuse = DEVICE_DT_GET(DT_NODELABEL(efuse));
+
+	tmpVal = eeprom_read(efuse, 0xF0, &trim, 4);
+	if (tmpVal < 0) {
+		LOG_ERR("Error: Couldn't read efuses: err: %d.\n", tmpVal);
+		return -EINVAL;
+	}
+	if ((trim & 0x4000000) == 0) {
+		LOG_ERR("Error: ADC calibration data not present");
+		return -EINVAL;
+	}
+	trim = (trim & 0x3FFC000) >> 14;
+	if (trim & 0x800) {
+		trim = ~trim;
+		trim += 1;
+		trim = trim & 0xfff;
+		coe = ((float)1.0 + ((float)trim / (float)2048.0));
+		adc_bflb_api.ref_internal = 3300 / coe;
+	} else {
+		coe = ((float)1.0 - ((float)trim / (float)2048.0));
+		adc_bflb_api.ref_internal = 3300 / coe;
+	}
+	return 0;
+}
+#endif
 
 #if defined(CONFIG_SOC_SERIES_BL60X)
 static void adc_bflb_init_clock(const struct device *dev)
@@ -407,6 +441,21 @@ static void adc_bflb_init_clock(const struct device *dev)
 	/* enable */
 	tmpVal |= 1 << GLB_GPADC_32M_DIV_EN_POS;
 	sys_write32(tmpVal, GLB_BASE + GLB_GPADC_32M_SRC_CTRL_OFFSET);
+}
+#elif defined(CONFIG_SOC_SERIES_BL61X)
+static void adc_bflb_init_clock(const struct device *dev)
+{
+	uint32_t	tmpVal = 0;
+
+	/* clock pathing*/
+	tmpVal = sys_read32(GLB_BASE + GLB_ADC_CFG0_OFFSET);
+	/* clock = XTAL or RC32M (32M) */
+	tmpVal |= GLB_GPADC_32M_CLK_SEL_MSK;
+	/* div = 1 so ADC gets 32Mhz */
+	tmpVal &= ~GLB_GPADC_32M_CLK_DIV_MSK;
+	/* enable */
+	tmpVal |= 1 << GLB_GPADC_32M_DIV_EN_POS;
+	sys_write32(tmpVal, GLB_BASE + GLB_ADC_CFG0_OFFSET);
 }
 #endif
 
@@ -526,6 +575,8 @@ GPIP_GPADC_RDY_CLR);
 	adc_bflb_trim2(dev);
 #elif defined(CONFIG_SOC_SERIES_BL60X)
 	adc_bflb_calibrate(dev);
+#elif defined(CONFIG_SOC_SERIES_BL61X)
+	adc_bflb_trim_bl61x(dev);
 #endif
 
 	cfg->irq_config_func(dev);
