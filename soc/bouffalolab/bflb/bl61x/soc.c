@@ -957,7 +957,33 @@ static void enable_dcache(void)
 	__asm__ volatile(
 		"csrr %0, 0x7C1"
 		: "=r"(tmpVal));
-	tmpVal |= (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 12);
+	tmpVal |= (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4);
+	__asm__ volatile(
+		"csrw 0x7C1, %0"
+		:
+		: "r"(tmpVal));
+	__asm__ volatile (
+		"fence\n"
+		"fence.i\n"
+	);
+}
+
+static void enable_branchpred(bool yes)
+{
+	uint32_t tmpVal = 0;
+
+	__asm__ volatile (
+		"fence\n"
+		"fence.i\n"
+	);
+	__asm__ volatile(
+		"csrr %0, 0x7C1"
+		: "=r"(tmpVal));
+	if (yes) {
+		tmpVal |= (1 << 5) | (1 << 12);
+	} else {
+		tmpVal &= ~((1 << 5) | (1 << 12));
+	}
 	__asm__ volatile(
 		"csrw 0x7C1, %0"
 		:
@@ -976,6 +1002,24 @@ static void enable_thead_isa_ext(void)
 		"csrr %0, 0x7C0"
 		: "=r"(tmpVal));
 	tmpVal |= (1 << 22);
+	__asm__ volatile(
+		"csrw 0x7C0, %0"
+		:
+		: "r"(tmpVal));
+}
+
+static void set_thead_enforce_aligned(bool enable)
+{
+	uint32_t tmpVal = 0;
+
+	__asm__ volatile(
+		"csrr %0, 0x7C0"
+		: "=r"(tmpVal));
+	if (enable) {
+		tmpVal |= (1 << 15);
+	} else {
+		tmpVal &= ~(1 << 15);
+	}
 	__asm__ volatile(
 		"csrw 0x7C0, %0"
 		:
@@ -1021,7 +1065,12 @@ static int bl61x_riscv_init(void)
 	/* supplementary clic init goes here */
 
 	enable_thead_isa_ext();
+	set_thead_enforce_aligned(true);
 	enable_dcache();
+	/* branch prediction can cause major slowdowns (250ms -> 2 seconds)
+	 * in some applications
+	 */
+	enable_branchpred(true);
 	enable_icache();
 	disable_interrupt_autostacking();
 	clean_dcache();
