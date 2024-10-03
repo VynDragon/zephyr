@@ -10,6 +10,7 @@
 #include <zephyr/dt-bindings/adc/adc.h>
 #include <zephyr/dt-bindings/gpio/gpio.h>
 #include <zephyr/dt-bindings/i2c/i2c.h>
+#include <zephyr/dt-bindings/spi/spi.h>
 #include <zephyr/dt-bindings/input/input-event-codes.h>
 
 
@@ -163,7 +164,7 @@
 			interrupt-parent = <&clic>;
 			status = "okay";
 		};
-		adc0: adc@40002000 {
+		adc0: adc@20002000 {
 			compatible = "bflb,adc";
 			/* GPIP reg, AON REG */
 			reg = <0x20002000 0x1000 0x2000F000 0x1000>;
