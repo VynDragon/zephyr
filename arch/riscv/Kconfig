@@ -383,6 +383,15 @@ config GEN_IRQ_VECTOR_TABLE
 config ARCH_HAS_SINGLE_THREAD_SUPPORT
 	default y if !SMP
 
+config GDBSTUB_BUF_SZ
+	# GDB for RISCV XLEN / 8 bytes per register
+	# and at least 33 registers (register 32 : PC)
+	depends on GDBSTUB
+	default 264
+	default 528 if 64BIT
+	default 1056 if RISCV_ISA_RV128I
+
 rsource "Kconfig.isa"
+
 
 endmenu

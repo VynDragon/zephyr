@@ -20,6 +20,7 @@
 		zephyr,sram = &sram0;
 		zephyr,console = &uart0;
 		zephyr,shell-uart = &uart0;
+		zephyr,gdbstub-uart = &uart1;
 	};
 
 };
@@ -65,9 +66,8 @@
 };
 
 &uart1 {
-	status = "disabled";
+	status = "okay";
 	current-speed = <115200>;
-
 	pinctrl-0 = <&uart1_default>;
 	pinctrl-1 = <&uart1_sleep>;
 	pinctrl-names = "default", "sleep";

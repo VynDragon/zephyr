@@ -12,6 +12,9 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_DECLARE(os, CONFIG_KERNEL_LOG_LEVEL);
 
+#include <zephyr/debug/gdbstub.h>
+#include <zephyr/arch/riscv/gdbstub.h>
+
 #ifdef CONFIG_USERSPACE
 Z_EXC_DECLARE(z_riscv_user_string_nlen);
 
@@ -217,6 +220,12 @@ void _Fault(struct arch_esf *esf)
 #endif
 
 	mcause &= CONFIG_RISCV_MCAUSE_EXCEPTION_MASK;
+
+#ifdef CONFIG_GDBSTUB
+	if (z_gdb_entry(esf, mcause) == 0) {
+		return;
+	}
+#endif
 	LOG_ERR("");
 	LOG_ERR(" mcause: %ld, %s", mcause, cause_str(mcause));
 #ifndef CONFIG_SOC_OPENISA_RV32M1
