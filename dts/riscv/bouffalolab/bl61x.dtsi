@@ -173,5 +173,14 @@
 			#io-channel-cells = <1>;
 			status = "disabled";
 		};
+		usb0: usb0@20072000 {
+			compatible = "bflb,udc-bl61x";
+			reg = <0x20072000 0x1000>;
+			interrupts = <37 0>;
+			interrupt-parent = <&clic>;
+			num-bidir-endpoints = <5>;
+			maximum-speed = "high-speed";
+			status = "disabled";
+		};
 	};
 };
