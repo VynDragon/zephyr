@@ -55,5 +55,6 @@ source "drivers/usb/udc/Kconfig.virtual"
 source "drivers/usb/udc/Kconfig.stm32"
 source "drivers/usb/udc/Kconfig.it82xx2"
 source "drivers/usb/udc/Kconfig.mcux"
+source "drivers/usb/udc/Kconfig.bflb"
 
 endif # UDC_DRIVER

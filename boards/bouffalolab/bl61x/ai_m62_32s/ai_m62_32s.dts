@@ -20,6 +20,7 @@
 		zephyr,sram = &sram0;
 		zephyr,console = &uart0;
 		zephyr,shell-uart = &uart0;
+		zephyr,code-partition = &main_partition;
 	};
 
 };
@@ -73,3 +74,12 @@
 	pinctrl-names = "default", "sleep";
 };
 
+zephyr_udc0: &usb0 {
+	compatible = "bflb,udc-bl61x";
+	status = "okay";
+	maximum-speed = "full-speed";
+
+	cdc_acm_uart: cdc_acm_uart {
+		compatible = "zephyr,cdc-acm-uart";
+	};
+};
