@@ -17,7 +17,7 @@ void riscv_clic_irq_enable(unsigned int irq)
 	*(volatile uint8_t *)(CLIC_HART0_ADDR + CLIC_INTIE + 4*irq) = 1;
 }
 
-void clic_irq_disable(unsigned int irq)
+void riscv_clic_irq_disable(unsigned int irq)
 {
 	*(volatile uint8_t *)(CLIC_HART0_ADDR + CLIC_INTIE + 4*irq) = 0;
 }

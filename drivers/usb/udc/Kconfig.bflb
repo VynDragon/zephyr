@@ -1,0 +1,21 @@
+# Copyright (c) 2023 Nordic Semiconductor ASA
+# SPDX-License-Identifier: Apache-2.0
+
+config UDC_BFLB_BL61X
+	bool "BFLB USB device controller driver 2"
+	imply UDC_WORKQUEUE
+	default y
+	depends on DT_HAS_BFLB_UDC_BL61X_ENABLED
+	help
+	  BFLB USB device controller driver 2
+
+if UDC_BFLB_BL61X
+
+config UDC_BFLB_BL61X_EVENT_COUNT
+	int "Number or blocks in event slab"
+	range 4 16
+	default 8
+	help
+	  Number of blocks in slab for internal endpoint events.
+
+endif # UDC_BFLB_BL61X

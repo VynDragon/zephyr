@@ -857,7 +857,7 @@ static void system_clock_init(void)
 {
 #if 1
 	/* safe mode: 320M clock and 32M Oscillator XCLK */
-	system_init_root_clock(0, 4);
+	system_init_root_clock(4, 4);
 #elif 1
 	/* Time for some super sonic speed! 1.5x320M = 480M, 40M crystal */
 	system_init_root_clock(4, 6);
@@ -884,6 +884,8 @@ static void peripheral_clock_init(void)
 	regval |= (1 << 25);
 	/* enable SPI0 clock routing */
 	regval |= (1 << 18);
+	/* enable USB clock routing */
+	regval |= (1 << 13);
 	sys_write32(regval, GLB_BASE + GLB_CGEN_CFG1_OFFSET);
 	system_uart_set_clock(1, 2, 0);
 }
