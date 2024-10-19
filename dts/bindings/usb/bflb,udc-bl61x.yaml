@@ -1,0 +1,15 @@
+# Copyright (c) 2024 MASSDRIVER EI (massdriver.space)
+# SPDX-License-Identifier: Apache-2.0
+
+description: BFLB BL61x USB device controller
+
+compatible: "bflb,udc-bl61x"
+
+include: usb-ep.yaml
+
+properties:
+  reg:
+    required: true
+
+  interrupts:
+    required: true
