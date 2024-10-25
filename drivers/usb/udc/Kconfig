@@ -21,7 +21,7 @@ config UDC_BUF_COUNT
 config UDC_BUF_POOL_SIZE
 	int "Memory available for requests"
 	range 64 32768
-	default 1024
+	default 32768
 	help
 	  Total amount of memory available for UDC requests.
 
@@ -31,6 +31,24 @@ config UDC_BUF_FORCE_NOCACHE
 	help
 	  Place the buffer pools in the nocache memory region if the driver
 	  cannot handle buffers in cached memory.
+
+
+config UDC_BUF_CUSTOM_ALIGNEMENT
+	bool "Enable setting UDC Buffer Alignement"
+
+config UDC_BUF_ALIGN
+	int "Alignement of UDC buffers"
+	default 4 if !UDC_BUF_CUSTOM_ALIGNEMENT
+	default 8 if 64BIT && !UDC_BUF_CUSTOM_ALIGNEMENT
+	help
+	  Sets the Memory Alignement of UDC buffers
+
+config UDC_BUF_GRANULARITY
+	int "Granularity of UDC buffers"
+	default 4 if !UDC_BUF_CUSTOM_ALIGNEMENT
+	default 8 if 64BIT && !UDC_BUF_CUSTOM_ALIGNEMENT
+	help
+	  Sets the Memory Granularity of UDC buffers
 
 config UDC_WORKQUEUE
 	bool "Use a dedicate work queue for UDC drivers"
