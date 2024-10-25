@@ -18,4 +18,13 @@ config UDC_BFLB_BL61X_EVENT_COUNT
 	help
 	  Number of blocks in slab for internal endpoint events.
 
+config UDC_BUF_CUSTOM_ALIGNEMENT
+	default y
+
+config UDC_BUF_ALIGN
+	default 32
+
+config UDC_BUF_GRANULARITY
+	default 32
+
 endif # UDC_BFLB_BL61X
