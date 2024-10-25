@@ -15,7 +15,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/net_buf.h>
 
-#if defined(CONFIG_DCACHE) && !defined(CONFIG_UDC_BUF_FORCE_NOCACHE)
+#if defined(CONFIG_DCACHE) && !defined(CONFIG_UDC_BUF_FORCE_NOCACHE) && !defined(UDC_BUF_CUSTOM_ALIGNEMENT)
 /*
  * Here we try to get DMA-safe buffers, but we lack a consistent source of
  * information about data cache properties, such as line cache size, and a
@@ -30,8 +30,8 @@
  * Default alignment and granularity to pointer size if the platform does not
  * have a data cache or buffers are placed in nocache memory region.
  */
-#define Z_UDC_BUF_ALIGN		sizeof(void *)
-#define Z_UDC_BUF_GRANULARITY	sizeof(void *)
+#define Z_UDC_BUF_ALIGN		CONFIG_UDC_BUF_ALIGN
+#define Z_UDC_BUF_GRANULARITY	CONFIG_UDC_BUF_GRANULARITY
 #endif
 
 /**
