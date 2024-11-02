@@ -91,6 +91,16 @@ static void udc_bflb_bl61x_ctrl_ack(const struct device *dev)
 	sys_write32(tmp, cfg->base + USB_DEV_CXCFE_OFFSET);
 }
 
+static void udc_bflb_bl61x_ep_ack(const struct device *dev, const uint8_t ep_idx)
+{
+	uint32_t tmp = 0;
+	const struct udc_bflb_bl61x_config *cfg = dev->config;
+
+	tmp = sys_read32(cfg->base + USB_DEV_INMPS1_OFFSET + (ep_idx - 1) * 4);
+	tmp |= USB_TX0BYTE_IEP1;
+	sys_write32(tmp, cfg->base + USB_DEV_INMPS1_OFFSET + (ep_idx - 1) * 4);
+}
+
 static uint8_t udc_bflb_bl61x_epcaps_to_eptype(const struct udc_ep_caps * const caps)
 {
 	uint8_t ret = 0;
@@ -190,7 +200,7 @@ static void udc_bflb_bl61x_fifo_reset(const struct device *dev, uint8_t fifo_idx
         sys_write32(tmp, cfg->base + USB_DEV_FIBC0_OFFSET + 4 * fifo_idx);
 }
 
-/* fifo_idx : 0-3, ep_idx: 0-4
+/* fifo_idx : 0-3, ep_idx: 1-4
  * ep_direction: 0 in 1 out
  */
 static void udc_bflb_bl61x_ep_setfifo(const struct device *dev,
@@ -206,20 +216,20 @@ static void udc_bflb_bl61x_ep_setfifo(const struct device *dev,
 	}
 	ep_dir = ep_dir * 4;
 
-	if (ep_idx < 4) {
+	if (ep_idx < 5) {
 		tmp = sys_read32(cfg->base + USB_DEV_EPMAP0_OFFSET);
-		tmp &= ~(0xf << (ep_idx * 8 + ep_dir));
-		tmp |= (fifo_idx << (ep_idx * 8 + ep_dir));
+		tmp &= ~(0xf << ((ep_idx - 1) * 8 + ep_dir));
+		tmp |= (fifo_idx << ((ep_idx - 1) * 8 + ep_dir));
 		sys_write32(tmp, cfg->base + USB_DEV_EPMAP0_OFFSET);
 	} else {
 		tmp = sys_read32(cfg->base + USB_DEV_EPMAP1_OFFSET);
-		tmp &= ~(0xf << ep_dir);
-		tmp |= (fifo_idx << ep_dir);
+		tmp &= ~(0xf << ((ep_idx - 5) * 8 + ep_dir));
+		tmp |= (fifo_idx << ((ep_idx - 5) * 8 + ep_dir));
 		sys_write32(tmp, cfg->base + USB_DEV_EPMAP1_OFFSET);
 	}
 }
 
-/* fifo_idx : 0-3, ep_idx: 0-4
+/* fifo_idx : 0-3, ep_idx: 1-4
  * ep_direction: 0 in 1 out
  * fifo_direction: 0 out 1 in 2 bidirectional
  */
@@ -266,6 +276,8 @@ static void udc_bflb_bl61x_vdma_dcipa(uint32_t addr, uint32_t len)
 	}
 }
 
+static uint8_t vdma_ep_buf[1024] __attribute__((aligned(32))) = {0};
+
 /* bl61x cannot use cpu read/write for USB */
 static void udc_bflb_bl61x_vdma_startread(const struct device *dev,
 					uint8_t fifo_idx,
@@ -275,6 +287,8 @@ static void udc_bflb_bl61x_vdma_startread(const struct device *dev,
 	const struct udc_bflb_bl61x_config *cfg = dev->config;
 	uint32_t tmp = 0;
 
+	//udc_bflb_bl61x_vdma_dcipa(vdma_dout_buf, len);
+
 	tmp = sys_read32(cfg->base + USB_VDMA_F0PS1_OFFSET + fifo_idx * 8);
 	tmp &= ~USB_VDMA_LEN_CXF_MASK;
 	tmp &= ~USB_VDMA_IO_CXF;
@@ -282,13 +296,13 @@ static void udc_bflb_bl61x_vdma_startread(const struct device *dev,
 	tmp |= (len << USB_VDMA_LEN_CXF_SHIFT);
 	sys_write32(tmp, cfg->base + USB_VDMA_F0PS1_OFFSET + fifo_idx * 8);
 
-	sys_write32((uint32_t)buf, cfg->base + USB_VDMA_F0PS2_OFFSET + fifo_idx * 8);
+	sys_write32((uint32_t)vdma_ep_buf, cfg->base + USB_VDMA_F0PS2_OFFSET + fifo_idx * 8);
 
 	tmp = sys_read32(cfg->base + USB_VDMA_F0PS1_OFFSET + fifo_idx * 8);
 	tmp |= USB_VDMA_START_CXF;
 	sys_write32(tmp, cfg->base + USB_VDMA_F0PS1_OFFSET + fifo_idx * 8);
 
-	udc_bflb_bl61x_vdma_dcipa(buf, len);
+	udc_bflb_bl61x_vdma_dcipa(vdma_ep_buf, len);
 }
 
 static void udc_bflb_bl61x_vdma_startwrite(const struct device *dev,
@@ -298,7 +312,9 @@ static void udc_bflb_bl61x_vdma_startwrite(const struct device *dev,
 	const struct udc_bflb_bl61x_config *cfg = dev->config;
 	uint32_t tmp = 0;
 
-	udc_bflb_bl61x_vdma_dcipa(data, len);
+	memcpy(vdma_ep_buf, data, len);
+
+	udc_bflb_bl61x_vdma_dcipa(vdma_ep_buf, len);
 
 	tmp = sys_read32(cfg->base + USB_VDMA_F0PS1_OFFSET + fifo_idx * 8);
 	tmp &= ~USB_VDMA_LEN_CXF_MASK;
@@ -307,7 +323,7 @@ static void udc_bflb_bl61x_vdma_startwrite(const struct device *dev,
 	tmp |= (len << USB_VDMA_LEN_CXF_SHIFT);
 	sys_write32(tmp, cfg->base + USB_VDMA_F0PS1_OFFSET + fifo_idx * 8);
 
-	sys_write32((uint32_t)data, cfg->base + USB_VDMA_F0PS2_OFFSET + fifo_idx * 8);
+	sys_write32((uint32_t)vdma_ep_buf, cfg->base + USB_VDMA_F0PS2_OFFSET + fifo_idx * 8);
 
 	tmp = sys_read32(cfg->base + USB_VDMA_F0PS1_OFFSET + fifo_idx * 8);
 	tmp |= USB_VDMA_START_CXF;
@@ -317,6 +333,7 @@ static void udc_bflb_bl61x_vdma_startwrite(const struct device *dev,
 static void udc_bflb_bl61x_vdma_startread_ctrl(const struct device *dev, uint8_t *buf, uint32_t len)
 {
 	const struct udc_bflb_bl61x_config *cfg = dev->config;
+	struct udc_bflb_bl61x_data *priv = udc_get_private(dev);
 	uint32_t tmp = 0;
 
 	tmp = sys_read32(cfg->base + USB_VDMA_CXFPS1_OFFSET);
@@ -327,6 +344,8 @@ static void udc_bflb_bl61x_vdma_startread_ctrl(const struct device *dev, uint8_t
 	sys_write32(tmp, cfg->base + USB_VDMA_CXFPS1_OFFSET);
 
 	sys_write32((uint32_t)buf, cfg->base + USB_VDMA_CXFPS2_OFFSET);
+
+	priv->ep_in[0] = false;
 
 	tmp = sys_read32(cfg->base + USB_VDMA_CXFPS1_OFFSET);
 	tmp |= USB_VDMA_START_CXF;
@@ -339,6 +358,7 @@ static void udc_bflb_bl61x_vdma_startwrite_ctrl(const struct device *dev,
 						uint8_t *data, uint32_t len)
 {
 	const struct udc_bflb_bl61x_config *cfg = dev->config;
+	struct udc_bflb_bl61x_data *priv = udc_get_private(dev);
 	uint32_t tmp = 0;
 
 	udc_bflb_bl61x_vdma_dcipa(data, len);
@@ -351,6 +371,8 @@ static void udc_bflb_bl61x_vdma_startwrite_ctrl(const struct device *dev,
 	sys_write32(tmp, cfg->base + USB_VDMA_CXFPS1_OFFSET);
 
 	sys_write32((uint32_t)data, cfg->base + USB_VDMA_CXFPS2_OFFSET);
+
+	priv->ep_in[0] = true;
 
 	tmp = sys_read32(cfg->base + USB_VDMA_CXFPS1_OFFSET);
 	tmp |= USB_VDMA_START_CXF;
@@ -406,6 +428,15 @@ static enum udc_bus_speed udc_bflb_bl61x_device_speed(const struct device *dev)
 	}
 
 	return UDC_BUS_UNKNOWN;
+}
+
+static uint32_t udc_bflb_bl61x_ctrl_remain(const struct device *dev)
+{
+	const struct udc_bflb_bl61x_config *cfg = dev->config;
+	uint32_t tmp = 0;
+
+	tmp = (sys_read32(cfg->base + USB_VDMA_CXFPS1_OFFSET) & USB_VDMA_LEN_CXF_MASK);
+        return (tmp >> USB_VDMA_LEN_CXF_SHIFT);
 }
 
 static uint8_t udc_bflb_bl61x_fifo_get_ep(const struct device *dev, uint8_t fifo)
@@ -529,8 +560,12 @@ static int udc_bflb_bl61x_ctrl_evt_end(const struct device *dev)
 		}
 	} else if (udc_ctrl_stage_is_data_out(dev)) {
 		buf = udc_buf_get(dev, USB_CONTROL_EP_OUT);
+		LOG_DBG("Received DOUT: %x: %llx", buf->data, *buf->data);
 		udc_ctrl_update_stage(dev, buf);
 		err = udc_ctrl_submit_s_out_status(dev, buf);
+		if (udc_ctrl_stage_is_status_in(dev)) {
+			udc_bflb_bl61x_ctrl_ack(dev);
+		}
 		return err;
 	} else if (udc_ctrl_stage_is_data_in(dev)) {
 		//buf = udc_ctrl_alloc(dev, USB_CONTROL_EP_OUT, 0U);
@@ -552,6 +587,92 @@ static int udc_bflb_bl61x_ctrl_evt_end(const struct device *dev)
 	return 0;
 }
 
+static uint32_t udc_bflb_bl61x_ep_remain(const struct device *dev, const uint8_t fifo_idx)
+{
+	const struct udc_bflb_bl61x_config *cfg = dev->config;
+	uint32_t tmp = 0;
+
+	tmp = (sys_read32(cfg->base + USB_VDMA_F0PS1_OFFSET + fifo_idx * 8) & USB_VDMA_LEN_CXF_MASK);
+        return (tmp >> USB_VDMA_LEN_CXF_SHIFT);
+}
+
+static void udc_bflb_bl61x_ep_dout_start(const struct device *dev, struct udc_ep_config *ep_cfg)
+{
+	const struct udc_bflb_bl61x_config *cfg = dev->config;
+	struct udc_bflb_bl61x_data *priv = udc_get_private(dev);
+	struct net_buf *buf;
+	uint8_t ep_idx = USB_EP_GET_IDX(ep_cfg->addr);
+	uint32_t remain;
+
+	LOG_DBG("dout start ep 0x%02x", ep_cfg->addr);
+
+	if (priv->ep_in[ep_idx]) {
+		LOG_ERR("Unexpected ep 0x%02x dout token", ep_cfg->addr);
+	}
+
+	sys_write32(0x1 << (udc_bflb_bl61x_ep_get_fifo(ep_cfg) + 1), cfg->base + USB_DEV_ISG3_OFFSET);
+
+	buf = udc_buf_peek(dev, ep_cfg->addr);
+	if (buf == NULL) {
+		LOG_ERR("No buffer for ep 0x%02x", ep_cfg->addr);
+		udc_submit_event(dev, UDC_EVT_ERROR, -ENOBUFS);
+	}
+
+	udc_bflb_bl61x_vdma_startread(dev, udc_bflb_bl61x_ep_get_fifo(ep_cfg), buf->data, buf->size);
+	priv->ep_in[ep_idx] = false;
+}
+
+static void udc_bflb_bl61x_ep_din_start(const struct device *dev, struct udc_ep_config *ep_cfg)
+{
+	const struct udc_bflb_bl61x_config *cfg = dev->config;
+	struct udc_bflb_bl61x_data *priv = udc_get_private(dev);
+	struct net_buf *buf;
+	uint8_t ep_idx = USB_EP_GET_IDX(ep_cfg->addr);
+
+	LOG_DBG("din start ep 0x%02x", ep_cfg->addr);
+
+	if (!priv->ep_in[ep_idx]) {
+		LOG_ERR("Unexpected ep 0x%02x din token", ep_cfg->addr);
+	}
+
+	sys_write32(0x1 << (udc_bflb_bl61x_ep_get_fifo(ep_cfg) + 1), cfg->base + USB_DEV_ISG3_OFFSET);
+
+	buf = udc_buf_peek(dev, ep_cfg->addr);
+	if (buf == NULL) {
+		LOG_ERR("No buffer for ep 0x%02x", ep_cfg->addr);
+		udc_submit_event(dev, UDC_EVT_ERROR, -ENOBUFS);
+	}
+
+	LOG_DBG("start DMA for buf %p, data %p, len %i", (void*)buf, (void*)buf->data, buf->len);
+	udc_bflb_bl61x_vdma_startwrite(dev, udc_bflb_bl61x_ep_get_fifo(ep_cfg), buf->data, buf->len);
+	priv->ep_in[ep_idx] = true;
+}
+
+static int udc_bflb_bl61x_ep_evt_end(const struct device *dev, struct udc_ep_config *ep_cfg)
+{
+	const struct udc_bflb_bl61x_config *cfg = dev->config;
+	struct udc_bflb_bl61x_data *priv = udc_get_private(dev);
+	struct net_buf *buf;
+	uint32_t remain = 0;
+
+	buf = udc_buf_get(dev, ep_cfg->addr);
+	LOG_DBG("Event end for 0x%02x got buf %x", ep_cfg->addr, buf);
+	if (buf == NULL) {
+		return -ENODATA;
+	}
+	if (USB_EP_DIR_IS_OUT(ep_cfg->addr)){
+		remain = udc_bflb_bl61x_ep_remain(dev, udc_bflb_bl61x_ep_get_fifo(ep_cfg));
+		memcpy(buf->data, vdma_ep_buf, buf->size);
+		net_buf_add(buf, buf->size - remain);
+		//net_buf_add(buf, buf->size);
+		//net_buf_add(buf, 1);
+	} else {
+		net_buf_pull(buf, buf->len);
+	}
+	LOG_DBG("Buf: %x", *buf->data);
+
+	return udc_submit_ep_event(dev, buf, 0);
+}
 static void udc_bflb_bl61x_work_handler(struct k_work *item)
 {
 	struct udc_bflb_bl61x_ev *ev;
@@ -585,6 +706,7 @@ static void udc_bflb_bl61x_work_handler(struct k_work *item)
 				//err = udc_bflb_bl61x_ctrl_setup_end(ev->dev);
 				break;
 			case UBFBL61X_EVT_END:
+				err = udc_bflb_bl61x_ep_evt_end(ev->dev, ep_cfg);
 				/*err = work_handler_out(ev->dev, ev->ep_addr);
 				udc_ep_set_busy(ev->dev, ev->ep_addr, false);*/
 				break;
@@ -614,34 +736,46 @@ static int udc_bflb_bl61x_ep_enqueue(const struct device *dev,
 				   struct net_buf *buf)
 {
 	const struct udc_bflb_bl61x_config *cfg = dev->config;
+	struct udc_bflb_bl61x_data *priv = udc_get_private(dev);
 	uint8_t ep_idx = USB_EP_GET_IDX(config->addr);
 	uint32_t tmp = 0;
 
-	LOG_DBG("%p enqueue %p", dev, buf);
+	LOG_DBG("%p enqueue %p for ep 0x%02x", dev, buf, config->addr);
 
 	if (config->stat.halted) {
 		LOG_DBG("ep 0x%02x halted", config->addr);
 		return 0;
 	}
 
-	if (buf->len == 0) {
+	if (USB_EP_DIR_IS_OUT(config->addr)) {
+		if (ep_idx == 0) {
+			//udc_buf_put(config, buf);
+			//udc_bflb_bl61x_ctrl_dout_start(dev);
+		} else {
+			udc_buf_put(config, buf);
+			priv->ep_in[ep_idx] = false;
+			udc_bflb_bl61x_ep_dout_start(dev, config);
+		}
+	} else if (buf->len == 0) {
 		if (ep_idx == 0) {
 			udc_bflb_bl61x_ctrl_ack(dev);
+			udc_ctrl_submit_status(dev, buf);
+			udc_ctrl_update_stage(dev, buf);
 		} else {
-			tmp = sys_read32(cfg->base + USB_DEV_INMPS1_OFFSET + (ep_idx - 1) * 4);
-			tmp |= USB_TX0BYTE_IEP1;
-			sys_write32(tmp, cfg->base + USB_DEV_INMPS1_OFFSET + (ep_idx - 1) * 4);
+			udc_bflb_bl61x_ep_ack(dev, ep_idx);
 		}
-		udc_ctrl_submit_status(dev, buf);
-		udc_ctrl_update_stage(dev, buf);
 		net_buf_unref(buf);
 	} else {
 		if (ep_idx == 0) {
 			udc_buf_put(config, buf);
 			udc_bflb_bl61x_ctrl_din_start(dev);
-			//udc_bflb_bl61x_ctrl_ack(dev);
+			net_buf_unref(buf);
+		} else {
+			udc_buf_put(config, buf);
+			priv->ep_in[ep_idx] = true;
+			udc_bflb_bl61x_ep_din_start(dev, config);
+			//net_buf_unref(buf);
 		}
-		net_buf_unref(buf);
 	}
 	return 0;
 }
@@ -697,6 +831,11 @@ static int udc_bflb_bl61x_ep_enable(const struct device *dev,
 			udc_bflb_bl61x_fifo_configure(dev, 1,
 				udc_bflb_bl61x_epcaps_to_eptype(&config->caps),
 				config->mps, 1, false);
+			if (config->caps.out) {
+				/*tmp = sys_read32(cfg->base + USB_DEV_MISG1_OFFSET);
+				tmp &= ~(1 << ((ep_idx - 1) * 2));
+				sys_write32(tmp, cfg->base + USB_DEV_MISG1_OFFSET);*/
+			}
 		} else {
 			udc_bflb_bl61x_ep_setfifo(dev, ep_idx, 2, 0);
 			udc_bflb_bl61x_ep_setfifo(dev, ep_idx, 2, 1);
@@ -708,6 +847,11 @@ static int udc_bflb_bl61x_ep_enable(const struct device *dev,
 			udc_bflb_bl61x_fifo_configure(dev, 3,
 				udc_bflb_bl61x_epcaps_to_eptype(&config->caps),
 				config->mps, 1, false);
+			if (config->caps.out) {
+				/*tmp = sys_read32(cfg->base + USB_DEV_MISG1_OFFSET);
+				tmp &= ~(1 << (2 * 2));
+				sys_write32(tmp, cfg->base + USB_DEV_MISG1_OFFSET);*/
+			}
 		}
 	} else {
 		udc_bflb_bl61x_ep_setfifo(dev, ep_idx, ep_idx - 1, 0);
@@ -716,6 +860,11 @@ static int udc_bflb_bl61x_ep_enable(const struct device *dev,
 		udc_bflb_bl61x_fifo_configure(dev, ep_idx - 1,
 			udc_bflb_bl61x_epcaps_to_eptype(&config->caps),
 			config->mps, 1, true);
+		if (config->caps.out) {
+			/*tmp = sys_read32(cfg->base + USB_DEV_MISG1_OFFSET);
+			tmp &= ~(1 << ((ep_idx - 1) * 2));
+			sys_write32(tmp, cfg->base + USB_DEV_MISG1_OFFSET);*/
+		}
 	}
 
 	tmp = sys_read32(cfg->base + USB_DEV_ADR_OFFSET);
@@ -874,11 +1023,12 @@ static int udc_bflb_bl61x_enable(const struct device *dev)
 		| (1 << 3);
 	sys_write32(tmp, cfg->base + USB_DEV_MISG0_OFFSET);
 
-	/* enable IRQs in group 1 (fifo interrupts) */
-	sys_write32(0x0, cfg->base + USB_DEV_MISG1_OFFSET);
+	/* disable IRQs in group 1 (fifo interrupts) */
+	sys_write32(0xffffffff, cfg->base + USB_DEV_MISG1_OFFSET);
 
 	/* enable some group 2 interrupts (usb rst tx rx sus res) */
-	sys_write32(0xFFFFFF98, cfg->base + USB_DEV_MISG2_OFFSET);
+	//sys_write32(0xFFFFFF98, cfg->base + USB_DEV_MISG2_OFFSET);
+	sys_write32(0xFFFFFFF8, cfg->base + USB_DEV_MISG2_OFFSET);
 
 	/* enable some group 3 interrupts (DMA completion interrupts?) */
 	sys_write32(0xFFFFFFE0, cfg->base + USB_DEV_MISG3_OFFSET);
@@ -898,6 +1048,11 @@ static int udc_bflb_bl61x_enable(const struct device *dev)
 	tmp &= ~USB_MDEV_INT;
 	sys_write32(tmp, cfg->base + USB_GLB_INT_OFFSET);
 
+
+	/* clear irqs group 0 */
+	sys_write32(0xffffffff, cfg->base + USB_DEV_ISG0_OFFSET);
+	/* clear irqs group 1 */
+	sys_write32(0xffffffff, cfg->base + USB_DEV_ISG1_OFFSET);
 	/* clear irqs group 2 */
 	sys_write32(0x3ff, cfg->base + USB_DEV_ISG2_OFFSET);
 	/* clear irqs group 3 */
@@ -1172,8 +1327,8 @@ static void udc_bflb_bl61x_isr(const struct device *dev)
 	uint32_t glb_intstatus;
 	uint32_t dev_intstatus;
 	uint32_t group_intstatus;
-	uint8_t ep_idx;
-
+	struct udc_ep_config *ep_cfg;
+;
 	glb_intstatus = sys_read32(cfg->base + USB_GLB_ISR_OFFSET);
 
 	if (glb_intstatus & USB_DEV_INT) {
@@ -1195,16 +1350,6 @@ static void udc_bflb_bl61x_isr(const struct device *dev)
 				priv->setup_received = true;
 				udc_bflb_bl61x_ctrl_setup_start(dev);
 			}
-			/*if (group_intstatus & USB_CX_IN_INT) {
-				priv->ep_in[0] = true;
-				//udc_bflb_bl61x_ctrl_din_start(dev);
-				udc_bflb_bl61x_ev_submit(dev, USB_CONTROL_EP_OUT, UBFBL61X_EVT_CTRL_DIN_START);
-			}
-			if (group_intstatus & USB_CX_OUT_INT) {
-				priv->ep_in[0] = false;
-				udc_bflb_bl61x_ctrl_dout_start(dev);
-				//udc_bflb_bl61x_ev_submit(dev, USB_CONTROL_EP_OUT, UBFBL61X_EVT_CTRL_DOUT_START);
-			}*/
 			if (group_intstatus & USB_CX_COMFAIL_INT) {
 				//udc_submit_event(dev, UDC_EVT_ERROR, -1);
 				LOG_ERR("Control command Fail");
@@ -1216,17 +1361,11 @@ static void udc_bflb_bl61x_isr(const struct device *dev)
 			group_intstatus = sys_read32(cfg->base + USB_DEV_ISG1_OFFSET);
 			group_intstatus &=  ~sys_read32(cfg->base + USB_DEV_MISG1_OFFSET);
 
+			LOG_INF("ISRG1: %x", group_intstatus);
 
-			for (int fifo = 0; fifo < cfg->num_of_eps - 1; fifo++) {
-				if (group_intstatus & (1 << 16 << (fifo))) {
-					priv->ep_in[udc_bflb_bl61x_fifo_get_ep(dev, fifo)] = true;
-					//udc_bflb_bl61x_ev_submit(dev, USB_EP_DIR_IN | udc_bflb_bl61x_fifo_get_ep(dev, fifo), UBFBL61X_EVT_DIN_START);
-				}
-
-				if ((group_intstatus & (1 << ((fifo) * 2))) ||
-				(group_intstatus & (1 << 1 << ((fifo) * 2)))) {
-					priv->ep_in[udc_bflb_bl61x_fifo_get_ep(dev, fifo)] = false;
-					//udc_bflb_bl61x_ev_submit(dev, USB_EP_DIR_OUT | udc_bflb_bl61x_fifo_get_ep(dev, fifo), UBFBL61X_EVT_DOUT_START);
+			for (uint8_t i = 0; i < cfg->num_of_eps - 1; i++) {
+				if (group_intstatus & (1 << (i * 2))) {
+					udc_bflb_bl61x_ep_dout_start(dev, udc_get_ep_cfg(dev, (USB_EP_DIR_OUT | udc_bflb_bl61x_fifo_get_ep(dev, i))));
 				}
 			}
 
@@ -1269,6 +1408,7 @@ static void udc_bflb_bl61x_isr(const struct device *dev)
 			}
 		}
 		if (dev_intstatus & USB_INT_G3) {
+			LOG_INF("ISRG3: %x", group_intstatus);
 			group_intstatus = sys_read32(cfg->base + USB_DEV_ISG3_OFFSET);
 			group_intstatus &=  ~sys_read32(cfg->base + USB_DEV_MISG3_OFFSET);
 			/* clear isr */
@@ -1287,13 +1427,14 @@ static void udc_bflb_bl61x_isr(const struct device *dev)
 				if (group_intstatus & (1 << (i + 1))) {
 					if (priv->ep_in[1 + i]) {
 						udc_bflb_bl61x_ev_submit(dev, USB_EP_DIR_IN | udc_bflb_bl61x_fifo_get_ep(dev, i), UBFBL61X_EVT_END);
+						//udc_bflb_bl61x_ep_ack(dev, udc_bflb_bl61x_fifo_get_ep(dev, i));
 					} else {
 						udc_bflb_bl61x_ev_submit(dev, USB_EP_DIR_OUT | udc_bflb_bl61x_fifo_get_ep(dev, i), UBFBL61X_EVT_END);
 					}
 				}
 			}
 
-			sys_write32(group_intstatus, cfg->base + USB_DEV_ISG3_OFFSET);
+			//sys_write32(group_intstatus, cfg->base + USB_DEV_ISG3_OFFSET);
 		}
 		if (dev_intstatus & USB_INT_G4) {
 		}
