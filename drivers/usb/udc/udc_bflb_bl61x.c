@@ -663,7 +663,7 @@ static int udc_bflb_bl61x_ep_evt_end(const struct device *dev, struct udc_ep_con
 	if (USB_EP_DIR_IS_OUT(ep_cfg->addr)){
 		remain = udc_bflb_bl61x_ep_remain(dev, udc_bflb_bl61x_ep_get_fifo(ep_cfg));
 		memcpy(buf->data, vdma_ep_buf, buf->size);
-		net_buf_add(buf, buf->size - remain);
+		net_buf_add(buf, ep_cfg->mps - remain);
 		//net_buf_add(buf, buf->size);
 		//net_buf_add(buf, 1);
 	} else {
