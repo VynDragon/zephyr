@@ -24,7 +24,7 @@
 
 		cpu0: cpu@0 {
 			clock-frequency = <0>;
-			compatible = "thead,e907", "riscv";
+			compatible = "xuantie,e907", "riscv";
 			device_type = "cpu";
 			hardware-exec-breakpoint-count = <4>;
 			reg = <0>;

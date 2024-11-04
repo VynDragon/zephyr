@@ -616,10 +616,12 @@ static void udc_bflb_bl61x_ep_dout_start(const struct device *dev, struct udc_ep
 	if (buf == NULL) {
 		LOG_ERR("No buffer for ep 0x%02x", ep_cfg->addr);
 		udc_submit_event(dev, UDC_EVT_ERROR, -ENOBUFS);
+		udc_bflb_bl61x_vdma_startread(dev, udc_bflb_bl61x_ep_get_fifo(ep_cfg), NULL, ep_cfg->mps);
+		priv->ep_in[ep_idx] = false;
+	} else {
+		udc_bflb_bl61x_vdma_startread(dev, udc_bflb_bl61x_ep_get_fifo(ep_cfg), buf->data, buf->size);
+		priv->ep_in[ep_idx] = false;
 	}
-
-	udc_bflb_bl61x_vdma_startread(dev, udc_bflb_bl61x_ep_get_fifo(ep_cfg), buf->data, buf->size);
-	priv->ep_in[ep_idx] = false;
 }
 
 static void udc_bflb_bl61x_ep_din_start(const struct device *dev, struct udc_ep_config *ep_cfg)
@@ -659,6 +661,7 @@ static int udc_bflb_bl61x_ep_evt_end(const struct device *dev, struct udc_ep_con
 	LOG_DBG("Event end for 0x%02x got buf %x", ep_cfg->addr, buf);
 	if (buf == NULL) {
 		return -ENODATA;
+		return 0;
 	}
 	if (USB_EP_DIR_IS_OUT(ep_cfg->addr)){
 		remain = udc_bflb_bl61x_ep_remain(dev, udc_bflb_bl61x_ep_get_fifo(ep_cfg));
@@ -1361,7 +1364,7 @@ static void udc_bflb_bl61x_isr(const struct device *dev)
 			group_intstatus = sys_read32(cfg->base + USB_DEV_ISG1_OFFSET);
 			group_intstatus &=  ~sys_read32(cfg->base + USB_DEV_MISG1_OFFSET);
 
-			LOG_INF("ISRG1: %x", group_intstatus);
+			LOG_DBG("ISRG1: %x", group_intstatus);
 
 			for (uint8_t i = 0; i < cfg->num_of_eps - 1; i++) {
 				if (group_intstatus & (1 << (i * 2))) {
@@ -1408,7 +1411,7 @@ static void udc_bflb_bl61x_isr(const struct device *dev)
 			}
 		}
 		if (dev_intstatus & USB_INT_G3) {
-			LOG_INF("ISRG3: %x", group_intstatus);
+			LOG_DBG("ISRG3: %x", group_intstatus);
 			group_intstatus = sys_read32(cfg->base + USB_DEV_ISG3_OFFSET);
 			group_intstatus &=  ~sys_read32(cfg->base + USB_DEV_MISG3_OFFSET);
 			/* clear isr */
