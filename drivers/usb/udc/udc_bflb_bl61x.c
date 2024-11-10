@@ -485,7 +485,9 @@ static void udc_bflb_bl61x_ctrl_dout_start(const struct device *dev)
 	struct net_buf *buf;
 	struct udc_ep_config *ep_cfg = udc_get_ep_cfg(dev, USB_CONTROL_EP_OUT);
 
-	if (!udc_ctrl_stage_is_data_out(dev)) {
+	LOG_DBG("ctrl dout start ep 0x%02x", ep_cfg->addr);
+
+	if (!udc_ctrl_stage_is_data_out(dev) || udc_bflb_bl61x_ctrl_remain(dev) != 0) {
 		LOG_ERR("Unexpected control dout token");
 	}
 
@@ -510,14 +512,16 @@ static void udc_bflb_bl61x_ctrl_din_start(const struct device *dev)
 	struct net_buf *buf;
 	struct udc_ep_config *ep_cfg = udc_get_ep_cfg(dev, USB_CONTROL_EP_IN);
 
-	if (!udc_ctrl_stage_is_data_in(dev)) {
+	LOG_DBG("ctrl din start ep 0x%02x", ep_cfg->addr);
+
+	if (!udc_ctrl_stage_is_data_in(dev) || udc_bflb_bl61x_ctrl_remain(dev) != 0) {
 		LOG_ERR("Unexpected control din token");
 	}
 
 	/* clear ctrl fifo transfer complete isr */
 	sys_write32(USB_VDMA_CMPLT_CXF, cfg->base + USB_DEV_ISG3_OFFSET);
 
-	buf = udc_buf_get(dev, USB_CONTROL_EP_IN);
+	buf = udc_buf_peek(dev, USB_CONTROL_EP_IN);
 	//if (buf == NULL || buf->len != priv->next_stage_size[0]) {
 	if (buf == NULL) {
 		udc_submit_event(dev, UDC_EVT_ERROR, -ENODATA);
@@ -563,16 +567,14 @@ static int udc_bflb_bl61x_ctrl_evt_end(const struct device *dev)
 		LOG_DBG("Received DOUT: %x: %llx", buf->data, *buf->data);
 		udc_ctrl_update_stage(dev, buf);
 		err = udc_ctrl_submit_s_out_status(dev, buf);
-		if (udc_ctrl_stage_is_status_in(dev)) {
-			udc_bflb_bl61x_ctrl_ack(dev);
-		}
 		return err;
 	} else if (udc_ctrl_stage_is_data_in(dev)) {
+		buf = udc_buf_get(dev, USB_CONTROL_EP_IN);
+		net_buf_unref(buf);
 		//buf = udc_ctrl_alloc(dev, USB_CONTROL_EP_OUT, 0U);
 		buf = udc_buf_get(dev, USB_CONTROL_EP_OUT);
 		udc_ctrl_update_stage(dev, buf);
 		if (udc_ctrl_stage_is_status_out(dev)) {
-			udc_bflb_bl61x_ctrl_ack(dev);
 			buf = udc_ctrl_alloc(dev, USB_CONTROL_EP_OUT, 0U);
 			//buf = udc_buf_get(dev, USB_CONTROL_EP_OUT);
 			err = udc_ctrl_submit_status(dev, buf);
@@ -767,17 +769,14 @@ static int udc_bflb_bl61x_ep_enqueue(const struct device *dev,
 		} else {
 			udc_bflb_bl61x_ep_ack(dev, ep_idx);
 		}
-		net_buf_unref(buf);
 	} else {
 		if (ep_idx == 0) {
 			udc_buf_put(config, buf);
 			udc_bflb_bl61x_ctrl_din_start(dev);
-			net_buf_unref(buf);
 		} else {
 			udc_buf_put(config, buf);
 			priv->ep_in[ep_idx] = true;
 			udc_bflb_bl61x_ep_din_start(dev, config);
-			//net_buf_unref(buf);
 		}
 	}
 	return 0;
@@ -1352,6 +1351,8 @@ static void udc_bflb_bl61x_isr(const struct device *dev)
 				priv->ep_in[0] = false;
 				priv->setup_received = true;
 				udc_bflb_bl61x_ctrl_setup_start(dev);
+			} else if (group_intstatus & USB_CX_SETUP_INT) {
+				LOG_ERR("Double Setup");
 			}
 			if (group_intstatus & USB_CX_COMFAIL_INT) {
 				//udc_submit_event(dev, UDC_EVT_ERROR, -1);
