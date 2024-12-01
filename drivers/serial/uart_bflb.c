@@ -721,36 +721,41 @@ static void uart_bflb_poll_out(const struct device *dev, unsigned char c)
 static int uart_bflb_pm_control(const struct device *dev,
 			      enum pm_device_action action)
 {
-	const struct bl_config *cfg = dev->config;
+	const struct bflb_config *cfg = dev->config;
+	uint32_t tmp;
 
 	switch (action) {
 	case PM_DEVICE_ACTION_RESUME:
 		(void)pinctrl_apply_state(cfg->pincfg, PINCTRL_STATE_DEFAULT);
-		const struct bflb_config *cfg = dev->config;
-		uint32_t tx_cfg;
-		uint32_t rx_cfg;
-
-		tx_cfg = sys_read32(cfg->base_reg + UART_UTX_CONFIG_OFFSET);
-		rx_cfg = sys_read32(cfg->base_reg + UART_URX_CONFIG_OFFSET);
-		tx_cfg |= UART_CR_UTX_EN;
-		rx_cfg |= UART_CR_URX_EN;
-		sys_write32(tx_cfg, cfg->base_reg + UART_UTX_CONFIG_OFFSET);
-		sys_write32(rx_cfg, cfg->base_reg + UART_URX_CONFIG_OFFSET);
+		tmp = sys_read32(GLB_BASE + GLB_CGEN_CFG1_OFFSET);
+		/* Ungate clock to peripheral */
+#if defined(CONFIG_SOC_SERIES_BL60X) || defined(CONFIG_SOC_SERIES_BL70X)
+		tmp |= (1 << 16);
+#elif defined(CONFIG_SOC_SERIES_BL61X)
+		if (cfg->base == 0x2000a000) {
+			tmp |= (1 << 16);
+		} else if (cfg->base == 0x2000a100) {
+			tmp |= (1 << 17);
+		}
+#endif
+		sys_write32(tmp, GLB_BASE + GLB_CGEN_CFG1_OFFSET);
 		break;
 	case PM_DEVICE_ACTION_SUSPEND:
 		if (pinctrl_apply_state(cfg->pincfg, PINCTRL_STATE_SLEEP)) {
 			return -134;
 		}
-		const struct bflb_config *cfg = dev->config;
-		uint32_t tx_cfg;
-		uint32_t rx_cfg;
-
-		tx_cfg = sys_read32(cfg->base_reg + UART_UTX_CONFIG_OFFSET);
-		rx_cfg = sys_read32(cfg->base_reg + UART_URX_CONFIG_OFFSET);
-		tx_cfg &= ~UART_CR_UTX_EN;
-		rx_cfg &= ~UART_CR_URX_EN;
-		sys_write32(tx_cfg, cfg->base_reg + UART_UTX_CONFIG_OFFSET);
-		sys_write32(rx_cfg, cfg->base_reg + UART_URX_CONFIG_OFFSET);
+		tmp = sys_read32(GLB_BASE + GLB_CGEN_CFG1_OFFSET);
+		/* Gate clock to peripheral */
+#if defined(CONFIG_SOC_SERIES_BL60X) || defined(CONFIG_SOC_SERIES_BL70X)
+		tmp &= (1 << 16);
+#elif defined(CONFIG_SOC_SERIES_BL61X)
+		if (cfg->base == 0x2000a000) {
+			tmp &= (1 << 16);
+		} else if (cfg->base == 0x2000a100) {
+			tmp &= (1 << 17);
+		}
+#endif
+		sys_write32(tmp, GLB_BASE + GLB_CGEN_CFG1_OFFSET);
 		break;
 	default:
 		return -134;
