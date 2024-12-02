@@ -91,7 +91,7 @@ void z_sys_poweroff(void)
 	/* Power Off HBN_RTC */
 	tmp |= HBN_PWRDN_HBN_RTC_MSK;
 	/* Set double reset at power on, 0: double 1: single*/
-	tmp &= HBN_PWR_ON_OPTION_MSK;
+	tmp &= HBN_PWR_ON_OPTION_UMSK;
 	*(uint32_t*)(HBN_BASE + HBN_CTL_OFFSET) = tmp;
 
 	/* gate all peripherals */

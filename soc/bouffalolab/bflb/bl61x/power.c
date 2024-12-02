@@ -7,10 +7,11 @@
 #include <zephyr/kernel.h>
 #include <zephyr/pm/pm.h>
 
-#include <bouffalolab/bl70x/glb_reg.h>
-#include <bouffalolab/bl70x/pds_reg.h>
-#include <bouffalolab/bl70x/hbn_reg.h>
-#include <bouffalolab/bl70x/aon_reg.h>
+#include <bouffalolab/bl61x/glb_reg.h>
+#include <bouffalolab/bl61x/cci_reg.h>
+#include <bouffalolab/bl61x/pds_reg.h>
+#include <bouffalolab/bl61x/hbn_reg.h>
+#include <bouffalolab/bl61x/aon_reg.h>
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_DECLARE(soc_power, CONFIG_SOC_LOG_LEVEL);
@@ -53,6 +54,16 @@ void z_sys_poweroff(void)
 	tmp &= HBN_REG_EN_HW_PU_PD_UMSK;
 	*(uint32_t*)(HBN_BASE + HBN_IRQ_MODE_OFFSET) = tmp;
 
+	/* Disable HBN GPIO interrupt */
+	tmp = *(uint32_t*)(HBN_BASE + HBN_IRQ_MODE_OFFSET);
+	tmp &= HBN_PIN_WAKEUP_MASK_UMSK;
+	*(uint32_t*)(HBN_BASE + HBN_IRQ_MODE_OFFSET) = tmp;
+
+	/* disable RTC counter */
+	tmp = *(uint32_t*)(HBN_BASE + HBN_CTL_OFFSET);
+	*(uint32_t*)(HBN_BASE + HBN_CTL_OFFSET) = tmp & (~1);
+
+
 	/* Power Off Flash */
 	/* TODO requires intelligence for multi-flash */
 
@@ -62,31 +73,28 @@ void z_sys_poweroff(void)
 	tmp &= AON_PU_XTAL_BUF_AON_UMSK;
 	*(uint32_t*)(AON_BASE + AON_RF_TOP_AON_OFFSET) = tmp;
 
-	/* Power Off DLL */
-	tmp = *(uint32_t*)(GLB_BASE + GLB_DLL_OFFSET);
-	tmp &= GLB_PPU_DLL_UMSK;
-	tmp &= GLB_PU_DLL_UMSK;
-	tmp |= GLB_DLL_RESET_MSK;
-	*(uint32_t*)(GLB_BASE + GLB_DLL_OFFSET) = tmp;
+	/* Power Off WIFI pll */
+	tmp = *(uint32_t*)(GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
+	tmp &= GLB_PU_WIFIPLL_UMSK;
+	*(uint32_t*)(GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET) = tmp;
+	tmp = *(uint32_t*)(GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
+	tmp &= GLB_PU_WIFIPLL_SFREG_UMSK;
+	*(uint32_t*)(GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET) = tmp;
 
-	/* Power Off Audio PLL? */
-	tmp = *(uint32_t*)(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-	tmp &= PDS_PU_CLKPLL_SFREG_UMSK;
-	tmp &= PDS_PU_CLKPLL_UMSK;
-	*(uint32_t*)(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET) = tmp;
-	tmp = *(uint32_t*)(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-	tmp &= PDS_CLKPLL_PU_CP_UMSK;
-	tmp &= PDS_CLKPLL_PU_PFD_UMSK;
-	tmp &= PDS_CLKPLL_PU_FBDV_UMSK;
-	tmp &= PDS_CLKPLL_PU_POSTDIV_UMSK;
-	*(uint32_t*)(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET) = tmp;
+	/* Power Off Audio PLL */
+	tmp = *(uint32_t*)(CCI_BASE + CCI_AUDIO_PLL_CFG0_OFFSET);
+	tmp &= CCI_PU_AUPLL_UMSK;
+	*(uint32_t*)(CCI_BASE + CCI_AUDIO_PLL_CFG0_OFFSET) = tmp;
+	tmp = *(uint32_t*)(CCI_BASE + CCI_AUDIO_PLL_CFG0_OFFSET);
+	tmp &= CCI_PU_AUPLL_SFREG_UMSK;
+	*(uint32_t*)(CCI_BASE + CCI_AUDIO_PLL_CFG0_OFFSET) = tmp;
 
 	/* Setup undocumented HBN LDO */
 	tmp = *(uint32_t*)(HBN_BASE + HBN_CTL_OFFSET);
 	tmp &= HBN_LDO11_AON_VOUT_SEL_UMSK;
 	tmp &= HBN_LDO11_RT_VOUT_SEL_UMSK;
-	tmp |= 8 << HBN_LDO11_AON_VOUT_SEL_POS;
-	tmp |= 8 << HBN_LDO11_RT_VOUT_SEL_POS;
+	tmp |= 10 << HBN_LDO11_AON_VOUT_SEL_POS;
+	tmp |= 10 << HBN_LDO11_RT_VOUT_SEL_POS;
 	*(uint32_t*)(HBN_BASE + HBN_CTL_OFFSET) = tmp;
 
 	/* set undocumented 'HBN Flag' */
