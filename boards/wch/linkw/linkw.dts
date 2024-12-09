@@ -55,6 +55,7 @@
 &pll {
 	clocks = <&clk_hse>;
 	status = "okay";
+	mul = <18>;
 };
 
 &rcc {

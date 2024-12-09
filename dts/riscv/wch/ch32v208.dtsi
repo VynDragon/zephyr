@@ -74,9 +74,14 @@
 			#address-cells = <1>;
 			#size-cells = <1>;
 
-			flash0: flash@0 {
+			flash0_zerowait: flash_zerowait@0 {
 				compatible = "soc-nv-flash";
 				reg = <0 0x20000>;
+			};
+
+			flash0: flash@8000000 {
+				compatible = "soc-nv-flash";
+				reg = <0x08000000 0x78000>;
 			};
 		};
 

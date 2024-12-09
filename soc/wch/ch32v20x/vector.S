@@ -14,6 +14,8 @@ GTEXT(__initialize)
 
 SECTION_FUNC(vectors, ivt)
 	.option norvc
+	lui	x5, 0x8000
+	jalr 	x0, 0x8(x5)
 	j       __start
 	.rept 103
 	.word	_isr_wrapper
