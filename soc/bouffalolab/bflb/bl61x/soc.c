@@ -1054,7 +1054,7 @@ static void disable_interrupt_autostacking(void)
 static int bl61x_riscv_init(void)
 {
 	uint32_t key;
-	uint32_t tmpVal = 0;
+	uint32_t tmp = 0;
 
 	key = irq_lock();
 
@@ -1080,6 +1080,11 @@ static int bl61x_riscv_init(void)
 	/* reset uart signals */
 	sys_write32(0xffffffff, GLB_BASE + GLB_UART_CFG1_OFFSET);
 	sys_write32(0x0000ffff, GLB_BASE + GLB_UART_CFG2_OFFSET);
+
+	/* reset wrongful AON control set by Bootrom on BL618 */
+	tmp = sys_read32(HBN_BASE + HBN_PAD_CTRL_0_OFFSET);
+	tmp &= ~HBN_REG_EN_AON_CTRL_GPIO_MSK;
+	sys_write32(tmp, HBN_BASE + HBN_PAD_CTRL_0_OFFSET);
 
 	/* TODO: 'em' config for ble goes here */
 
