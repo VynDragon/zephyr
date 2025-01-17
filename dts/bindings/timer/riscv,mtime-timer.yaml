@@ -1,0 +1,14 @@
+# Copyright (c) 2024 MASSDRIVER EI (massdriver.space)
+# SPDX-License-Identifier: Apache-2.0
+
+description: RISC-V Standard mtime Timer.
+
+compatible: "riscv,mtime-timer"
+
+include: base.yaml
+
+properties:
+  reg:
+    required: true
+  interrupts-extended:
+    required: true

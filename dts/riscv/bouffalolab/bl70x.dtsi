@@ -69,6 +69,13 @@
 			reg-names = "control";
 		};
 
+		mtimer: timer@200bff8 {
+			compatible = "riscv,mtime-timer";
+			interrupts-extended = <&ictrl 7>;
+			reg = <0x200BFF8 0x8 0x2004000 0x8>;
+			reg-names = "mtime", "mtimecmp";
+		};
+
 		clic: clic@2000000 {
 			#interrupt-cells = <2>;
 			interrupt-controller;
