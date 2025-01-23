@@ -38,6 +38,11 @@
 		};
 	};
 
+	bflb_bt_hci: bflb_bt_hci {
+		compatible = "bflb,bt-hci";
+		status = "disabled";
+	};
+
 	soc {
 		#address-cells = <1>;
 		#size-cells = <1>;

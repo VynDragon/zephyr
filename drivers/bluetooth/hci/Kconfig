@@ -159,6 +159,12 @@ config BT_AMBIQ_HCI
 	  Supports Ambiq Bluetooth SoC using SPI as the communication protocol.
 	  HCI packets are sent and received as single Byte transfers.
 
+config BT_BFLB
+	bool
+	default y
+	depends on DT_HAS_BFLB_BT_HCI_ENABLED
+	help
+	  BFLB HCI bluetooth interface
 
 if BT_SPI
 

@@ -62,3 +62,7 @@
 	pinctrl-1 = <&uart0_sleep>;
 	pinctrl-names = "default", "sleep";
 };
+
+&bflb_bt_hci {
+		status = "okay";
+};
