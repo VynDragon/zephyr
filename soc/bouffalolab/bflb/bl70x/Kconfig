@@ -6,6 +6,8 @@ config SOC_SERIES_BL70X
 	select RISCV_MACHINE_TIMER
 	select ATOMIC_OPERATIONS_C
 	select CPU_HAS_FPU
+	select FPU
+	select FLOAT_HARD
 	select INCLUDE_RESET_VECTOR
 	select XIP
 	select RISCV_PRIVILEGED
