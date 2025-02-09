@@ -1,0 +1,27 @@
+# Copyright (c) 2025 tinyVision.ai
+# SPDX-License-Identifier: Apache-2.0
+
+if BOARD_PICO_ICE
+
+if I2C_DW
+
+config I2C_DW_CLOCK_SPEED
+	default 125
+
+endif # I2C_DW
+
+config USB_SELF_POWERED
+	default n
+
+source "boards/common/usb/Kconfig.cdc_acm_serial.defconfig"
+
+config USB_DEVICE_PRODUCT
+	default "Zephyr RTOS on tinyVision.ai pico-ice"
+
+config USB_DEVICE_VID
+	default 0x1209
+
+config USB_DEVICE_PID
+	default 0xB1C0
+
+endif # BOARD_PICO_ICE

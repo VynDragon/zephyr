@@ -1,0 +1,5 @@
+# Copyright (c) 2025 tinyVision.ai
+# SPDX-License-Identifier: Apache-2.0
+
+config BOARD_PICO_ICE
+	select RP2_FLASH_W25Q080

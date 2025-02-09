@@ -1,0 +1,219 @@
+/*
+ * Copyright (c) 2025 tinyVision.ai
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/dts-v1/;
+
+#include <freq.h>
+
+#include <raspberrypi/rpi_pico/rp2040.dtsi>
+#include "pico_ice-pinctrl.dtsi"
+#include <zephyr/dt-bindings/pwm/pwm.h>
+#include <zephyr/dt-bindings/i2c/i2c.h>
+
+
+/ {
+	chosen {
+		zephyr,sram = &sram0;
+		zephyr,flash = &flash0;
+		zephyr,flash-controller = &ssi;
+		zephyr,console = &cdc_acm_uart0;
+		zephyr,shell-uart = &cdc_acm_uart0;
+		zephyr,code-partition = &code_partition;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+		led0_red: led_0 {
+			gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
+			label = "Red LED 0";
+		};
+		led1_green: led_1 {
+			gpios = <&gpio0 12 GPIO_ACTIVE_LOW>;
+			label = "Green LED 1";
+		};
+		led2_blue: led_2 {
+			gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
+			label = "Blue LED 2";
+		};
+		led3_cdone: led_3 {
+			gpios = <&gpio0 26 GPIO_ACTIVE_LOW>;
+			label = "CDONE LED 3";
+		};
+	};
+
+	pwmleds {
+		compatible = "pwm-leds";
+		pwm_led0_red: pwm_led_0 {
+			pwms = <&pwm 13 PWM_MSEC(20) PWM_POLARITY_INVERTED>;
+			label = "Red PWM LED 0";
+		};
+		pwm_led1_green: pwm_led_1 {
+			pwms = <&pwm 12 PWM_MSEC(20) PWM_POLARITY_INVERTED>;
+			label = "Green PWM LED 1";
+		};
+		pwm_led2_blue: pwm_led_2 {
+			pwms = <&pwm 15 PWM_MSEC(20) PWM_POLARITY_INVERTED>;
+			label = "Blue PWM LED 2";
+		};
+		pwm_led3_cdone: pwm_led_3 {
+			pwms = <&pwm 10 PWM_MSEC(20) PWM_POLARITY_INVERTED>;
+			label = "Blue PWM LED 2";
+		};
+	};
+
+	aliases {
+		rtc = &rtc;
+		watchdog0 = &wdt0;
+		led0 = &led0_red;
+		led1 = &led1_green;
+		led2 = &led2_blue;
+		led3 = &led3_cdone;
+		pwm-led0 = &pwm_led0_red;
+		pwm-led1 = &pwm_led1_green;
+		pwm-led2 = &pwm_led2_blue;
+		pwm-led3 = &pwm_led3_cdone;
+		green-pwm-led = &pwm_led1_green;
+		red-pwm-led = &pwm_led0_red;
+		blue-pwm-led = &pwm_led2_blue;
+		yellow-pwm-led = &pwm_led3_cdone;
+		fpga = &fpga_ice40;
+	};
+
+	spi_fpga: spi_bitbang {
+		compatible = "zephyr,spi-bitbang";
+		status = "disabled";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		clock-frequency = <DT_FREQ_M(1)>;
+		clk-gpios = <&gpio0 10 0>;
+		mosi-gpios = <&gpio0 8 0>;
+		cs-gpios = <&gpio0 9 GPIO_ACTIVE_LOW>;
+
+		fpga_ice40: ice40@0 {
+			status = "disabled";
+			compatible = "lattice,ice40-fpga";
+			reg = <0x0>;
+			spi-max-frequency = <DT_FREQ_M(1)>;
+
+			cdone-gpios = <&gpio0 26 0>;
+			creset-gpios = <&gpio0 27 0>;
+			config-delay-us = <3900>;
+		};
+	};
+};
+
+&flash0 {
+	reg = <0x10000000 DT_SIZE_M(4)>;
+
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		/* Reserved memory for the second stage bootloader */
+		second_stage_bootloader: partition@0 {
+			label = "second_stage_bootloader";
+			reg = <0x00000000 0x100>;
+			read-only;
+		};
+
+		code_partition: partition@100 {
+			label = "code-partition";
+			reg = <0x100 (DT_SIZE_M(4) - 0x100)>;
+			read-only;
+		};
+	};
+};
+
+ice_uart: &uart0 {
+	current-speed = <115200>;
+	status = "disabled";
+	pinctrl-0 = <&ice_uart_default>;
+	pinctrl-names = "default";
+};
+
+&gpio0 {
+	status = "okay";
+};
+
+&i2c0 {
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+	status = "okay";
+	pinctrl-0 = <&i2c0_default>;
+	pinctrl-names = "default";
+};
+
+&spi0 {
+	clock-frequency = <DT_FREQ_M(10)>;
+	status = "okay";
+	pinctrl-0 = <&spi0_default>;
+	pinctrl-names = "default";
+};
+
+&spi1 {
+	clock-frequency = <DT_FREQ_M(33)>;
+	status = "okay";
+	pinctrl-0 = <&spi1_default>;
+	pinctrl-names = "default";
+
+	cs-gpios = <&gpio0 9 GPIO_ACTIVE_LOW>,
+			<&gpio0 14 GPIO_ACTIVE_LOW>;
+
+	spi1_cs0_flash: w25q32jvsiq@0 {
+		compatible = "jedec,spi-nor";
+		size = <DT_SIZE_M(4)>;
+		reg = <0x0>;
+		spi-max-frequency = <DT_FREQ_M(24)>;
+		jedec-id = [ef 40 16];
+		status = "okay";
+	};
+
+	/* This is unsupported in zephyr ATM */
+	spi1_cs1_ram: aps6404l@1 {
+		compatible = "apmem,spi-ram";
+		size = <DT_SIZE_M(8)>;
+		reg = <0x1>;
+		spi-max-frequency = <DT_FREQ_M(33)>;
+		status = "disabled";
+	};
+};
+
+&timer {
+	status = "okay";
+};
+
+&wdt0 {
+	status = "okay";
+};
+
+&rtc {
+	clocks = <&clocks RPI_PICO_CLKID_CLK_RTC>;
+	status = "okay";
+};
+
+&pwm {
+	pinctrl-0 = <&pwm_rgbled_default>;
+	pinctrl-names = "default";
+	status = "okay";
+};
+
+&vreg {
+	regulator-always-on;
+	regulator-allowed-modes = <REGULATOR_RPI_PICO_MODE_NORMAL>;
+};
+
+pico_spi: &spi0 {};
+pico_i2c0: &i2c0 {};
+pico_i2c1: &i2c1 {};
+pico_serial: &uart1 {};
+
+zephyr_udc0: &usbd {
+	status = "okay";
+};
+
+#include <../boards/common/usb/cdc_acm_serial.dtsi>
+
+

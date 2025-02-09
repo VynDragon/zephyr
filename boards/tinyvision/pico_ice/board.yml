@@ -1,0 +1,6 @@
+board:
+  name: pico_ice
+  full_name: tinyVision.ai pico-ice
+  vendor: tinyvision
+  socs:
+  - name: rp2040

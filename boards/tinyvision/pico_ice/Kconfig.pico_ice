@@ -1,0 +1,6 @@
+# Copyright (c) 2025 tinyVision.ai
+# SPDX-License-Identifier: Apache-2.0
+
+config BOARD_PICO_ICE
+	select SOC_RP2040
+	select BOARD_REQUIRES_SERIAL_BACKEND_CDC_ACM

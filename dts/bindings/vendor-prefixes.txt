@@ -63,6 +63,7 @@ aosong	Guangzhou Aosong Electronic Co., Ltd.
 ap	Angst+Pfister
 apa	Apa Electronic Co., Ltd
 apm	Applied Micro Circuits Corporation (APM)
+apmem	AP Memory
 apple	Apple Inc.
 aptina	Aptina Imaging
 arasan	Arasan Chip Systems
