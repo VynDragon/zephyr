@@ -1527,11 +1527,12 @@ static int flash_bflb_init(const struct device *dev)
 	flash_bflb_config_init_e907(dev);
 #endif
 
+	locker = irq_lock();
+
 	ret = flash_bflb_save_xip_state(dev);
 	if (ret != 0) {
 		return ret;
 	}
-	locker = irq_lock();
 	/* TODO: AES flash support goes here */
 	data->jedec_id = flash_bflb_get_jedecid_live(data);
 

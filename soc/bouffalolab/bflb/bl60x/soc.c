@@ -761,12 +761,6 @@ GLB_JTAG_SWAP_SET_POS);
 
 	irq_unlock(key);
 
-	/* wait 10 ms for peripherals to be ready */
-	k_timepoint_t end_timeout = sys_timepoint_calc(K_MSEC(10));
-
-	while (!sys_timepoint_expired(end_timeout)) {
-	}
-
 	return 0;
 }
 

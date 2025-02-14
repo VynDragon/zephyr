@@ -60,14 +60,11 @@
 			reg = <0x42020000 DT_SIZE_K(176)>;
 		};
 
-		clint: clint@2000000 {
-			#address-cells = <0>;
-			#interrupt-cells = <1>;
-			interrupt-controller;
-			compatible = "sifive,clint0";
-			interrupts-extended = <&ictrl 3 &ictrl 7>;
-			reg = <0x2000000 0x10000>;
-			reg-names = "control";
+		mtimer: timer@200bff8 {
+			compatible = "riscv,machine-timer";
+			interrupts-extended = <&ictrl 7>;
+			reg = <0x200BFF8 0x8 0x2004000 0x8>;
+			reg-names = "mtime", "mtimecmp";
 		};
 
 		clic: clic@2000000 {
