@@ -1,0 +1,64 @@
+/*
+ * Copyright (c) 2021, ATL Electronics
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/dts-v1/;
+
+#include <bouffalolab/bl704l.dtsi>
+#include "3r_zigbee_sensor-pinctrl.dtsi"
+
+/ {
+	model = "bl704l";
+	compatible = "bflb,bl704l";
+
+	chosen {
+		zephyr,flash = &flash0;
+		zephyr,code-partition = &main_partition;
+		zephyr,itcm = &itcm;
+		zephyr,dtcm = &dtcm;
+		zephyr,sram = &sram0;
+		zephyr,console = &uart0;
+		zephyr,shell-uart = &uart0;
+	};
+};
+
+&cpu0 {
+	clock-frequency = <128000000>;
+};
+
+&flashctrl {
+	flash0: flash@23000000 {
+		compatible = "soc-nv-flash", "mxic,kh25v80";
+		reg = <0x23000000 (0x100000 - 0x2000)>;
+		write-block-size = <256>;
+		erase-block-size = <DT_SIZE_K(4)>;
+		/* jedec-id = [c2 20 14]; */
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			main_partition: partition@0 {
+				label = "code";
+				reg = <0x00000000 0x00080000>;
+				read-only;
+			};
+
+			storage_partition: partition@80000 {
+				label = "storage";
+				reg = <0x00080000 (0x00080000 - 0x2000)>;
+			};
+		};
+	};
+};
+
+&uart0 {
+	status = "okay";
+	current-speed = <115200>;
+
+	pinctrl-0 = <&uart0_default>;
+	pinctrl-1 = <&uart0_sleep>;
+	pinctrl-names = "default", "sleep";
+};

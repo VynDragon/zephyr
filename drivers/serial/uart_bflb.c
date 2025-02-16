@@ -360,6 +360,93 @@ static uint32_t uart_bflb_get_clock(void)
 		return system_get_bclk() / (uart_divider + 1);
 	}
 }
+#elif defined(CONFIG_SOC_SERIES_BL70XL)
+static uint32_t system_get_xtal(void)
+{
+	return (32 * 1000 * 1000);
+}
+
+/* source for most clocks, either XTAL or RC32M */
+static uint32_t system_get_xclk(void)
+{
+	return (32 * 1000 * 1000);
+}
+
+
+/* Almost always CPU, AXI bus, SRAM Memory, Cache, use HCLK query instead */
+static uint32_t system_get_fclk(void)
+{
+	uint32_t tmpVal = 0;
+
+	tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG0_OFFSET);
+	tmpVal = (tmpVal & GLB_HBN_ROOT_CLK_SEL_MSK) >> GLB_HBN_ROOT_CLK_SEL_POS;
+
+	if (tmpVal == 0 || tmpVal == 1) {
+		return system_get_xclk();
+	} else if (tmpVal > 1) {
+		tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG0_OFFSET);
+		tmpVal = (tmpVal & GLB_HBN_ROOT_CLK_SEL_MSK) >> GLB_HBN_ROOT_CLK_SEL_POS;
+		if (tmpVal == 3) {
+			return 128 * 1000 * 1000;
+		} else if (tmpVal == 2) {
+			return 64 * 1000 * 1000;
+		} else if (tmpVal == 1) {
+			return 42 * 1000 * 1000 + 67 * 10 * 1000;
+		} else if (tmpVal == 0) {
+			return 25 * 1000 * 1000 + 6 * 100 * 1000;
+		}
+	}
+	return 0;
+}
+
+/* also CPU, AXI bus, SRAM Memory, Cache */
+static uint32_t system_get_hclk(void)
+{
+	uint32_t tmpVal = 0;
+	uint32_t clock = 0;
+
+	tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG0_OFFSET);
+	tmpVal = (tmpVal & GLB_REG_HCLK_DIV_MSK) >> GLB_REG_HCLK_DIV_POS;
+	clock = system_get_fclk();
+	return clock / (tmpVal + 1);
+}
+
+/* most peripherals clock */
+static uint32_t system_get_bclk(void)
+{
+	uint32_t tmpVal = 0;
+	uint32_t clock = 0;
+
+	tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG0_OFFSET);
+	tmpVal = (tmpVal & GLB_REG_BCLK_DIV_MSK) >> GLB_REG_BCLK_DIV_POS;
+	clock = system_get_hclk();
+	return clock / (tmpVal + 1);
+}
+
+static uint32_t uart_bflb_get_clock(void)
+{
+	uint32_t tmpVal = 0;
+	uint32_t uart_divider = 0;
+	uint32_t hclk_divider = 0;
+
+
+	tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG2_OFFSET);
+	uart_divider = (tmpVal & GLB_UART_CLK_DIV_MSK) >> GLB_UART_CLK_DIV_POS;
+
+
+	tmpVal = sys_read32(HBN_BASE + HBN_GLB_OFFSET);
+	tmpVal = (tmpVal & HBN_UART_CLK_SEL_MSK) >> HBN_UART_CLK_SEL_POS;
+
+
+	if (tmpVal == 0) {
+		return (system_get_hclk() / (uart_divider + 1));
+	} else {
+		/* UART DLL 64 */
+		return ((64 * 1000 * 1000) / (uart_divider + 1));
+	}
+	return 0;
+}
+
 #endif
 
 

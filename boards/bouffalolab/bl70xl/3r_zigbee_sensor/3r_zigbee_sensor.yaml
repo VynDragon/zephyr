@@ -1,0 +1,19 @@
+# Copyright (c) 2025 MASSDRIVER EI (massdriver.space)
+# SPDX-License-Identifier: Apache-2.0
+
+identifier: 3r_zigbee_sensor
+name: bl702l module
+type: mcu
+arch: riscv
+ram: 80
+toolchain:
+  - zephyr
+testing:
+  ignore_tags:
+    - net
+    - bluetooth
+supported:
+  - uart
+  - i2c
+  - gpio
+vendor: bouffalolab

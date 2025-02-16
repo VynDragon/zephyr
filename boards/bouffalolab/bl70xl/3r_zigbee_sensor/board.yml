@@ -1,0 +1,5 @@
+board:
+  name: 3r_zigbee_sensor
+  vendor: bflb
+  socs:
+    - name: bl704l10q2i

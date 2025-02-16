@@ -11,7 +11,8 @@
 #include <zephyr/dt-bindings/pinctrl/bl60x-pinctrl.h>
 #include <glb_reg.h>
 
-#if defined(CONFIG_SOC_SERIES_BL60X) || defined(CONFIG_SOC_SERIES_BL70X)
+#if defined(CONFIG_SOC_SERIES_BL60X) || defined(CONFIG_SOC_SERIES_BL70X) \
+	|| defined(CONFIG_SOC_SERIES_BL70XL)
 
 void pinctrl_configure_uart(uint8_t pin, uint8_t func)
 {

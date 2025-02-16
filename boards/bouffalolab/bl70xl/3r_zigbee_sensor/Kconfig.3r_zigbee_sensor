@@ -1,0 +1,7 @@
+# Bouffalolab BL702
+# Copyright (c) 2024 MASSDRIVER EI (massdriver.space)
+# SPDX-License-Identifier: Apache-2.0
+
+config BOARD_3R_ZIGBEE_SENSOR
+	bool "BL702 zigbee module"
+	select SOC_BL704L10Q2I
