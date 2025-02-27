@@ -42,7 +42,7 @@ static uint32_t system_get_fclk(void)
 		return system_get_xclk();
 	} else if (tmpVal > 1) {
 		tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG0_OFFSET);
-		tmpVal = (tmpVal & GLB_HBN_ROOT_CLK_SEL_MSK) >> GLB_HBN_ROOT_CLK_SEL_POS;
+		tmpVal = (tmpVal & GLB_REG_PLL_SEL_MSK) >> GLB_REG_PLL_SEL_MSK;
 		if (tmpVal == 3) {
 			return 128 * 1000 * 1000;
 		} else if (tmpVal == 2) {
@@ -87,7 +87,7 @@ static uint32_t mtimer_get_clk_src_div(void)
 
 	bclk_div = sys_read32(GLB_BASE + GLB_CLK_CFG0_OFFSET);
 	bclk_div = (bclk_div & GLB_REG_BCLK_DIV_MSK) >> GLB_REG_BCLK_DIV_POS;
-	return (system_get_bclk() / 1000 / 1000 - 1);
+	return (system_get_fclk() / 1000 / 1000 - 1);
 }
 
 static void system_clock_settle(void)
@@ -505,7 +505,7 @@ ulong_t __soc_get_gp_initial_value(void)
  * @return 0
  */
 
-static int bl_riscv_init(void)
+int soc_early_init_hook(void)
 {
 	uint32_t key;
 	uint32_t *p;
@@ -518,6 +518,7 @@ static int bl_riscv_init(void)
 	tmpVal = sys_read32(GLB_BASE + GLB_PARM_OFFSET);
 	tmpVal |= GLB_REG_EN_GPIO_O_LATCH_MODE_MSK;
 	sys_write32(tmpVal, GLB_BASE + GLB_PARM_OFFSET);
+
 
 	/* disable hardware_pullup_pull_down (reg_en_hw_pu_pd = 0) */
 	tmpVal = sys_read32(HBN_BASE + HBN_IRQ_MODE_OFFSET);
@@ -549,8 +550,7 @@ static int bl_riscv_init(void)
 
 	irq_unlock(key);
 
+	system_clock_settle();
+
 	return 0;
 }
-
-
-SYS_INIT(bl_riscv_init, PRE_KERNEL_1, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);

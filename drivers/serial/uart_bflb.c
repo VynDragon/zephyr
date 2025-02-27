@@ -385,7 +385,7 @@ static uint32_t system_get_fclk(void)
 		return system_get_xclk();
 	} else if (tmpVal > 1) {
 		tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG0_OFFSET);
-		tmpVal = (tmpVal & GLB_HBN_ROOT_CLK_SEL_MSK) >> GLB_HBN_ROOT_CLK_SEL_POS;
+		tmpVal = (tmpVal & GLB_REG_PLL_SEL_MSK) >> GLB_REG_PLL_SEL_MSK;
 		if (tmpVal == 3) {
 			return 128 * 1000 * 1000;
 		} else if (tmpVal == 2) {

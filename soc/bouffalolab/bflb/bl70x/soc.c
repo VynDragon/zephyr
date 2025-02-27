@@ -436,7 +436,7 @@ static void uart_set_clock(uint32_t enable, uint32_t clock, uint32_t divider)
 /* TODO: should take crystal type, defaults to 40Mhz crystal for BL602 as seems the most common */
 static void system_clock_init(void)
 {
-#if 0
+#if 1
 	system_init_root_clock(0, 32);
 	system_set_root_clock_dividers(0, 0);
 	system_clock_trim_32M();
@@ -479,7 +479,7 @@ ulong_t __soc_get_gp_initial_value(void)
  * @return 0
  */
 
-static int bl_riscv_init(void)
+int soc_early_init_hook(void)
 {
 	uint32_t key;
 	uint32_t *p;
@@ -528,8 +528,7 @@ GLB_UART_SWAP_SET_POS);
 
 	irq_unlock(key);
 
+	system_clock_settle();
+
 	return 0;
 }
-
-
-SYS_INIT(bl_riscv_init, PRE_KERNEL_1, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
