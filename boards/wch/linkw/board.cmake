@@ -1,7 +1,7 @@
 # Copyright (c) 2024 MASSDRIVER EI (massdriver.space)
 # SPDX-License-Identifier: Apache-2.0
 
-board_runner_args(minichlink "--no-reset")
+board_runner_args(minichlink "--no-reset" "--dt-flash=y")
 include(${ZEPHYR_BASE}/boards/common/minichlink.board.cmake)
 
 board_runner_args(openocd "--use-elf" "--cmd-reset-halt" "halt")
