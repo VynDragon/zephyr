@@ -37,7 +37,8 @@ config SOC_SERIES_BL61X
 	# other extensions: zpsfoperand
 
 	select HAS_POWEROFF
-	select HAS_PM
 
 	select CODE_DATA_RELOCATION
+	select SOC_EARLY_INIT_HOOK
+	select CLOCK_CONTROL
 
