@@ -32,7 +32,7 @@ source "drivers/clock_control/Kconfig.stm32"
 
 source "drivers/clock_control/Kconfig.beetle"
 
-source "drivers/clock_control/Kconfig.bflb_bl61x"
+source "drivers/clock_control/Kconfig.bflb"
 
 source "drivers/clock_control/Kconfig.fixed"
 

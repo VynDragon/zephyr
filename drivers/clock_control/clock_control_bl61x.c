@@ -23,7 +23,7 @@
 	DT_SAME_NODE(DT_CLOCKS_CTLR_BY_IDX(DT_INST_CLOCKS_CTLR_BY_NAME(0, clk), 0),                \
 		     DT_INST_CLOCKS_CTLR_BY_NAME(0, src))
 
-#define CLOCK_TIMEOUT 1024
+#define CLOCK_TIMEOUT	1024
 #define RC32M_FREQ	(32 * 1000 * 1000)
 
 enum bl61x_clkid {
