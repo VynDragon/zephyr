@@ -147,12 +147,9 @@ AON_PU_XTAL_BUF_AON_POS);
 	/* wait for crystal to be powered on */
 	do {
 		clock_control_bl60x_clock_settle();
-		clock_control_bl60x_clock_settle();
-		clock_control_bl60x_clock_settle();
-		clock_control_bl60x_clock_settle();
 		tmp = sys_read32(AON_BASE + AON_TSEN_OFFSET);
-		count++;
-	} while (!(tmp & AON_XTAL_RDY_MSK) && count < 1);
+		count--;
+	} while (!(tmp & AON_XTAL_RDY_MSK) && count > 0);
 
 	clock_control_bl60x_set_root_clock(old_rootclk);
 	clock_control_bl60x_clock_settle();
@@ -162,9 +159,7 @@ AON_PU_XTAL_BUF_AON_POS);
 	return 0;
 }
 
-/* /!\ on bl60x hclk is only for CLIC
- * FCLK is the core clock
- */
+/* HCLK is the core clock */
 static int clock_control_bl60x_set_root_clock_dividers(uint32_t hclk_div, uint32_t bclk_div)
 {
 	uint32_t tmp = 0;
