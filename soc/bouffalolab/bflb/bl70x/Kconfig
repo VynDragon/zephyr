@@ -1,4 +1,4 @@
-# Copyright (c) 2021, ATL Electronics
+# Copyright (c) 2024-2025 MASSDRIVER EI (massdriver.space)
 # SPDX-License-Identifier: Apache-2.0
 
 config SOC_SERIES_BL70X
@@ -27,3 +27,5 @@ config SOC_SERIES_BL70X
 	select HAS_PM
 
 	select CODE_DATA_RELOCATION
+	select SOC_EARLY_INIT_HOOK
+	select CLOCK_CONTROL
