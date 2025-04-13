@@ -946,7 +946,7 @@ static void clock_control_bl61x_peripheral_clock_init(void)
 
 	sys_write32(regval, GLB_BASE + GLB_CGEN_CFG1_OFFSET);
 
-	clock_control_bl61x_uart_set_clock(1, 2, 0);
+	clock_control_bl61x_uart_set_clock(1, 0, 2);
 }
 
 static int clock_control_bl61x_on(const struct device *dev, clock_control_subsys_t sys)
