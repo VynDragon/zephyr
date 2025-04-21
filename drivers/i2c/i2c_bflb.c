@@ -12,6 +12,8 @@
 #include <soc.h>
 #include <zephyr/sys/sys_io.h>
 #include <zephyr/sys/ring_buffer.h>
+#include <zephyr/drivers/clock_control.h>
+#include <zephyr/dt-bindings/clock/bflb_clock_common.h>
 
 #define LOG_LEVEL CONFIG_I2C_LOG_LEVEL
 #include <zephyr/logging/log.h>
@@ -51,250 +53,6 @@ struct i2c_bflb_data {
 	uint8_t	buffer_data[I2C_MAX_PACKET_LENGTH];
 };
 
-/* Support Functions */
-
-/* this will go in clock driver when clock driver is a thing */
-#ifdef CONFIG_SOC_SERIES_BL60X
-
-static uint32_t uart_bflb_get_crystal_frequency(void)
-{
-	uint32_t tmpVal;
-
-	/* get clkpll_sdmin */
-	tmpVal = sys_read32(PDS_BASE + PDS_CLKPLL_SDM_OFFSET);
-	tmpVal = (tmpVal & PDS_CLKPLL_SDMIN_MSK) >> PDS_CLKPLL_SDMIN_POS;
-
-	switch (tmpVal) {
-	case 0x500000:
-	/* 24m */
-	return (24 * 1000 * 1000);
-
-	case 0x3C0000:
-	/* 32m */
-	return (32 * 1000 * 1000);
-
-	case 0x320000:
-	/* 38.4m */
-	return (384 * 100 * 1000);
-
-	case 0x300000:
-	/* 40m */
-	return (40 * 1000 * 1000);
-
-	case 0x49D39D:
-	/* 26m */
-	return (26 * 1000 * 1000);
-
-	default:
-	/* 32m */
-	return (32 * 1000 * 1000);
-	}
-}
-
-static uint32_t uart_bflb_get_PLL_frequency(void)
-{
-	uint32_t tmpVal;
-
-	tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG0_OFFSET);
-	tmpVal = (tmpVal & GLB_REG_PLL_SEL_MSK) >> GLB_REG_PLL_SEL_POS;
-
-	if (tmpVal == 0) {
-		/* pll 48m */
-		return (48 * 1000 * 1000);
-	} else if (tmpVal == 1) {
-		/* pll 120m */
-		return (120 * 1000 * 1000);
-	} else if (tmpVal == 2) {
-		/* pll 160m */
-		return (160 * 1000 * 1000);
-	} else if (tmpVal == 3) {
-		/* pll 192m */
-		return (192 * 1000 * 1000);
-	} else {
-		return 0;
-	}
-}
-
-#elif defined(CONFIG_SOC_SERIES_BL70X)
-
-
-static uint32_t uart_bflb_get_crystal_frequency(void)
-{
-	return (32 * 1000 * 1000);
-}
-
-static uint32_t uart_bflb_get_PLL_frequency(void)
-{
-	uint32_t tmpVal;
-
-	tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG0_OFFSET);
-	tmpVal = (tmpVal & GLB_REG_PLL_SEL_MSK) >> GLB_REG_PLL_SEL_POS;
-
-	if (tmpVal == 0) {
-		return (57 * 1000 * 1000 + 6 * 100 * 1000);
-	} else if (tmpVal == 1) {
-		return (96 * 1000 * 1000);
-	} else if (tmpVal == 2) {
-		return (144 * 1000 * 1000);
-	} else if (tmpVal == 3) {
-		return (288 * 1000 * 1000);
-	} else {
-		return 0;
-	}
-}
-
-#elif defined(CONFIG_SOC_SERIES_BL61X)
-
-static uint32_t system_get_xtal(void)
-{
-	uint32_t tmpVal;
-	tmpVal = sys_read32(HBN_BASE + HBN_RSV3_OFFSET);
-	tmpVal &= 0xF;
-
-	switch (tmpVal) {
-	case 0:
-		return 0;
-	case 1:
-		return 24 * 1000 * 1000;
-	case 2:
-		return 32 * 1000 * 1000;
-	case 3:
-		return 38.4 * 1000 * 1000;
-	case 4:
-		return 40 * 1000 * 1000;
-	case 5:
-		return 26 * 1000 * 1000;
-	case 6:
-		return 32 * 1000 * 1000;
-	default:
-		return 0;
-	}
-}
-
-/* source for most clocks, either XTAL or RC32M */
-static uint32_t system_get_xclk(void)
-{
-	uint32_t tmpVal = 0;
-	tmpVal = sys_read32(HBN_BASE + HBN_GLB_OFFSET);
-	tmpVal &= HBN_ROOT_CLK_SEL_MSK;
-	tmpVal = tmpVal >> HBN_ROOT_CLK_SEL_POS;
-	tmpVal &= 1;
-	if (tmpVal == 0) {
-		return (32 * 1000 * 1000);
-	} else if (tmpVal == 1) {
-		return system_get_xtal();
-	} else {
-		return 0;
-	}
-}
-
-
-/* Almost always CPU, AXI bus, SRAM Memory, Cache, use HCLK query instead */
-static uint32_t system_get_fclk(void)
-{
-	uint32_t tmpVal = 0;
-
-	tmpVal = sys_read32(HBN_BASE + HBN_GLB_OFFSET);
-	tmpVal &= HBN_ROOT_CLK_SEL_MSK;
-	tmpVal = (tmpVal >> HBN_ROOT_CLK_SEL_POS) >> 1;
-	tmpVal &= 1;
-
-	if (tmpVal == 0) {
-		return system_get_xclk();
-	} else if (tmpVal == 1) {
-		tmpVal = sys_read32(PDS_BASE + PDS_CPU_CORE_CFG1_OFFSET);
-		tmpVal = (tmpVal & PDS_REG_PLL_SEL_MSK) >> PDS_REG_PLL_SEL_POS;
-		if (tmpVal == 3) {
-			return 320 * 1000 * 1000;
-		} else if (tmpVal == 2) {
-			return 240 * 1000 * 1000;
-		} else if (tmpVal == 1) {
-			/* TODO AUPLL DIV 1 */
-		} else if (tmpVal == 0) {
-			/* TODO AUPLL DIV 2 */
-		}
-	}
-	return 0;
-}
-
-/* also CPU, AXI bus, SRAM Memory, Cache */
-static uint32_t system_get_hclk(void)
-{
-	uint32_t tmpVal = 0;
-	uint32_t clock = 0;
-
-	tmpVal = sys_read32(GLB_BASE + GLB_SYS_CFG0_OFFSET);
-	tmpVal = (tmpVal & GLB_REG_HCLK_DIV_MSK) >> GLB_REG_HCLK_DIV_POS;
-	clock = system_get_fclk();
-	return clock / (tmpVal + 1);
-}
-
-/* most peripherals clock */
-static uint32_t system_get_bclk(void)
-{
-	uint32_t tmpVal = 0;
-	uint32_t clock = 0;
-
-	tmpVal = sys_read32(GLB_BASE + GLB_SYS_CFG0_OFFSET);
-	tmpVal = (tmpVal & GLB_REG_BCLK_DIV_MSK) >> GLB_REG_BCLK_DIV_POS;
-	clock = system_get_hclk();
-	return clock / (tmpVal + 1);
-}
-
-#endif
-
-#if defined(CONFIG_SOC_SERIES_BL70X) || defined(CONFIG_SOC_SERIES_BL60X)
-
-static uint32_t i2c_bflb_get_bclk_clk(void)
-{
-	uint32_t tmpVal = 0;
-	uint32_t i2c_divider = 0;
-	uint32_t hclk_divider = 0;
-	uint32_t bclk_divider = 0;
-
-	/* root -> HCLK */
-	tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG0_OFFSET);
-	hclk_divider = (tmpVal & GLB_REG_HCLK_DIV_MSK) >> GLB_REG_HCLK_DIV_POS;
-
-	/* HCLK -> BCLK */
-	tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG0_OFFSET);
-	bclk_divider = (tmpVal & GLB_REG_BCLK_DIV_MSK) >> GLB_REG_BCLK_DIV_POS;
-
-	/* bclk -> i2cclk */
-	tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG3_OFFSET);
-	i2c_divider = (tmpVal & GLB_I2C_CLK_DIV_MSK) >> GLB_I2C_CLK_DIV_POS;
-
-	/* what is root */
-	tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG0_OFFSET);
-	tmpVal = (tmpVal & GLB_HBN_ROOT_CLK_SEL_MSK) >> GLB_HBN_ROOT_CLK_SEL_POS;
-
-	if (tmpVal == 0) {
-		/* RC32M clock */
-		tmpVal = (32 * 1000 * 1000) / (hclk_divider + 1)
-		/ (bclk_divider + 1) / (i2c_divider + 1);
-		return tmpVal;
-	} else if (tmpVal == 1) {
-		/* Crystal clock */
-		tmpVal = uart_bflb_get_crystal_frequency() / (hclk_divider + 1)
-		/ (bclk_divider + 1) / (i2c_divider + 1);
-		return tmpVal;
-	} else if (tmpVal > 1) {
-		/* PLL Clock */
-		tmpVal = uart_bflb_get_PLL_frequency() / (hclk_divider + 1)
-		/ (bclk_divider + 1) / (i2c_divider + 1);
-		return tmpVal;
-
-	}
-	return 0;
-}
-
-#elif defined(CONFIG_SOC_SERIES_BL61X)
-static uint32_t i2c_bflb_get_bclk_clk(void)
-{
-	return system_get_bclk();
-}
-#endif
-
 static int32_t i2c_bflb_clamp_phase(int32_t phase)
 {
 	if (phase < 1) {
@@ -313,12 +71,16 @@ static int32_t i2c_bflb_clamp_phase(int32_t phase)
 static void i2c_bflb_set_start_stop(const struct device *dev, uint32_t frequency)
 {
 	const struct i2c_bflb_cfg *config = dev->config;
+	const struct device *clock =  DEVICE_DT_GET_ANY(bflb_clock_controller);
 	int32_t phase = 0;
 	int32_t phase0, phase1, phase2, phase3;
 	int32_t bias = 0;
-	uint32_t tmpVal = 0;
+	uint32_t tmp = 0;
+	uint32_t clk;
 
-	phase = (i2c_bflb_get_bclk_clk() + frequency / 2) / frequency;
+	clock_control_get_rate(clock, (void*)BFLB_CLKID_CLK_BCLK, &clk);
+
+	phase = (clk + frequency / 2) / frequency;
 
 	if (frequency <= 100 * 1000) {
 		/* when SCL clock <= 100KHz, duty cycle is default 50%  */
@@ -335,14 +97,14 @@ static void i2c_bflb_set_start_stop(const struct device *dev, uint32_t frequency
 	}
 
 	/* calculate rectify phase when de-glitch or clock-stretching is enabled */
-	tmpVal = sys_read32(config->base + I2C_CONFIG_OFFSET);
-	if ((tmpVal & I2C_CR_I2C_DEG_EN) && (tmpVal & I2C_CR_I2C_SCL_SYNC_EN)) {
-		bias = (tmpVal & I2C_CR_I2C_DEG_CNT_MASK) >> I2C_CR_I2C_DEG_CNT_SHIFT;
+	tmp = sys_read32(config->base + I2C_CONFIG_OFFSET);
+	if ((tmp & I2C_CR_I2C_DEG_EN) && (tmp & I2C_CR_I2C_SCL_SYNC_EN)) {
+		bias = (tmp & I2C_CR_I2C_DEG_CNT_MASK) >> I2C_CR_I2C_DEG_CNT_SHIFT;
 		bias += 1;
 	} else {
 		bias = 0;
 	}
-	if (tmpVal & I2C_CR_I2C_SCL_SYNC_EN) {
+	if (tmp & I2C_CR_I2C_SCL_SYNC_EN) {
 		bias += 3;
 	}
 
@@ -352,47 +114,47 @@ static void i2c_bflb_set_start_stop(const struct device *dev, uint32_t frequency
 	phase3 = i2c_bflb_clamp_phase(phase3);
 
 	/* calculate data phase */
-	tmpVal = (phase0 - 1) << I2C_CR_I2C_PRD_D_PH_0_SHIFT;
-	tmpVal |= (((phase1 - bias - 1) <= 0) ? 1 : (phase1 - bias - 1)) <<
+	tmp = (phase0 - 1) << I2C_CR_I2C_PRD_D_PH_0_SHIFT;
+	tmp |= (((phase1 - bias - 1) <= 0) ? 1 : (phase1 - bias - 1)) <<
 I2C_CR_I2C_PRD_D_PH_1_SHIFT;	/* data phase1 must not be 0 */
-	tmpVal |= (phase2 - 1) << I2C_CR_I2C_PRD_D_PH_2_SHIFT;
-	tmpVal |= (phase3 - 1) << I2C_CR_I2C_PRD_D_PH_3_SHIFT;
-	sys_write32(tmpVal, config->base + I2C_PRD_DATA_OFFSET);
+	tmp |= (phase2 - 1) << I2C_CR_I2C_PRD_D_PH_2_SHIFT;
+	tmp |= (phase3 - 1) << I2C_CR_I2C_PRD_D_PH_3_SHIFT;
+	sys_write32(tmp, config->base + I2C_PRD_DATA_OFFSET);
 	/* calculate start phase */
-	tmpVal = (phase0 - 1) << I2C_CR_I2C_PRD_S_PH_0_SHIFT;
-	tmpVal |= (((phase0 + phase3 - 1) >= 256) ? 255 : (phase0 + phase3 - 1)) <<
+	tmp = (phase0 - 1) << I2C_CR_I2C_PRD_S_PH_0_SHIFT;
+	tmp |= (((phase0 + phase3 - 1) >= 256) ? 255 : (phase0 + phase3 - 1)) <<
 	I2C_CR_I2C_PRD_S_PH_1_SHIFT;
-	tmpVal |= (((phase1 + phase2 - 1) >= 256) ? 255 : (phase1 + phase2 - 1)) <<
+	tmp |= (((phase1 + phase2 - 1) >= 256) ? 255 : (phase1 + phase2 - 1)) <<
 	I2C_CR_I2C_PRD_S_PH_2_SHIFT;
-	tmpVal |= (phase3 - 1) << I2C_CR_I2C_PRD_S_PH_3_SHIFT;
-	sys_write32(tmpVal, config->base + I2C_PRD_START_OFFSET);
+	tmp |= (phase3 - 1) << I2C_CR_I2C_PRD_S_PH_3_SHIFT;
+	sys_write32(tmp, config->base + I2C_PRD_START_OFFSET);
 	/* calculate stop phase */
-	tmpVal = (phase0 - 1) << I2C_CR_I2C_PRD_P_PH_0_SHIFT;
-	tmpVal |= (((phase1 + phase2 - 1) >= 256) ? 255 : (phase1 + phase2 - 1)) <<
+	tmp = (phase0 - 1) << I2C_CR_I2C_PRD_P_PH_0_SHIFT;
+	tmp |= (((phase1 + phase2 - 1) >= 256) ? 255 : (phase1 + phase2 - 1)) <<
 	I2C_CR_I2C_PRD_P_PH_1_SHIFT;
-	tmpVal |= (phase0 - 1) << I2C_CR_I2C_PRD_P_PH_2_SHIFT;
-	tmpVal |= (phase3 - 1) << I2C_CR_I2C_PRD_P_PH_3_SHIFT;
-	sys_write32(tmpVal, config->base + I2C_PRD_STOP_OFFSET);
+	tmp |= (phase0 - 1) << I2C_CR_I2C_PRD_P_PH_2_SHIFT;
+	tmp |= (phase3 - 1) << I2C_CR_I2C_PRD_P_PH_3_SHIFT;
+	sys_write32(tmp, config->base + I2C_PRD_STOP_OFFSET);
 }
 
 static void i2c_bflb_trigger(const struct device *dev)
 {
-	uint32_t tmpVal = 0;
+	uint32_t tmp = 0;
 	const struct i2c_bflb_cfg *config = dev->config;
 
-	tmpVal = sys_read32(config->base + I2C_CONFIG_OFFSET);
-	tmpVal |= I2C_CR_I2C_M_EN;
-	sys_write32(tmpVal, config->base + I2C_CONFIG_OFFSET);
+	tmp = sys_read32(config->base + I2C_CONFIG_OFFSET);
+	tmp |= I2C_CR_I2C_M_EN;
+	sys_write32(tmp, config->base + I2C_CONFIG_OFFSET);
 }
 
 static void i2c_bflb_detrigger(const struct device *dev)
 {
-	uint32_t tmpVal = 0;
+	uint32_t tmp = 0;
 	const struct i2c_bflb_cfg *config = dev->config;
 
-	tmpVal = sys_read32(config->base + I2C_CONFIG_OFFSET);
-	tmpVal &= ~I2C_CR_I2C_M_EN;
-	sys_write32(tmpVal, config->base + I2C_CONFIG_OFFSET);
+	tmp = sys_read32(config->base + I2C_CONFIG_OFFSET);
+	tmp &= ~I2C_CR_I2C_M_EN;
+	sys_write32(tmp, config->base + I2C_CONFIG_OFFSET);
 }
 
 static int i2c_bflb_triggered(const struct device *dev)
@@ -401,7 +163,6 @@ static int i2c_bflb_triggered(const struct device *dev)
 
 	return(sys_read32(config->base + I2C_CONFIG_OFFSET) & I2C_CR_I2C_M_EN);
 }
-
 
 /* API Functions */
 
@@ -412,7 +173,7 @@ static int i2c_bflb_configure(const struct device *dev, uint32_t dev_config)
 	uint32_t speed_freq = 0;
 	uint32_t mode = (dev_config & I2C_MODE_CONTROLLER) >> 4;
 	uint32_t tenbit_addr = dev_config & I2C_ADDR_10_BITS;
-	uint32_t tmpVal = 0;
+	uint32_t tmp = 0;
 
 	switch (I2C_SPEED_GET(dev_config)) {
 	case I2C_SPEED_STANDARD:
@@ -440,44 +201,44 @@ static int i2c_bflb_configure(const struct device *dev, uint32_t dev_config)
 
 	/* clean*/
 	i2c_bflb_detrigger(dev);
-	tmpVal = sys_read32(config->base + I2C_FIFO_CONFIG_0_OFFSET);
-	tmpVal |= I2C_TX_FIFO_CLR;
-	tmpVal |= I2C_RX_FIFO_CLR;
-	sys_write32(tmpVal, config->base + I2C_FIFO_CONFIG_0_OFFSET);
+	tmp = sys_read32(config->base + I2C_FIFO_CONFIG_0_OFFSET);
+	tmp |= I2C_TX_FIFO_CLR;
+	tmp |= I2C_RX_FIFO_CLR;
+	sys_write32(tmp, config->base + I2C_FIFO_CONFIG_0_OFFSET);
 
 #if defined(CONFIG_SOC_SERIES_BL61X)
-	tmpVal = sys_read32(GLB_BASE + GLB_I2C_CFG0_OFFSET);
+	tmp = sys_read32(GLB_BASE + GLB_I2C_CFG0_OFFSET);
 	/* set div to 1 (2) */
-	tmpVal = tmpVal & GLB_I2C_CLK_DIV_UMSK;
-	tmpVal |= 1 << GLB_I2C_CLK_DIV_POS;
-	sys_write32(tmpVal, GLB_BASE + GLB_I2C_CFG0_OFFSET);
+	tmp = tmp & GLB_I2C_CLK_DIV_UMSK;
+	tmp |= 1 << GLB_I2C_CLK_DIV_POS;
+	sys_write32(tmp, GLB_BASE + GLB_I2C_CFG0_OFFSET);
 #else
-	tmpVal = sys_read32(GLB_BASE + GLB_CLK_CFG3_OFFSET);
+	tmp = sys_read32(GLB_BASE + GLB_CLK_CFG3_OFFSET);
 	/* set div to 1 (2) */
-	tmpVal = tmpVal & GLB_I2C_CLK_DIV_UMSK;
-	tmpVal |= 1 << GLB_I2C_CLK_DIV_POS;
-	sys_write32(tmpVal, GLB_BASE + GLB_CLK_CFG3_OFFSET);
+	tmp = tmp & GLB_I2C_CLK_DIV_UMSK;
+	tmp |= 1 << GLB_I2C_CLK_DIV_POS;
+	sys_write32(tmp, GLB_BASE + GLB_CLK_CFG3_OFFSET);
 #endif
 
 
-	tmpVal = sys_read32(config->base + I2C_INT_STS_OFFSET);
+	tmp = sys_read32(config->base + I2C_INT_STS_OFFSET);
 
 	/* enable all interrupts */
-	tmpVal |= (I2C_CR_I2C_END_EN |
+	tmp |= (I2C_CR_I2C_END_EN |
 		I2C_CR_I2C_TXF_EN |
 		I2C_CR_I2C_RXF_EN |
 		I2C_CR_I2C_NAK_EN |
 		I2C_CR_I2C_ARB_EN |
 		I2C_CR_I2C_FER_EN);
 	/* mask some interrupts */
-	tmpVal |= (I2C_CR_I2C_NAK_MASK |
+	tmp |= (I2C_CR_I2C_NAK_MASK |
 		I2C_CR_I2C_ARB_MASK |
 		I2C_CR_I2C_FER_MASK |
 		I2C_CR_I2C_TXF_MASK |
 		I2C_CR_I2C_RXF_MASK |
 		I2C_CR_I2C_END_MASK);
 
-	sys_write32(tmpVal, config->base + I2C_INT_STS_OFFSET);
+	sys_write32(tmp, config->base + I2C_INT_STS_OFFSET);
 
 	i2c_bflb_set_start_stop(dev, speed_freq);
 #if !(defined(CONFIG_SOC_SERIES_BL60X) || defined(CONFIG_SOC_SERIES_BL70X))
@@ -498,43 +259,42 @@ static int i2c_bflb_configure(const struct device *dev, uint32_t dev_config)
 
 static void i2c_bflb_set_address(const struct device *dev, uint32_t address)
 {
-	uint32_t tmpVal = 0;
+	uint32_t tmp = 0;
 	const struct i2c_bflb_cfg *config = dev->config;
 
-	tmpVal = sys_read32(config->base + I2C_CONFIG_OFFSET);
+	tmp = sys_read32(config->base + I2C_CONFIG_OFFSET);
 	/* no sub addresses */
-	tmpVal &= ~I2C_CR_I2C_SUB_ADDR_EN;
-	tmpVal &= ~I2C_CR_I2C_SLV_ADDR_MASK;
+	tmp &= ~I2C_CR_I2C_SUB_ADDR_EN;
+	tmp &= ~I2C_CR_I2C_SLV_ADDR_MASK;
 #if !(defined(CONFIG_SOC_SERIES_BL60X) && !defined(CONFIG_SOC_SERIES_BL70X))
 	struct i2c_bflb_data *data = dev->data;
 	if (data->is_10_bits_address) {
-		tmpVal |= I2C_CR_I2C_10B_ADDR_EN;
-		tmpVal |= ((address & 0x3FF) << I2C_CR_I2C_SLV_ADDR_SHIFT);
+		tmp |= I2C_CR_I2C_10B_ADDR_EN;
+		tmp |= ((address & 0x3FF) << I2C_CR_I2C_SLV_ADDR_SHIFT);
 	} else {
-		tmpVal |= ((address & 0x7F) << I2C_CR_I2C_SLV_ADDR_SHIFT);
+		tmp |= ((address & 0x7F) << I2C_CR_I2C_SLV_ADDR_SHIFT);
 	}
 #else
-	tmpVal |= ((address & 0x7F) << I2C_CR_I2C_SLV_ADDR_SHIFT);
+	tmp |= ((address & 0x7F) << I2C_CR_I2C_SLV_ADDR_SHIFT);
 #endif
-	sys_write32(tmpVal, config->base + I2C_CONFIG_OFFSET);
+	sys_write32(tmp, config->base + I2C_CONFIG_OFFSET);
 }
 
 
 static int i2c_bflb_read_bits(const struct device *dev, uint8_t *buf, uint8_t num)
 {
 	const struct i2c_bflb_cfg *config = dev->config;
-	struct i2c_bflb_data *data = dev->data;
-	uint32_t tmpVal = 0;
+	uint32_t tmp = 0;
 	k_timepoint_t end_timeout = sys_timepoint_calc(K_MSEC(I2C_WAIT_TIMEOUT_MS));
 
 	while ((sys_read32(config->base + I2C_INT_STS_OFFSET) & I2C_RXF_INT) == 0 &&
 		!sys_timepoint_expired(end_timeout)) {
 	}
 
-	tmpVal = sys_read32(config->base + I2C_FIFO_RDATA_OFFSET);
+	tmp = sys_read32(config->base + I2C_FIFO_RDATA_OFFSET);
 
 	for (uint8_t i = 0; i < num; i++) {
-		buf[i] = (tmpVal >> ((i % 4) * 8)) & 0xFF;
+		buf[i] = (tmp >> ((i % 4) * 8)) & 0xFF;
 	}
 	return 0;
 }
@@ -544,9 +304,7 @@ static int i2c_bflb_read_msgs(const struct device *dev,
 				uint8_t num_msgs)
 {
 	const struct i2c_bflb_cfg *config = dev->config;
-	struct i2c_bflb_data *data = dev->data;
-	uint32_t tmpVal = 0;
-	uint32_t timeout = 0;
+	uint32_t tmp = 0;
 	uint32_t total_len = 0;
 	uint32_t i = 0;
 	uint32_t z = 0;
@@ -568,15 +326,15 @@ static int i2c_bflb_read_msgs(const struct device *dev,
 	}
 
 	/* set message length */
-	tmpVal = sys_read32(config->base + I2C_CONFIG_OFFSET);
-	tmpVal &= ~I2C_CR_I2C_PKT_LEN_MASK;
-	tmpVal |= ((total_len - 1) << I2C_CR_I2C_PKT_LEN_SHIFT) & I2C_CR_I2C_PKT_LEN_MASK;
-	sys_write32(tmpVal, config->base + I2C_CONFIG_OFFSET);
+	tmp = sys_read32(config->base + I2C_CONFIG_OFFSET);
+	tmp &= ~I2C_CR_I2C_PKT_LEN_MASK;
+	tmp |= ((total_len - 1) << I2C_CR_I2C_PKT_LEN_SHIFT) & I2C_CR_I2C_PKT_LEN_MASK;
+	sys_write32(tmp, config->base + I2C_CONFIG_OFFSET);
 
 	/* set read direction */
-	tmpVal = sys_read32(config->base + I2C_CONFIG_OFFSET);
-	tmpVal |= I2C_CR_I2C_PKT_DIR;
-	sys_write32(tmpVal, config->base + I2C_CONFIG_OFFSET);
+	tmp = sys_read32(config->base + I2C_CONFIG_OFFSET);
+	tmp |= I2C_CR_I2C_PKT_DIR;
+	sys_write32(tmp, config->base + I2C_CONFIG_OFFSET);
 
 	i2c_bflb_trigger(dev);
 	for (i = 0; i < num_msgs; i++) {
@@ -592,9 +350,9 @@ static int i2c_bflb_read_msgs(const struct device *dev,
 	}
 
 	/* clean up RX */
-	tmpVal = sys_read32(config->base + I2C_FIFO_CONFIG_0_OFFSET);
-	tmpVal |= I2C_RX_FIFO_CLR;
-	sys_write32(tmpVal, config->base + I2C_FIFO_CONFIG_0_OFFSET);
+	tmp = sys_read32(config->base + I2C_FIFO_CONFIG_0_OFFSET);
+	tmp |= I2C_RX_FIFO_CLR;
+	sys_write32(tmp, config->base + I2C_FIFO_CONFIG_0_OFFSET);
 	return 0;
 }
 
@@ -627,7 +385,7 @@ static int i2c_bflb_fill(const struct device *dev,
 {
 	const struct i2c_bflb_cfg *config = dev->config;
 	struct i2c_bflb_data *data = dev->data;
-	uint32_t tmpVal = 0;
+	uint32_t tmp = 0;
 	uint32_t i = 0;
 	uint32_t j = 0;
 	uint32_t total_len = 0;
@@ -645,19 +403,19 @@ static int i2c_bflb_fill(const struct device *dev,
 	i2c_bflb_detrigger(dev);
 
 	/* clean up TX */
-	tmpVal = sys_read32(config->base + I2C_FIFO_CONFIG_0_OFFSET);
-	tmpVal |= I2C_TX_FIFO_CLR;
-	sys_write32(tmpVal, config->base + I2C_FIFO_CONFIG_0_OFFSET);
+	tmp = sys_read32(config->base + I2C_FIFO_CONFIG_0_OFFSET);
+	tmp |= I2C_TX_FIFO_CLR;
+	sys_write32(tmp, config->base + I2C_FIFO_CONFIG_0_OFFSET);
 
 	/* set write direction */
-	tmpVal = sys_read32(config->base + I2C_CONFIG_OFFSET);
-	tmpVal &= ~I2C_CR_I2C_PKT_DIR;
-	sys_write32(tmpVal, config->base + I2C_CONFIG_OFFSET);
+	tmp = sys_read32(config->base + I2C_CONFIG_OFFSET);
+	tmp &= ~I2C_CR_I2C_PKT_DIR;
+	sys_write32(tmp, config->base + I2C_CONFIG_OFFSET);
 
 	/* clear END */
-	tmpVal = sys_read32(config->base + I2C_INT_STS_OFFSET);
-	tmpVal |= I2C_CR_I2C_END_CLR;
-	sys_write32(tmpVal, config->base + I2C_INT_STS_OFFSET);
+	tmp = sys_read32(config->base + I2C_INT_STS_OFFSET);
+	tmp |= I2C_CR_I2C_END_CLR;
+	sys_write32(tmp, config->base + I2C_INT_STS_OFFSET);
 
 
 	for (i = 0; i < num_msgs; i++) {
@@ -670,31 +428,31 @@ static int i2c_bflb_fill(const struct device *dev,
 	}
 
 	/* set message length */
-	tmpVal = sys_read32(config->base + I2C_CONFIG_OFFSET);
-	tmpVal &= ~I2C_CR_I2C_PKT_LEN_MASK;
-	tmpVal |= ((ring_buf_size_get(&data->buffer) - 1) << I2C_CR_I2C_PKT_LEN_SHIFT) &
+	tmp = sys_read32(config->base + I2C_CONFIG_OFFSET);
+	tmp &= ~I2C_CR_I2C_PKT_LEN_MASK;
+	tmp |= ((ring_buf_size_get(&data->buffer) - 1) << I2C_CR_I2C_PKT_LEN_SHIFT) &
 I2C_CR_I2C_PKT_LEN_MASK;
-	sys_write32(tmpVal, config->base + I2C_CONFIG_OFFSET);
+	sys_write32(tmp, config->base + I2C_CONFIG_OFFSET);
 
 	i = 4;
 	while (i == 4) {
 		i = ring_buf_get(&data->buffer, (uint8_t *)&sub_buffer, 4);
-		tmpVal = 0;
+		tmp = 0;
 		for (j = 0; j < 4; j++) {
-			tmpVal |= (sub_buffer[j]) << (j * 8);
+			tmp |= (sub_buffer[j]) << (j * 8);
 		}
-		sys_write32(tmpVal, config->base + I2C_FIFO_WDATA_OFFSET);
+		sys_write32(tmp, config->base + I2C_FIFO_WDATA_OFFSET);
 		while ((sys_read32(config->base + I2C_INT_STS_OFFSET) &
 I2C_TXF_INT) == 0) {
 			i2c_bflb_trigger(dev);
 		}
 	}
 	if (i > 0 && i != 4) {
-		tmpVal = 0;
+		tmp = 0;
 		for (j = 0; j < 4; j++) {
-			tmpVal |= (sub_buffer[j]) << (j * 8);
+			tmp |= (sub_buffer[j]) << (j * 8);
 		}
-		sys_write32(tmpVal, config->base + I2C_FIFO_WDATA_OFFSET);
+		sys_write32(tmp, config->base + I2C_FIFO_WDATA_OFFSET);
 	}
 	i2c_bflb_trigger(dev);
 	/* wait until finished*/
@@ -703,9 +461,9 @@ I2C_TXF_INT) == 0) {
 	while ((sys_read32(config->base + I2C_INT_STS_OFFSET) & I2C_END_INT) == 0 &&
 !sys_timepoint_expired(end_timeout)) {
 	}
-	tmpVal = sys_read32(config->base + I2C_INT_STS_OFFSET);
-	tmpVal |= I2C_CR_I2C_END_CLR;
-	sys_write32(tmpVal, config->base + I2C_INT_STS_OFFSET);
+	tmp = sys_read32(config->base + I2C_INT_STS_OFFSET);
+	tmp |= I2C_CR_I2C_END_CLR;
+	sys_write32(tmp, config->base + I2C_INT_STS_OFFSET);
 
 	i2c_bflb_detrigger(dev);
 	return 0;
@@ -780,7 +538,7 @@ static int i2c_bflb_init(const struct device *dev)
 	struct i2c_bflb_data *data = dev->data;
 	int rc = 0;
 	uint32_t dev_config = 0;
-	uint32_t tmpVal = 0;
+	uint32_t tmp = 0;
 
 	/* pin control */
 	pinctrl_apply_state(config->pincfg, PINCTRL_STATE_DEFAULT);
@@ -790,10 +548,10 @@ static int i2c_bflb_init(const struct device *dev)
 	config->irq_config_func(dev);
 	/* clean*/
 	i2c_bflb_detrigger(dev);
-	tmpVal = sys_read32(config->base + I2C_FIFO_CONFIG_0_OFFSET);
-	tmpVal |= I2C_TX_FIFO_CLR;
-	tmpVal |= I2C_RX_FIFO_CLR;
-	sys_write32(tmpVal, config->base + I2C_FIFO_CONFIG_0_OFFSET);
+	tmp = sys_read32(config->base + I2C_FIFO_CONFIG_0_OFFSET);
+	tmp |= I2C_TX_FIFO_CLR;
+	tmp |= I2C_RX_FIFO_CLR;
+	sys_write32(tmp, config->base + I2C_FIFO_CONFIG_0_OFFSET);
 	rc = i2c_bflb_configure(dev, dev_config);
 	if (rc != 0) {
 		LOG_ERR("Failed to configure I2C on init");
@@ -807,21 +565,21 @@ static int i2c_bflb_init(const struct device *dev)
 static void i2c_bflb_isr(const struct device *dev)
 {
 	const struct i2c_bflb_cfg *config = dev->config;
-	uint32_t tmpVal = 0;
+	uint32_t tmp = 0;
 
-	tmpVal = sys_read32(config->base + I2C_INT_STS_OFFSET);
+	tmp = sys_read32(config->base + I2C_INT_STS_OFFSET);
 
-	if ((tmpVal & I2C_END_INT) != 0) {
+	if ((tmp & I2C_END_INT) != 0) {
 		i2c_bflb_isr_END(dev);
-		tmpVal |= I2C_CR_I2C_END_CLR;
+		tmp |= I2C_CR_I2C_END_CLR;
 	}
-	if ((tmpVal & I2C_TXF_INT) != 0) {
+	if ((tmp & I2C_TXF_INT) != 0) {
 		i2c_bflb_isr_TXF(dev);
 	}
-	if ((tmpVal & I2C_RXF_INT) != 0) {
+	if ((tmp & I2C_RXF_INT) != 0) {
 		i2c_bflb_isr_RXF(dev);
 	}
-	sys_write32(tmpVal, config->base + I2C_INT_STS_OFFSET);
+	sys_write32(tmp, config->base + I2C_INT_STS_OFFSET);
 }
 
 
