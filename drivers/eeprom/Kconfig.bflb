@@ -1,8 +1,8 @@
-# Copyright (c) 2024 MASSDRIVER EI (massdriver.space)
+# Copyright (c) 2024-2025 MASSDRIVER EI (massdriver.space)
 # SPDX-License-Identifier: Apache-2.0
 
-config EEPROM_BFLB
-	bool "Bouffalolab EFUSE driver"
+config EFUSE_BFLB
+	bool "Bouffalolab EFUSEs driver"
 	default y
 	depends on DT_HAS_BFLB_EFUSE_ENABLED
 	help
