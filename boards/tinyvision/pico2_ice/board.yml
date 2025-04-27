@@ -1,0 +1,6 @@
+board:
+  name: pico2_ice
+  full_name: tinyVision.ai pico2-ice
+  vendor: tinyvision
+  socs:
+  - name: rp2350b

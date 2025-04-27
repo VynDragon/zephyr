@@ -1,0 +1,19 @@
+/*
+ * Copyright (c) 2025 tinyVision.ai
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <zephyr/dt-bindings/pinctrl/rpi-pico-rp2350b-pinctrl.h>
+
+&pinctrl {
+	pwm_rgbled_default: pwm_rgbled_default {
+		group1 {
+			pinmux = <PWM_0B_P1>, <PWM_0A_P0>, <PWM_4B_P9>;
+		};
+	};
+	fpga_gpout0: fpga_gpout0 {
+		group1 {
+			pinmux = <GPOUT0_P21>;
+		};
+	};
+};
