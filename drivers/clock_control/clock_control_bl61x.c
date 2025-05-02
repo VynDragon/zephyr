@@ -8,7 +8,7 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/clock_control.h>
-#include <zephyr/drivers/eeprom.h>
+#include <zephyr/drivers/syscon.h>
 #include <zephyr/dt-bindings/clock/bflb_bl61x_clock.h>
 
 
@@ -687,7 +687,7 @@ static int clock_control_bl61x_clock_trim_32M(void)
 	const struct device *efuse = DEVICE_DT_GET_ONE(bflb_efuse);
 
 
-	tmp = eeprom_read(efuse, 0x7C, &trim, 4);
+	tmp = syscon_read_reg(efuse, 0x7C, &trim);
 	if (tmp < 0) {
 		printk("Error: Couldn't read efuses: err: %d.\n", tmp);
 		return tmp;

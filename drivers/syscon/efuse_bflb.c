@@ -6,12 +6,12 @@
 
 #define DT_DRV_COMPAT bflb_efuse
 
-#include <zephyr/drivers/eeprom.h>
+#include <zephyr/drivers/syscon.h>
 #include <soc.h>
 #include <zephyr/kernel.h>
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(efuse_bflb, CONFIG_EEPROM_LOG_LEVEL);
+LOG_MODULE_REGISTER(efuse_bflb, CONFIG_SYSCON_LOG_LEVEL);
 
 #define EF_CTRL_DFT_TIMEOUT_VAL 160*1000
 #define EF_CTRL_EFUSE_CYCLE_PROTECT (0xbf << 24)
@@ -198,37 +198,56 @@ static void efuse_bflb_cache(const struct device *dev)
 	data->cached = true;
 }
 
-static int efuse_bflb_read(const struct device *dev, off_t offset,
-				void *buf,
-				size_t len)
+static int efuse_bflb_read(const struct device *dev, uint16_t reg, uint32_t *val)
 {
+	if (!dev) {
+		return -ENODEV;
+	}
+
 	struct efuse_bflb_data *data = dev->data;
+
+	if (!val) {
+		return -EINVAL;
+	}
 
 	if (!data->cached) {
 		efuse_bflb_cache(dev);
 	}
 
-	memcpy(buf, data->cache + offset, len);
+	*val = *((uint32_t*)&data->cache[reg]);
 	return 0;
 }
 
-static int efuse_bflb_write(const struct device *dev, off_t offset,
-				const void *buf, size_t len)
+static int efuse_bflb_write(const struct device *dev, uint16_t reg, uint32_t val)
 {
 	return -ENOTSUP;
 }
 
-static size_t efuse_bflb_size(const struct device *dev)
+static int efuse_bflb_size(const struct device *dev, size_t *size)
 {
 	const struct efuse_bflb_config *config = dev->config;
 
-	return config->size;
+	*size = config->size;
+	return 0;
 }
 
-static const struct eeprom_driver_api efuse_bflb_api = {
+static int efuse_bflb_get_base(const struct device *dev, uintptr_t *addr)
+{
+	if (!dev) {
+		return -ENODEV;
+	}
+
+	struct efuse_bflb_data *data = dev->data;
+
+	*addr = (uint32_t)data->cache;
+	return 0;
+}
+
+static DEVICE_API(syscon, efuse_bflb_api) = {
 	.read = efuse_bflb_read,
 	.write = efuse_bflb_write,
-	.size = efuse_bflb_size,
+	.get_size = efuse_bflb_size,
+	.get_base = efuse_bflb_get_base,
 };
 
 static const struct efuse_bflb_config efuse_config = {
@@ -243,4 +262,4 @@ static struct efuse_bflb_data efuse_data = {
 
 
 DEVICE_DT_INST_DEFINE(0, NULL, NULL, &efuse_data, &efuse_config, POST_KERNEL,
-		      CONFIG_EEPROM_INIT_PRIORITY, &efuse_bflb_api);
+		      CONFIG_SYSCON_INIT_PRIORITY, &efuse_bflb_api);

@@ -5,4 +5,7 @@ if SOC_FAMILY_BFLB
 
 rsource "*/Kconfig"
 
+config SYSCON
+	default y
+
 endif # SOC_FAMILY_BFLB
