@@ -168,9 +168,9 @@ static void set_thead_enforce_aligned(bool enable)
 		"csrr %0, 0x7C0"
 		: "=r"(tmpVal));
 	if (enable) {
-		tmpVal |= (1 << 15);
-	} else {
 		tmpVal &= ~(1 << 15);
+	} else {
+		tmpVal |= (1 << 15);
 	}
 	__asm__ volatile(
 		"csrw 0x7C0, %0"
@@ -215,7 +215,7 @@ void soc_early_init_hook(void)
 	/* supplementary clic init goes here */
 
 	enable_thead_isa_ext();
-	set_thead_enforce_aligned(true);
+	set_thead_enforce_aligned(false);
 	enable_dcache();
 	/* branch prediction can cause major slowdowns (250ms -> 2 seconds)
 	 * in some applications
