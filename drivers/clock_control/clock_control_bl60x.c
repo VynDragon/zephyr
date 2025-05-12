@@ -11,7 +11,6 @@
 #include <zephyr/drivers/syscon.h>
 #include <zephyr/dt-bindings/clock/bflb_bl60x_clock.h>
 
-
 #include <bouffalolab/bl60x/bflb_soc.h>
 #include <bouffalolab/bl60x/aon_reg.h>
 #include <bouffalolab/bl60x/glb_reg.h>
@@ -24,8 +23,8 @@
 	DT_SAME_NODE(DT_CLOCKS_CTLR_BY_IDX(DT_INST_CLOCKS_CTLR_BY_NAME(0, clk), 0),                \
 		     DT_INST_CLOCKS_CTLR_BY_NAME(0, src))
 
-#define CLOCK_TIMEOUT	1024
-#define RC32M_FREQ	(32 * 1000 * 1000)
+#define CLOCK_TIMEOUT 1024
+#define RC32M_FREQ    (32 * 1000 * 1000)
 
 enum bl60x_clkid {
 	bl60x_clkid_none = -1,
@@ -37,33 +36,33 @@ enum bl60x_clkid {
 };
 
 struct clock_control_bl60x_pll_config {
-	enum bl60x_clkid	source;
-	bool			overclock;
+	enum bl60x_clkid source;
+	bool overclock;
 };
 
 struct clock_control_bl60x_root_config {
-	enum bl60x_clkid	source;
-	uint8_t			pll_select;
-	uint8_t			divider;
+	enum bl60x_clkid source;
+	uint8_t pll_select;
+	uint8_t divider;
 };
 
 struct clock_control_bl60x_bclk_config {
-	uint8_t			divider;
+	uint8_t divider;
 };
 
 struct clock_control_bl60x_config {
-	uint32_t	crystal_frequency;
+	uint32_t crystal_frequency;
 };
 
 struct clock_control_bl60x_data {
-	bool	crystal_enabled;
-	bool	pll_enabled;
-	struct clock_control_bl60x_pll_config	pll;
-	struct clock_control_bl60x_root_config	root;
-	struct clock_control_bl60x_bclk_config	bclk;
+	bool crystal_enabled;
+	bool pll_enabled;
+	struct clock_control_bl60x_pll_config pll;
+	struct clock_control_bl60x_root_config root;
+	struct clock_control_bl60x_bclk_config bclk;
 };
 
-const static uint32_t clock_control_bl60x_crystal_SDMIN_table [] = {
+const static uint32_t clock_control_bl60x_crystal_SDMIN_table[] = {
 	/* 32M */
 	0x3C0000,
 	/* 24M */
@@ -94,9 +93,9 @@ static int clock_control_bl60x_crystal_to_id(uint32_t crystal_freq)
 	}
 }
 
-static void clock_control_bl60x_clock_settle(void)
+static inline void clock_control_bl60x_clock_settle(void)
 {
-	__asm__ volatile (".rept 15 ; nop ; .endr");
+	__asm__ volatile(".rept 15 ; nop ; .endr");
 }
 
 /* 32 Mhz Oscillator: 0
@@ -118,7 +117,6 @@ static void clock_control_bl60x_set_root_clock(uint32_t clock)
 
 	clock_control_bl60x_clock_settle();
 }
-
 
 static uint32_t clock_control_bl60x_get_root_clock(void)
 {
@@ -150,8 +148,7 @@ static int clock_control_bl60x_init_crystal(void)
 	/* power crystal */
 	tmp = sys_read32(AON_BASE + AON_RF_TOP_AON_OFFSET);
 	tmp = (tmp & AON_PU_XTAL_AON_UMSK) | ((uint32_t)(1) << AON_PU_XTAL_AON_POS);
-	tmp = (tmp & AON_PU_XTAL_BUF_AON_UMSK) | ((uint32_t)(1) <<
-AON_PU_XTAL_BUF_AON_POS);
+	tmp = (tmp & AON_PU_XTAL_BUF_AON_UMSK) | ((uint32_t)(1) << AON_PU_XTAL_BUF_AON_POS);
 	sys_write32(tmp, AON_BASE + AON_RF_TOP_AON_OFFSET);
 
 	/* wait for crystal to be powered on */
@@ -223,7 +220,8 @@ static void clock_control_bl60x_set_machine_timer_clock_enable(uint32_t enable)
  * 0: BCLK
  * 1: 32Khz Oscillator (RC32*K*)
  */
-static void clock_control_bl60x_set_machine_timer_clock(uint32_t enable, uint32_t clock, uint32_t divider)
+static void clock_control_bl60x_set_machine_timer_clock(uint32_t enable, uint32_t clock,
+							uint32_t divider)
 {
 	uint32_t tmp = 0;
 
@@ -251,23 +249,17 @@ static void clock_control_bl60x_deinit_pll(void)
 
 	/* PLL Off */
 	tmp = sys_read32(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-	tmp = (tmp & PDS_PU_CLKPLL_SFREG_UMSK) | ((uint32_t)(0) <<
-PDS_PU_CLKPLL_SFREG_POS);
-	tmp = (tmp & PDS_PU_CLKPLL_UMSK) | ((uint32_t)(0) <<
-PDS_PU_CLKPLL_POS);
-	 sys_write32(tmp, PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
+	tmp = (tmp & PDS_PU_CLKPLL_SFREG_UMSK) | ((uint32_t)(0) << PDS_PU_CLKPLL_SFREG_POS);
+	tmp = (tmp & PDS_PU_CLKPLL_UMSK) | ((uint32_t)(0) << PDS_PU_CLKPLL_POS);
+	sys_write32(tmp, PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
 
-	 /* needs 2 steps ? */
+	/* needs 2 steps ? */
 	tmp = sys_read32(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-	tmp = (tmp & PDS_CLKPLL_PU_CP_UMSK) | ((uint32_t)(0) <<
-PDS_CLKPLL_PU_CP_POS);
-	tmp = (tmp & PDS_CLKPLL_PU_PFD_UMSK) | ((uint32_t)(0) <<
-PDS_CLKPLL_PU_PFD_POS);
-	tmp = (tmp & PDS_CLKPLL_PU_FBDV_UMSK) | ((uint32_t)(0) <<
-PDS_CLKPLL_PU_FBDV_POS);
-	tmp = (tmp & PDS_CLKPLL_PU_POSTDIV_UMSK) | ((uint32_t)(0) <<
-PDS_CLKPLL_PU_POSTDIV_POS);
-	 sys_write32(tmp, PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
+	tmp = (tmp & PDS_CLKPLL_PU_CP_UMSK) | ((uint32_t)(0) << PDS_CLKPLL_PU_CP_POS);
+	tmp = (tmp & PDS_CLKPLL_PU_PFD_UMSK) | ((uint32_t)(0) << PDS_CLKPLL_PU_PFD_POS);
+	tmp = (tmp & PDS_CLKPLL_PU_FBDV_UMSK) | ((uint32_t)(0) << PDS_CLKPLL_PU_FBDV_POS);
+	tmp = (tmp & PDS_CLKPLL_PU_POSTDIV_UMSK) | ((uint32_t)(0) << PDS_CLKPLL_PU_POSTDIV_POS);
+	sys_write32(tmp, PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
 }
 
 /* RC32M : 0
@@ -279,15 +271,15 @@ static void clock_control_bl60x_set_pll_source(uint32_t source)
 
 	tmp = sys_read32(PDS_BASE + PDS_CLKPLL_TOP_CTRL_OFFSET);
 	if (source > 0) {
-		tmp = (tmp & PDS_CLKPLL_REFCLK_SEL_UMSK) | ((uint32_t)(1) <<
-	PDS_CLKPLL_REFCLK_SEL_POS);
-		tmp = (tmp & PDS_CLKPLL_XTAL_RC32M_SEL_UMSK) | ((uint32_t)(0) <<
-	PDS_CLKPLL_XTAL_RC32M_SEL_POS);
+		tmp = (tmp & PDS_CLKPLL_REFCLK_SEL_UMSK) |
+		      ((uint32_t)(1) << PDS_CLKPLL_REFCLK_SEL_POS);
+		tmp = (tmp & PDS_CLKPLL_XTAL_RC32M_SEL_UMSK) |
+		      ((uint32_t)(0) << PDS_CLKPLL_XTAL_RC32M_SEL_POS);
 	} else {
-		tmp = (tmp & PDS_CLKPLL_REFCLK_SEL_UMSK) | ((uint32_t)(0) <<
-	PDS_CLKPLL_REFCLK_SEL_POS);
-		tmp = (tmp & PDS_CLKPLL_XTAL_RC32M_SEL_UMSK) | ((uint32_t)(1) <<
-	PDS_CLKPLL_XTAL_RC32M_SEL_POS);
+		tmp = (tmp & PDS_CLKPLL_REFCLK_SEL_UMSK) |
+		      ((uint32_t)(0) << PDS_CLKPLL_REFCLK_SEL_POS);
+		tmp = (tmp & PDS_CLKPLL_XTAL_RC32M_SEL_UMSK) |
+		      ((uint32_t)(1) << PDS_CLKPLL_XTAL_RC32M_SEL_POS);
 	}
 	sys_write32(tmp, PDS_BASE + PDS_CLKPLL_TOP_CTRL_OFFSET);
 }
@@ -304,8 +296,7 @@ static void clock_control_bl60x_init_pll(enum bl60x_clkid source, uint32_t cryst
 		clock_control_bl60x_set_root_clock(0);
 	}
 
-	if (clock_control_bl60x_crystal_to_id(crystal_frequency) < 0)
-	{
+	if (clock_control_bl60x_crystal_to_id(crystal_frequency) < 0) {
 		return;
 	}
 
@@ -320,117 +311,97 @@ static void clock_control_bl60x_init_pll(enum bl60x_clkid source, uint32_t cryst
 	/* 26M special treatment */
 	tmp = sys_read32(PDS_BASE + PDS_CLKPLL_CP_OFFSET);
 	if (clock_control_bl60x_crystal_to_id(crystal_frequency) == 4) {
-		tmp = (tmp & PDS_CLKPLL_ICP_1U_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_ICP_1U_POS);
-		tmp = (tmp & PDS_CLKPLL_ICP_5U_UMSK) | ((uint32_t)(0) <<
-PDS_CLKPLL_ICP_5U_POS);
-		tmp = (tmp & PDS_CLKPLL_INT_FRAC_SW_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_INT_FRAC_SW_POS);
+		tmp = (tmp & PDS_CLKPLL_ICP_1U_UMSK) | ((uint32_t)(1) << PDS_CLKPLL_ICP_1U_POS);
+		tmp = (tmp & PDS_CLKPLL_ICP_5U_UMSK) | ((uint32_t)(0) << PDS_CLKPLL_ICP_5U_POS);
+		tmp = (tmp & PDS_CLKPLL_INT_FRAC_SW_UMSK) |
+		      ((uint32_t)(1) << PDS_CLKPLL_INT_FRAC_SW_POS);
 	} else {
-		tmp = (tmp & PDS_CLKPLL_ICP_1U_UMSK) | ((uint32_t)(0) <<
-PDS_CLKPLL_ICP_1U_POS);
-		tmp = (tmp & PDS_CLKPLL_ICP_5U_UMSK) | ((uint32_t)(2) <<
-PDS_CLKPLL_ICP_5U_POS);
-		tmp = (tmp & PDS_CLKPLL_INT_FRAC_SW_UMSK) | ((uint32_t)(0) <<
-PDS_CLKPLL_INT_FRAC_SW_POS);
+		tmp = (tmp & PDS_CLKPLL_ICP_1U_UMSK) | ((uint32_t)(0) << PDS_CLKPLL_ICP_1U_POS);
+		tmp = (tmp & PDS_CLKPLL_ICP_5U_UMSK) | ((uint32_t)(2) << PDS_CLKPLL_ICP_5U_POS);
+		tmp = (tmp & PDS_CLKPLL_INT_FRAC_SW_UMSK) |
+		      ((uint32_t)(0) << PDS_CLKPLL_INT_FRAC_SW_POS);
 	}
 	sys_write32(tmp, PDS_BASE + PDS_CLKPLL_CP_OFFSET);
 
 	/* More 26M special treatment */
 	tmp = sys_read32(PDS_BASE + PDS_CLKPLL_RZ_OFFSET);
 	if (clock_control_bl60x_crystal_to_id(crystal_frequency) == 4) {
-		tmp = (tmp & PDS_CLKPLL_C3_UMSK) | ((uint32_t)(2) <<
-PDS_CLKPLL_C3_POS);
-		tmp = (tmp & PDS_CLKPLL_CZ_UMSK) | ((uint32_t)(2) <<
-PDS_CLKPLL_CZ_POS);
-		tmp = (tmp & PDS_CLKPLL_RZ_UMSK) | ((uint32_t)(5) <<
-PDS_CLKPLL_RZ_POS);
-		tmp = (tmp & PDS_CLKPLL_R4_SHORT_UMSK) | ((uint32_t)(0) <<
-PDS_CLKPLL_R4_SHORT_POS);
+		tmp = (tmp & PDS_CLKPLL_C3_UMSK) | ((uint32_t)(2) << PDS_CLKPLL_C3_POS);
+		tmp = (tmp & PDS_CLKPLL_CZ_UMSK) | ((uint32_t)(2) << PDS_CLKPLL_CZ_POS);
+		tmp = (tmp & PDS_CLKPLL_RZ_UMSK) | ((uint32_t)(5) << PDS_CLKPLL_RZ_POS);
+		tmp = (tmp & PDS_CLKPLL_R4_SHORT_UMSK) | ((uint32_t)(0) << PDS_CLKPLL_R4_SHORT_POS);
 	} else {
-		tmp = (tmp & PDS_CLKPLL_C3_UMSK) | ((uint32_t)(3) <<
-PDS_CLKPLL_C3_POS);
-		tmp = (tmp & PDS_CLKPLL_CZ_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_CZ_POS);
-		tmp = (tmp & PDS_CLKPLL_RZ_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_RZ_POS);
-		tmp = (tmp & PDS_CLKPLL_R4_SHORT_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_R4_SHORT_POS);
+		tmp = (tmp & PDS_CLKPLL_C3_UMSK) | ((uint32_t)(3) << PDS_CLKPLL_C3_POS);
+		tmp = (tmp & PDS_CLKPLL_CZ_UMSK) | ((uint32_t)(1) << PDS_CLKPLL_CZ_POS);
+		tmp = (tmp & PDS_CLKPLL_RZ_UMSK) | ((uint32_t)(1) << PDS_CLKPLL_RZ_POS);
+		tmp = (tmp & PDS_CLKPLL_R4_SHORT_UMSK) | ((uint32_t)(1) << PDS_CLKPLL_R4_SHORT_POS);
 	}
-	tmp = (tmp & PDS_CLKPLL_R4_UMSK) | ((uint32_t)(2) <<
-PDS_CLKPLL_R4_POS);
+	tmp = (tmp & PDS_CLKPLL_R4_UMSK) | ((uint32_t)(2) << PDS_CLKPLL_R4_POS);
 	sys_write32(tmp, PDS_BASE + PDS_CLKPLL_RZ_OFFSET);
 
 	/* set pll dividers */
 	tmp = sys_read32(PDS_BASE + PDS_CLKPLL_TOP_CTRL_OFFSET);
-	tmp = (tmp & PDS_CLKPLL_POSTDIV_UMSK) | ((uint32_t)(0x14) <<
-PDS_CLKPLL_POSTDIV_POS);
-	tmp = (tmp & PDS_CLKPLL_REFDIV_RATIO_UMSK) | ((uint32_t)(2) <<
-PDS_CLKPLL_REFDIV_RATIO_POS);
+	tmp = (tmp & PDS_CLKPLL_POSTDIV_UMSK) | ((uint32_t)(0x14) << PDS_CLKPLL_POSTDIV_POS);
+	tmp = (tmp & PDS_CLKPLL_REFDIV_RATIO_UMSK) | ((uint32_t)(2) << PDS_CLKPLL_REFDIV_RATIO_POS);
 	sys_write32(tmp, PDS_BASE + PDS_CLKPLL_TOP_CTRL_OFFSET);
 
 	/* set SDMIN */
 	tmp = sys_read32(PDS_BASE + PDS_CLKPLL_SDM_OFFSET);
 	if (source == BL60X_CLKID_CLK_CRYSTAL) {
-		tmp = (tmp & PDS_CLKPLL_SDMIN_UMSK) | ( clock_control_bl60x_crystal_SDMIN_table[clock_control_bl60x_crystal_to_id(crystal_frequency)] << PDS_CLKPLL_SDMIN_POS);
+		tmp = (tmp & PDS_CLKPLL_SDMIN_UMSK) |
+		      (clock_control_bl60x_crystal_SDMIN_table[clock_control_bl60x_crystal_to_id(
+			       crystal_frequency)]
+		       << PDS_CLKPLL_SDMIN_POS);
 	} else {
-		tmp = (tmp & PDS_CLKPLL_SDMIN_UMSK) | ( clock_control_bl60x_crystal_SDMIN_table[clock_control_bl60x_crystal_to_id(RC32M_FREQ)] << PDS_CLKPLL_SDMIN_POS);
+		tmp = (tmp & PDS_CLKPLL_SDMIN_UMSK) |
+		      (clock_control_bl60x_crystal_SDMIN_table[clock_control_bl60x_crystal_to_id(
+			       RC32M_FREQ)]
+		       << PDS_CLKPLL_SDMIN_POS);
 	}
 	sys_write32(tmp, PDS_BASE + PDS_CLKPLL_SDM_OFFSET);
 
 	/* phase comparator settings? */
 	tmp = sys_read32(PDS_BASE + PDS_CLKPLL_FBDV_OFFSET);
-	tmp = (tmp & PDS_CLKPLL_SEL_FB_CLK_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_SEL_FB_CLK_POS);
-	tmp = (tmp & PDS_CLKPLL_SEL_SAMPLE_CLK_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_SEL_SAMPLE_CLK_POS);
+	tmp = (tmp & PDS_CLKPLL_SEL_FB_CLK_UMSK) | ((uint32_t)(1) << PDS_CLKPLL_SEL_FB_CLK_POS);
+	tmp = (tmp & PDS_CLKPLL_SEL_SAMPLE_CLK_UMSK) |
+	      ((uint32_t)(1) << PDS_CLKPLL_SEL_SAMPLE_CLK_POS);
 	sys_write32(tmp, PDS_BASE + PDS_CLKPLL_FBDV_OFFSET);
 
 	tmp = sys_read32(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-	tmp = (tmp & PDS_PU_CLKPLL_SFREG_UMSK) | ((uint32_t)(1) <<
-PDS_PU_CLKPLL_SFREG_POS);
+	tmp = (tmp & PDS_PU_CLKPLL_SFREG_UMSK) | ((uint32_t)(1) << PDS_PU_CLKPLL_SFREG_POS);
 	sys_write32(tmp, PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
 	clock_control_bl60x_clock_settle();
 
 	/* enable PPL clock actual? */
 	tmp = sys_read32(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-	tmp = (tmp & PDS_PU_CLKPLL_UMSK) | ((uint32_t)(1) <<
-PDS_PU_CLKPLL_POS);
+	tmp = (tmp & PDS_PU_CLKPLL_UMSK) | ((uint32_t)(1) << PDS_PU_CLKPLL_POS);
 	sys_write32(tmp, PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
 
 	/* More power up sequencing*/
 	tmp = sys_read32(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-	tmp = (tmp & PDS_CLKPLL_PU_CP_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_PU_CP_POS);
-	tmp = (tmp & PDS_CLKPLL_PU_PFD_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_PU_PFD_POS);
-	tmp = (tmp & PDS_CLKPLL_PU_FBDV_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_PU_FBDV_POS);
-	tmp = (tmp & PDS_CLKPLL_PU_POSTDIV_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_PU_POSTDIV_POS);
+	tmp = (tmp & PDS_CLKPLL_PU_CP_UMSK) | ((uint32_t)(1) << PDS_CLKPLL_PU_CP_POS);
+	tmp = (tmp & PDS_CLKPLL_PU_PFD_UMSK) | ((uint32_t)(1) << PDS_CLKPLL_PU_PFD_POS);
+	tmp = (tmp & PDS_CLKPLL_PU_FBDV_UMSK) | ((uint32_t)(1) << PDS_CLKPLL_PU_FBDV_POS);
+	tmp = (tmp & PDS_CLKPLL_PU_POSTDIV_UMSK) | ((uint32_t)(1) << PDS_CLKPLL_PU_POSTDIV_POS);
 	sys_write32(tmp, PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
 
 	clock_control_bl60x_clock_settle();
 
 	/* reset couple things one by one? */
 	tmp = sys_read32(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-	tmp = (tmp & PDS_CLKPLL_SDM_RESET_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_SDM_RESET_POS);
+	tmp = (tmp & PDS_CLKPLL_SDM_RESET_UMSK) | ((uint32_t)(1) << PDS_CLKPLL_SDM_RESET_POS);
 	sys_write32(tmp, PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
 
 	tmp = sys_read32(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-	tmp = (tmp & PDS_CLKPLL_RESET_FBDV_UMSK) | ((uint32_t)(1) <<
-PDS_CLKPLL_RESET_FBDV_POS);
+	tmp = (tmp & PDS_CLKPLL_RESET_FBDV_UMSK) | ((uint32_t)(1) << PDS_CLKPLL_RESET_FBDV_POS);
 	sys_write32(tmp, PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
 
 	tmp = sys_read32(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-	tmp = (tmp & PDS_CLKPLL_RESET_FBDV_UMSK) | ((uint32_t)(0) <<
-PDS_CLKPLL_RESET_FBDV_POS);
+	tmp = (tmp & PDS_CLKPLL_RESET_FBDV_UMSK) | ((uint32_t)(0) << PDS_CLKPLL_RESET_FBDV_POS);
 	sys_write32(tmp, PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
 
 	tmp = sys_read32(PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
-	tmp = (tmp & PDS_CLKPLL_SDM_RESET_UMSK) | ((uint32_t)(0) <<
-PDS_CLKPLL_SDM_RESET_POS);
+	tmp = (tmp & PDS_CLKPLL_SDM_RESET_UMSK) | ((uint32_t)(0) << PDS_CLKPLL_SDM_RESET_POS);
 	sys_write32(tmp, PDS_BASE + PDS_PU_RST_CLKPLL_OFFSET);
 
 	clock_control_bl60x_set_root_clock(old_rootclk);
@@ -457,7 +428,6 @@ static int clock_control_bl60x_clock_trim_32M(void)
 	uint32_t tmp = 0;
 	uint32_t trim = 0;
 	const struct device *efuse = DEVICE_DT_GET_ONE(bflb_efuse);
-
 
 	tmp = syscon_read_reg(efuse, 0xC, &trim);
 	if (tmp < 0) {
@@ -640,7 +610,8 @@ static int clock_control_bl60x_update_root(const struct device *dev)
 		clock_control_bl60x_deinit_crystal();
 	}
 
-	ret = clock_control_bl60x_set_root_clock_dividers(data->root.divider - 1, data->bclk.divider - 1);
+	ret = clock_control_bl60x_set_root_clock_dividers(data->root.divider - 1,
+							  data->bclk.divider - 1);
 	if (ret < 0) {
 		return ret;
 	}
@@ -655,7 +626,8 @@ static int clock_control_bl60x_update_root(const struct device *dev)
 	if (ret < 0) {
 		return ret;
 	}
-	clock_control_bl60x_set_machine_timer_clock(1, 0, clock_control_bl60x_mtimer_get_clk_src_div(dev));
+	clock_control_bl60x_set_machine_timer_clock(
+		1, 0, clock_control_bl60x_mtimer_get_clk_src_div(dev));
 
 	clock_control_bl60x_clock_settle();
 
@@ -812,7 +784,7 @@ static int clock_control_bl60x_off(const struct device *dev, clock_control_subsy
 }
 
 static enum clock_control_status clock_control_bl60x_get_status(const struct device *dev,
-								   clock_control_subsys_t sys)
+								clock_control_subsys_t sys)
 {
 	struct clock_control_bl60x_data *data = dev->data;
 
@@ -839,7 +811,7 @@ static enum clock_control_status clock_control_bl60x_get_status(const struct dev
 }
 
 static int clock_control_bl60x_get_rate(const struct device *dev, clock_control_subsys_t sys,
-					   uint32_t *rate)
+					uint32_t *rate)
 {
 	const struct clock_control_bl60x_config *config = dev->config;
 
@@ -892,41 +864,45 @@ static struct clock_control_bl60x_data clock_control_bl60x_data = {
 	.crystal_enabled = DT_NODE_HAS_STATUS_OKAY(DT_INST_CLOCKS_CTLR_BY_NAME(0, crystal)),
 	.pll_enabled = DT_NODE_HAS_STATUS_OKAY(DT_INST_CLOCKS_CTLR_BY_NAME(0, pll)),
 
-	.root = {
+	.root =
+		{
 #if CLK_SRC_IS(root, pll)
-		.source = bl60x_clkid_clk_pll,
+			.source = bl60x_clkid_clk_pll,
 #elif CLK_SRC_IS(root, crystal)
-		.source = bl60x_clkid_clk_crystal,
+			.source = bl60x_clkid_clk_crystal,
 #else
-		.source = bl60x_clkid_clk_rc32m,
+			.source = bl60x_clkid_clk_rc32m,
 #endif
-		.pll_select = DT_PROP(DT_INST_CLOCKS_CTLR_BY_NAME(0, root), pll_select),
-		.divider = DT_PROP(DT_INST_CLOCKS_CTLR_BY_NAME(0, root), divider),
-	},
+			.pll_select = DT_PROP(DT_INST_CLOCKS_CTLR_BY_NAME(0, root), pll_select),
+			.divider = DT_PROP(DT_INST_CLOCKS_CTLR_BY_NAME(0, root), divider),
+		},
 
-	.pll = {
+	.pll =
+		{
 #if CLK_SRC_IS(pll, crystal)
-		.source = bl60x_clkid_clk_crystal,
+			.source = bl60x_clkid_clk_crystal,
 #else
-		.source = bl60x_clkid_clk_rc32m,
+			.source = bl60x_clkid_clk_rc32m,
 #endif
-	},
+		},
 
-	.bclk = {
-		.divider = DT_PROP(DT_INST_CLOCKS_CTLR_BY_NAME(0, bclk), divider),
-	},
+	.bclk =
+		{
+			.divider = DT_PROP(DT_INST_CLOCKS_CTLR_BY_NAME(0, bclk), divider),
+		},
 };
 
-BUILD_ASSERT( CLK_SRC_IS(pll, crystal) || CLK_SRC_IS(root, crystal) ? DT_NODE_HAS_STATUS_OKAY(DT_INST_CLOCKS_CTLR_BY_NAME(0, crystal)) : 1,
+BUILD_ASSERT(CLK_SRC_IS(pll, crystal) || CLK_SRC_IS(root, crystal)
+		     ? DT_NODE_HAS_STATUS_OKAY(DT_INST_CLOCKS_CTLR_BY_NAME(0, crystal))
+		     : 1,
 	     "Crystal must be enabled to use it");
 
-BUILD_ASSERT(CLK_SRC_IS(root, pll) ? DT_NODE_HAS_STATUS_OKAY(DT_INST_CLOCKS_CTLR_BY_NAME(0, pll)) : 1,
+BUILD_ASSERT(CLK_SRC_IS(root, pll) ? DT_NODE_HAS_STATUS_OKAY(DT_INST_CLOCKS_CTLR_BY_NAME(0, pll))
+				   : 1,
 	     "PLL must be enabled to use it");
 
-BUILD_ASSERT(DT_NODE_HAS_STATUS_OKAY(DT_INST_CLOCKS_CTLR_BY_NAME(0, rc32m)),
-	     "RC32M is always on");
+BUILD_ASSERT(DT_NODE_HAS_STATUS_OKAY(DT_INST_CLOCKS_CTLR_BY_NAME(0, rc32m)), "RC32M is always on");
 
 DEVICE_DT_INST_DEFINE(0, clock_control_bl60x_init, NULL, &clock_control_bl60x_data,
-		      &clock_control_bl60x_config, PRE_KERNEL_1,
-		      CONFIG_CLOCK_CONTROL_INIT_PRIORITY, &clock_control_bl60x_api);
-
+		      &clock_control_bl60x_config, PRE_KERNEL_1, CONFIG_CLOCK_CONTROL_INIT_PRIORITY,
+		      &clock_control_bl60x_api);
