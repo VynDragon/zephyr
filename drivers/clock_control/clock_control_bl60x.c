@@ -128,14 +128,24 @@ static uint32_t clock_control_bl60x_get_root_clock(void)
 	return (((tmp & HBN_ROOT_CLK_SEL_MSK) >> HBN_ROOT_CLK_SEL_POS) & 0x3);
 }
 
+static int clock_control_bl60x_deinit_crystal(void)
+{
+	uint32_t tmp = 0;
+
+	/* unpower crystal */
+	tmp = sys_read32(AON_BASE + AON_RF_TOP_AON_OFFSET);
+	tmp = tmp & AON_PU_XTAL_AON_UMSK;
+	tmp = tmp & AON_PU_XTAL_BUF_AON_UMSK;
+	sys_write32(tmp, AON_BASE + AON_RF_TOP_AON_OFFSET);
+
+	clock_control_bl60x_clock_settle();
+	return 0;
+}
+
 static int clock_control_bl60x_init_crystal(void)
 {
 	uint32_t tmp = 0;
-	uint32_t old_rootclk = 0;
 	int count = CLOCK_TIMEOUT;
-
-	old_rootclk = clock_control_bl60x_get_root_clock();
-	clock_control_bl60x_set_root_clock(0);
 
 	/* power crystal */
 	tmp = sys_read32(AON_BASE + AON_RF_TOP_AON_OFFSET);
@@ -151,7 +161,6 @@ AON_PU_XTAL_BUF_AON_POS);
 		count--;
 	} while (!(tmp & AON_XTAL_RDY_MSK) && count > 0);
 
-	clock_control_bl60x_set_root_clock(old_rootclk);
 	clock_control_bl60x_clock_settle();
 	if (count < 1) {
 		return -1;
@@ -601,7 +610,7 @@ static void clock_control_bl60x_init_root_as_crystal(const struct device *dev)
 	sys_write32(clock_control_bl60x_get_clk(dev), CORECLOCKREGISTER);
 }
 
-static int clock_control_bl60x_init_root(const struct device *dev)
+static int clock_control_bl60x_update_root(const struct device *dev)
 {
 	struct clock_control_bl60x_data *data = dev->data;
 	uint32_t tmp;
@@ -627,6 +636,8 @@ static int clock_control_bl60x_init_root(const struct device *dev)
 		if (clock_control_bl60x_init_crystal() < 0) {
 			return -EIO;
 		}
+	} else {
+		clock_control_bl60x_deinit_crystal();
 	}
 
 	ret = clock_control_bl60x_set_root_clock_dividers(data->root.divider - 1, data->bclk.divider - 1);
@@ -712,18 +723,119 @@ static void clock_control_bl60x_peripheral_clock_init(void)
 
 static int clock_control_bl60x_on(const struct device *dev, clock_control_subsys_t sys)
 {
-	return -ENOTSUP;
+	struct clock_control_bl60x_data *data = dev->data;
+	int ret = -EINVAL;
+	uint32_t key;
+
+	key = irq_lock();
+
+	if ((enum bl60x_clkid)sys == bl60x_clkid_clk_crystal) {
+		if (data->crystal_enabled) {
+			ret = 0;
+		} else {
+			if (data->root.source == bl60x_clkid_clk_rc32m) {
+				data->root.source = bl60x_clkid_clk_crystal;
+			}
+			if (data->pll.source == bl60x_clkid_clk_rc32m) {
+				data->pll.source = bl60x_clkid_clk_crystal;
+			}
+			data->crystal_enabled = true;
+			ret = clock_control_bl60x_update_root(dev);
+			if (ret < 0) {
+				data->crystal_enabled = false;
+			}
+		}
+	} else if ((enum bl60x_clkid)sys == bl60x_clkid_clk_pll) {
+		if (data->pll_enabled) {
+			ret = 0;
+		} else {
+			if (data->root.source != bl60x_clkid_clk_pll) {
+				data->root.source = bl60x_clkid_clk_pll;
+			}
+			data->pll_enabled = true;
+			ret = clock_control_bl60x_update_root(dev);
+			if (ret < 0) {
+				data->pll_enabled = false;
+			}
+		}
+	}
+
+	irq_unlock(key);
+	return ret;
 }
 
 static int clock_control_bl60x_off(const struct device *dev, clock_control_subsys_t sys)
 {
-	return -ENOTSUP;
+	struct clock_control_bl60x_data *data = dev->data;
+	int ret = -EINVAL;
+	uint32_t key;
+
+	key = irq_lock();
+
+	if ((enum bl60x_clkid)sys == bl60x_clkid_clk_crystal) {
+		if (!data->crystal_enabled) {
+			ret = 0;
+		} else {
+			if (data->root.source == bl60x_clkid_clk_crystal) {
+				data->root.source = bl60x_clkid_clk_rc32m;
+			}
+			if (data->pll.source == bl60x_clkid_clk_crystal) {
+				data->pll.source = bl60x_clkid_clk_rc32m;
+			}
+			data->crystal_enabled = false;
+			ret = clock_control_bl60x_update_root(dev);
+			if (ret < 0) {
+				data->crystal_enabled = true;
+			}
+		}
+	} else if ((enum bl60x_clkid)sys == bl60x_clkid_clk_pll) {
+		if (!data->pll_enabled) {
+			ret = 0;
+		} else {
+			if (data->root.source == bl60x_clkid_clk_pll) {
+				if (!data->crystal_enabled) {
+					data->root.source = bl60x_clkid_clk_rc32m;
+				} else {
+					data->root.source = bl60x_clkid_clk_crystal;
+				}
+			}
+			data->pll_enabled = false;
+			ret = clock_control_bl60x_update_root(dev);
+			if (ret < 0) {
+				data->pll_enabled = true;
+			}
+		}
+	}
+
+	irq_unlock(key);
+	return ret;
 }
 
 static enum clock_control_status clock_control_bl60x_get_status(const struct device *dev,
 								   clock_control_subsys_t sys)
 {
-	return CLOCK_CONTROL_STATUS_UNKNOWN;
+	struct clock_control_bl60x_data *data = dev->data;
+
+	if ((enum bl60x_clkid)sys == bl60x_clkid_clk_root) {
+		return CLOCK_CONTROL_STATUS_ON;
+	} else if ((enum bl60x_clkid)sys == bl60x_clkid_clk_bclk) {
+		return CLOCK_CONTROL_STATUS_ON;
+	} else if ((enum bl60x_clkid)sys == bl60x_clkid_clk_crystal) {
+		if (data->crystal_enabled) {
+			return CLOCK_CONTROL_STATUS_ON;
+		} else {
+			return CLOCK_CONTROL_STATUS_OFF;
+		}
+	} else if ((enum bl60x_clkid)sys == bl60x_clkid_clk_rc32m) {
+		return CLOCK_CONTROL_STATUS_ON;
+	} else if ((enum bl60x_clkid)sys == bl60x_clkid_clk_pll) {
+		if (data->pll_enabled) {
+			return CLOCK_CONTROL_STATUS_ON;
+		} else {
+			return CLOCK_CONTROL_STATUS_OFF;
+		}
+	}
+	return -EINVAL;
 }
 
 static int clock_control_bl60x_get_rate(const struct device *dev, clock_control_subsys_t sys,
@@ -733,11 +845,11 @@ static int clock_control_bl60x_get_rate(const struct device *dev, clock_control_
 
 	if ((enum bl60x_clkid)sys == bl60x_clkid_clk_root) {
 		*rate = clock_control_bl60x_get_clk(dev);
-	} else if  ((enum bl60x_clkid)sys == bl60x_clkid_clk_bclk) {
+	} else if ((enum bl60x_clkid)sys == bl60x_clkid_clk_bclk) {
 		*rate = clock_control_bl60x_get_bclk(dev);
-	} else if  ((enum bl60x_clkid)sys == bl60x_clkid_clk_crystal) {
+	} else if ((enum bl60x_clkid)sys == bl60x_clkid_clk_crystal) {
 		*rate = config->crystal_frequency;
-	} else if  ((enum bl60x_clkid)sys == bl60x_clkid_clk_rc32m) {
+	} else if ((enum bl60x_clkid)sys == bl60x_clkid_clk_rc32m) {
 		*rate = RC32M_FREQ;
 	} else {
 		return -EINVAL;
@@ -752,7 +864,7 @@ static int clock_control_bl60x_init(const struct device *dev)
 
 	key = irq_lock();
 
-	ret = clock_control_bl60x_init_root(dev);
+	ret = clock_control_bl60x_update_root(dev);
 	if (ret < 0) {
 		irq_unlock(key);
 		return ret;
