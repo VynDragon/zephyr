@@ -62,6 +62,14 @@
 			divider = <4>;
 			status = "okay";
 		};
+
+		clk_flash: clk-flash {
+			#clock-cells = <0>;
+			compatible = "bflb,bl61x-flash-clk";
+			clocks = <&clk_bclk>;
+			divider = <2>;
+			status = "okay";
+		};
 	};
 
 	cpus {
@@ -231,9 +239,9 @@
 			#clock-cells = <1>;
 			status = "okay";
 			clocks = <&clk_rc32m>, <&clk_crystal>, <&clk_wifipll>, <&clk_aupll>,
-				<&clk_root>, <&clk_bclk>;
+				<&clk_root>, <&clk_bclk>, <&clk_flash>;
 			clock-names = "rc32m", "crystal", "wifipll", "aupll",
-				"root", "bclk";
+				"root", "bclk", "flash";
 		};
 	};
 };
