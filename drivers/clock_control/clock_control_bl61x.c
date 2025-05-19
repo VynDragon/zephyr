@@ -1099,12 +1099,6 @@ static int clock_control_bl61x_off(const struct device *dev, clock_control_subsy
 		if (!data->crystal_enabled) {
 			ret = 0;
 		} else {
-			if (data->root.source == bl61x_clkid_clk_crystal) {
-				data->root.source = bl61x_clkid_clk_rc32m;
-			}
-			if (data->wifipll.source == bl61x_clkid_clk_crystal) {
-				data->wifipll.source = bl61x_clkid_clk_rc32m;
-			}
 			data->crystal_enabled = false;
 			ret = clock_control_bl61x_update_root(dev);
 			if (ret < 0) {
@@ -1115,13 +1109,6 @@ static int clock_control_bl61x_off(const struct device *dev, clock_control_subsy
 		if (!data->wifipll_enabled) {
 			ret = 0;
 		} else {
-			if (data->root.source == bl61x_clkid_clk_wifipll) {
-				if (!data->crystal_enabled) {
-					data->root.source = bl61x_clkid_clk_rc32m;
-				} else {
-					data->root.source = bl61x_clkid_clk_crystal;
-				}
-			}
 			data->wifipll_enabled = false;
 			ret = clock_control_bl61x_update_root(dev);
 			if (ret < 0) {
