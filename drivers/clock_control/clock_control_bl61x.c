@@ -1027,6 +1027,7 @@ static int clock_control_bl61x_on(const struct device *dev, clock_control_subsys
 	struct clock_control_bl61x_data *data = dev->data;
 	int ret = -EINVAL;
 	uint32_t key;
+	enum bl61x_clkid oldroot;
 
 	key = irq_lock();
 
@@ -1034,12 +1035,6 @@ static int clock_control_bl61x_on(const struct device *dev, clock_control_subsys
 		if (data->crystal_enabled) {
 			ret = 0;
 		} else {
-			if (data->root.source == bl61x_clkid_clk_rc32m) {
-				data->root.source = bl61x_clkid_clk_crystal;
-			}
-			if (data->wifipll.source == bl61x_clkid_clk_rc32m) {
-				data->wifipll.source = bl61x_clkid_clk_crystal;
-			}
 			data->crystal_enabled = true;
 			ret = clock_control_bl61x_update_root(dev);
 			if (ret < 0) {
@@ -1050,13 +1045,40 @@ static int clock_control_bl61x_on(const struct device *dev, clock_control_subsys
 		if (data->wifipll_enabled) {
 			ret = 0;
 		} else {
-			if (data->root.source != bl61x_clkid_clk_wifipll) {
-				data->root.source = bl61x_clkid_clk_wifipll;
-			}
 			data->wifipll_enabled = true;
 			ret = clock_control_bl61x_update_root(dev);
 			if (ret < 0) {
 				data->wifipll_enabled = false;
+			}
+		}
+	} else if ((int)sys == BFLB_FORCE_ROOT_RC32M) {
+		if (data->root.source == bl61x_clkid_clk_rc32m) {
+			ret = 0;
+		} else {
+			/* Cannot fail to set root to rc32m */
+			data->root.source = bl61x_clkid_clk_rc32m;
+			ret = clock_control_bl61x_update_root(dev);
+		}
+	} else if ((int)sys == BFLB_FORCE_ROOT_CRYSTAL) {
+		if (data->root.source == bl61x_clkid_clk_crystal) {
+			ret = 0;
+		} else {
+			oldroot = data->root.source;
+			data->root.source = bl61x_clkid_clk_crystal;
+			ret = clock_control_bl61x_update_root(dev);
+			if (ret < 0) {
+				data->root.source = oldroot;
+			}
+		}
+	} else if ((int)sys == BFLB_FORCE_ROOT_PLL) {
+		if (data->root.source == bl61x_clkid_clk_wifipll) {
+			ret = 0;
+		} else {
+			oldroot = data->root.source;
+			data->root.source = bl61x_clkid_clk_wifipll;
+			ret = clock_control_bl61x_update_root(dev);
+			if (ret < 0) {
+				data->root.source = oldroot;
 			}
 		}
 	}
