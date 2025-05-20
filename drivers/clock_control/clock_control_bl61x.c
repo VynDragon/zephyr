@@ -327,10 +327,10 @@ static void clock_control_bl61x_clock_at_least_us(uint32_t us)
  */
 static void clock_control_bl61x_set_root_clock(uint32_t clock)
 {
-	uint32_t tmp = 0;
+	uint32_t tmp;
 
 	/* invalid value, fallback to internal 32M */
-	if (clock < 0 || clock > 3) {
+	if (clock > 3) {
 		clock = 0;
 	}
 	tmp = sys_read32(HBN_BASE + HBN_GLB_OFFSET);
@@ -343,7 +343,7 @@ static void clock_control_bl61x_set_root_clock(uint32_t clock)
 
 static uint32_t clock_control_bl61x_get_root_clock(void)
 {
-	uint32_t tmp = 0;
+	uint32_t tmp;
 
 	tmp = sys_read32(HBN_BASE + HBN_GLB_OFFSET);
 	return (((tmp & HBN_ROOT_CLK_SEL_MSK) >> HBN_ROOT_CLK_SEL_POS) & 0x3);
@@ -365,7 +365,7 @@ static int clock_control_bl61x_deinit_crystal(void)
 
 static int clock_control_bl61x_init_crystal(void)
 {
-	uint32_t tmp = 0;
+	uint32_t tmp;
 	int count = CLOCK_TIMEOUT;
 
 	/* power crystal */
@@ -393,8 +393,8 @@ static int clock_control_bl61x_init_crystal(void)
  */
 static int clock_control_bl61x_set_root_clock_dividers(uint32_t hclk_div, uint32_t bclk_div)
 {
-	uint32_t tmp = 0;
-	uint32_t old_rootclk = 0;
+	uint32_t tmp;
+	uint32_t old_rootclk;
 	int count = CLOCK_TIMEOUT;
 
 	old_rootclk = clock_control_bl61x_get_root_clock();
@@ -434,7 +434,7 @@ static int clock_control_bl61x_set_root_clock_dividers(uint32_t hclk_div, uint32
 
 static void clock_control_bl61x_set_machine_timer_clock_enable(uint32_t enable)
 {
-	uint32_t tmp = 0;
+	uint32_t tmp;
 
 	if (enable > 1) {
 		enable = 1;
@@ -450,7 +450,7 @@ static void clock_control_bl61x_set_machine_timer_clock_enable(uint32_t enable)
  */
 static void clock_control_bl61x_set_machine_timer_clock(uint32_t enable, uint32_t clock, uint32_t divider)
 {
-	uint32_t tmp = 0;
+	uint32_t tmp;
 
 	if (clock > 1) {
 		clock = 0;
@@ -474,7 +474,7 @@ static void clock_control_bl61x_set_machine_timer_clock(uint32_t enable, uint32_
 
 static void clock_control_bl61x_deinit_wifipll(void)
 {
-	uint32_t tmp = 0;
+	uint32_t tmp;
 
 	tmp = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
 	tmp &= GLB_PU_WIFIPLL_UMSK;
@@ -487,7 +487,7 @@ static void clock_control_bl61x_deinit_wifipll(void)
  */
 static void clock_control_bl61x_set_wifipll_source(uint32_t source)
 {
-	uint32_t tmp = 0;
+	uint32_t tmp;
 
 	tmp = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG1_OFFSET);
 	if (source == 0) {
@@ -500,7 +500,7 @@ static void clock_control_bl61x_set_wifipll_source(uint32_t source)
 
 static void clock_control_bl61x_init_wifipll_setup(const bl61x_pll_config *const config)
 {
-	uint32_t tmp = 0;
+	uint32_t tmp;
 
 	tmp = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG1_OFFSET);
 	tmp = (tmp & GLB_WIFIPLL_REFDIV_RATIO_UMSK)
@@ -631,7 +631,7 @@ static void clock_control_bl61x_init_wifipll_setup(const bl61x_pll_config *const
 
 static void clock_control_bl61x_init_wifipll(const bl61x_pll_config *const *config, enum bl61x_clkid source, uint32_t crystal_frequency)
 {
-	uint32_t tmp = 0;
+	uint32_t tmp;
 	uint32_t old_rootclk = 0;
 
 	old_rootclk = clock_control_bl61x_get_root_clock();
@@ -669,7 +669,7 @@ static void clock_control_bl61x_init_wifipll(const bl61x_pll_config *const *conf
  */
 static void clock_control_bl61x_select_PLL(uint8_t pll)
 {
-	uint32_t tmp = 0;
+	uint32_t tmp;
 
 	tmp = sys_read32(PDS_BASE + PDS_CPU_CORE_CFG1_OFFSET);
 	tmp = (tmp & PDS_REG_PLL_SEL_UMSK) | (pll << PDS_REG_PLL_SEL_POS);
@@ -691,7 +691,7 @@ static void clock_control_bl61x_select_PLL(uint8_t pll)
  */
 static void clock_control_bl61x_ungate_pll(uint8_t pll)
 {
-	uint32_t tmp = 0;
+	uint32_t tmp;
 
 	tmp = sys_read32(PDS_BASE + GLB_CGEN_CFG3_OFFSET);
 	tmp |= (1 << pll);
@@ -700,15 +700,16 @@ static void clock_control_bl61x_ungate_pll(uint8_t pll)
 
 static int clock_control_bl61x_clock_trim_32M(void)
 {
-	uint32_t tmp = 0;
-	uint32_t trim = 0;
+	uint32_t tmp;
+	uint32_t trim;
+	int err;
 	const struct device *efuse = DEVICE_DT_GET_ONE(bflb_efuse);
 
 
-	tmp = syscon_read_reg(efuse, 0x7C, &trim);
-	if (tmp < 0) {
-		printk("Error: Couldn't read efuses: err: %d.\n", tmp);
-		return tmp;
+	err = syscon_read_reg(efuse, 0x7C, &trim);
+	if (err < 0) {
+		printk("Error: Couldn't read efuses: err: %d.\n", err);
+		return err;
 	}
 	/* TODO: check trim parity */
 	trim = (trim & 0xFF0) >> 4;
@@ -757,7 +758,7 @@ static uint32_t clock_control_bl61x_mtimer_get_xclk_src_div(const struct device 
 static uint32_t clock_control_bl61x_get_fclk(const struct device *dev)
 {
 	struct clock_control_bl61x_data *data = dev->data;
-	uint32_t tmp = 0;
+	uint32_t tmp;
 
 	tmp = sys_read32(HBN_BASE + HBN_GLB_OFFSET);
 	tmp &= HBN_ROOT_CLK_SEL_MSK;
@@ -766,26 +767,25 @@ static uint32_t clock_control_bl61x_get_fclk(const struct device *dev)
 
 	if (tmp == 0) {
 		return clock_control_bl61x_get_xclk(dev);
-	} else if (tmp == 1) {
-		tmp = sys_read32(PDS_BASE + PDS_CPU_CORE_CFG1_OFFSET);
-		tmp = (tmp & PDS_REG_PLL_SEL_MSK) >> PDS_REG_PLL_SEL_POS;
-		if (tmp == 3) {
-			if (data->wifipll.overclock) {
-				return 480 * 1000 * 1000;
-			} else {
-				return 320 * 1000 * 1000;
-			}
-		} else if (tmp == 2) {
-			if (data->wifipll.overclock) {
-				return 360 * 1000 * 1000;
-			} else {
-				return 240 * 1000 * 1000;
-			}
-		} else if (tmp == 1) {
-			/* TODO AUPLL DIV 1 */
-		} else if (tmp == 0) {
-			/* TODO AUPLL DIV 2 */
+	}
+	tmp = sys_read32(PDS_BASE + PDS_CPU_CORE_CFG1_OFFSET);
+	tmp = (tmp & PDS_REG_PLL_SEL_MSK) >> PDS_REG_PLL_SEL_POS;
+	if (tmp == 3) {
+		if (data->wifipll.overclock) {
+			return 480 * 1000 * 1000;
+		} else {
+			return 320 * 1000 * 1000;
 		}
+	} else if (tmp == 2) {
+		if (data->wifipll.overclock) {
+			return 360 * 1000 * 1000;
+		} else {
+			return 240 * 1000 * 1000;
+		}
+	} else if (tmp == 1) {
+		/* TODO AUPLL DIV 1 */
+	} else if (tmp == 0) {
+		/* TODO AUPLL DIV 2 */
 	}
 	return 0;
 }
@@ -793,19 +793,19 @@ static uint32_t clock_control_bl61x_get_fclk(const struct device *dev)
 /* CLIC, should be same as FCLK ideally */
 static uint32_t clock_control_bl61x_get_hclk(const struct device *dev)
 {
-	uint32_t tmp = 0;
-	uint32_t clock = 0;
+	uint32_t tmp;
+	uint32_t clock_f;
 
 	tmp = sys_read32(GLB_BASE + GLB_SYS_CFG0_OFFSET);
 	tmp = (tmp & GLB_REG_HCLK_DIV_MSK) >> GLB_REG_HCLK_DIV_POS;
-	clock = clock_control_bl61x_get_fclk(dev);
-	return clock / (tmp + 1);
+	clock_f = clock_control_bl61x_get_fclk(dev);
+	return clock_f / (tmp + 1);
 }
 
 /* most peripherals clock */
 static uint32_t clock_control_bl61x_get_bclk(const struct device *dev)
 {
-	uint32_t tmp = 0;
+	uint32_t tmp;
 	uint32_t clock = 0;
 
 	tmp = sys_read32(GLB_BASE + GLB_SYS_CFG0_OFFSET);
@@ -951,7 +951,7 @@ static int clock_control_bl61x_update_root(const struct device *dev)
 
 static void clock_control_bl61x_uart_set_clock_enable(uint32_t enable)
 {
-	uint32_t tmp = 0;
+	uint32_t tmp;
 
 	if (enable > 1) {
 		enable = 1;
@@ -968,7 +968,7 @@ static void clock_control_bl61x_uart_set_clock_enable(uint32_t enable)
  */
 static void clock_control_bl61x_uart_set_clock(uint32_t enable, uint32_t clock, uint32_t divider)
 {
-	uint32_t tmp = 0;
+	uint32_t tmp;
 
 	if (divider > 0x7) {
 		divider = 0x7;
