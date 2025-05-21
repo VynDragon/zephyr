@@ -9,6 +9,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/clock_control.h>
 #include <zephyr/drivers/syscon.h>
+#include <zephyr/sys/util.h>
 #include <zephyr/dt-bindings/clock/bflb_bl61x_clock.h>
 
 
@@ -290,15 +291,15 @@ static const bl61x_pll_config *const bl61x_pll_configs_O480M[6] = {
 static int clock_control_bl61x_crystal_to_id(uint32_t crystal_freq)
 {
 	switch (crystal_freq) {
-	case 32 * 1000 * 1000:
+	case KHZ(32000):
 		return 0;
-	case 24 * 1000 * 1000:
+	case KHZ(24000):
 		return 1;
-	case (int)(38.4 * 1000 * 1000):
+	case KHZ(38400):
 		return 2;
-	case 40 * 1000 * 1000:
+	case KHZ(40000):
 		return 3;
-	case 26 * 1000 * 1000:
+	case KHZ(26000):
 		return 4;
 	default:
 		return 0;
@@ -370,8 +371,8 @@ static int clock_control_bl61x_init_crystal(void)
 
 	/* power crystal */
 	tmp = sys_read32(AON_BASE + AON_RF_TOP_AON_OFFSET);
-	tmp = (tmp & AON_PU_XTAL_AON_UMSK) | ((uint32_t)(1) << AON_PU_XTAL_AON_POS);
-	tmp = (tmp & AON_PU_XTAL_BUF_AON_UMSK) | ((uint32_t)(1) << AON_PU_XTAL_BUF_AON_POS);
+	tmp = (tmp & AON_PU_XTAL_AON_UMSK) | (1U << AON_PU_XTAL_AON_POS);
+	tmp = (tmp & AON_PU_XTAL_BUF_AON_UMSK) | (1U << AON_PU_XTAL_BUF_AON_POS);
 	sys_write32(tmp, AON_BASE + AON_RF_TOP_AON_OFFSET);
 
 	/* wait for crystal to be powered on */
@@ -432,15 +433,16 @@ static int clock_control_bl61x_set_root_clock_dividers(uint32_t hclk_div, uint32
 	return 0;
 }
 
-static void clock_control_bl61x_set_machine_timer_clock_enable(uint32_t enable)
+static void clock_control_bl61x_set_machine_timer_clock_enable(bool enable)
 {
 	uint32_t tmp;
 
-	if (enable > 1) {
-		enable = 1;
-	}
 	tmp = sys_read32(MCU_MISC_BASE + MCU_MISC_MCU_E907_RTC_OFFSET);
-	tmp = (tmp & MCU_MISC_REG_MCU_RTC_EN_UMSK) | (enable << MCU_MISC_REG_MCU_RTC_EN_POS);
+	if (enable) {
+		tmp = (tmp & MCU_MISC_REG_MCU_RTC_EN_UMSK) | (1U << MCU_MISC_REG_MCU_RTC_EN_POS);
+	} else {
+		tmp = (tmp & MCU_MISC_REG_MCU_RTC_EN_UMSK) | (0U << MCU_MISC_REG_MCU_RTC_EN_POS);
+	}
 	sys_write32(tmp, MCU_MISC_BASE + MCU_MISC_MCU_E907_RTC_OFFSET);
 }
 
@@ -448,7 +450,7 @@ static void clock_control_bl61x_set_machine_timer_clock_enable(uint32_t enable)
  * 0: XCLK (RC32M or XTAL)
  * 1: Root Clock (FCLK: RC32M, XTAL or PLLs)
  */
-static void clock_control_bl61x_set_machine_timer_clock(uint32_t enable, uint32_t clock, uint32_t divider)
+static void clock_control_bl61x_set_machine_timer_clock(bool enable, uint32_t clock, uint32_t divider)
 {
 	uint32_t tmp;
 
@@ -462,7 +464,7 @@ static void clock_control_bl61x_set_machine_timer_clock(uint32_t enable, uint32_
 	sys_write32(tmp, MCU_MISC_BASE + MCU_MISC_MCU_E907_RTC_OFFSET);
 
 	/* disable first, then set div */
-	clock_control_bl61x_set_machine_timer_clock_enable(0);
+	clock_control_bl61x_set_machine_timer_clock_enable(false);
 
 	tmp = sys_read32(MCU_MISC_BASE + MCU_MISC_MCU_E907_RTC_OFFSET);
 	tmp = (tmp & MCU_MISC_REG_MCU_RTC_DIV_UMSK)
@@ -772,15 +774,15 @@ static uint32_t clock_control_bl61x_get_fclk(const struct device *dev)
 	tmp = (tmp & PDS_REG_PLL_SEL_MSK) >> PDS_REG_PLL_SEL_POS;
 	if (tmp == 3) {
 		if (data->wifipll.overclock) {
-			return 480 * 1000 * 1000;
+			return MHZ(480);
 		} else {
-			return 320 * 1000 * 1000;
+			return MHZ(320);
 		}
 	} else if (tmp == 2) {
 		if (data->wifipll.overclock) {
-			return 360 * 1000 * 1000;
+			return MHZ(360);
 		} else {
-			return 240 * 1000 * 1000;
+			return MHZ(240);
 		}
 	} else if (tmp == 1) {
 		/* TODO AUPLL DIV 1 */
@@ -905,9 +907,9 @@ static int clock_control_bl61x_update_root(const struct device *dev)
 
 	/* make sure all clocks are enabled */
 	tmp = sys_read32(GLB_BASE + GLB_SYS_CFG0_OFFSET);
-	tmp = (tmp & GLB_REG_BCLK_EN_UMSK) | ((uint32_t)(1) << GLB_REG_BCLK_EN_POS);
-	tmp = (tmp & GLB_REG_HCLK_EN_UMSK) | ((uint32_t)(1) << GLB_REG_HCLK_EN_POS);
-	tmp = (tmp & GLB_REG_FCLK_EN_UMSK) | ((uint32_t)(1) << GLB_REG_FCLK_EN_POS);
+	tmp = (tmp & GLB_REG_BCLK_EN_UMSK) | (1U << GLB_REG_BCLK_EN_POS);
+	tmp = (tmp & GLB_REG_HCLK_EN_UMSK) | (1U << GLB_REG_HCLK_EN_POS);
+	tmp = (tmp & GLB_REG_FCLK_EN_UMSK) | (1U << GLB_REG_FCLK_EN_POS);
 	sys_write32(tmp, GLB_BASE + GLB_SYS_CFG0_OFFSET);
 
 	/* set root clock to internal 32MHz Oscillator as failsafe */
@@ -949,15 +951,16 @@ static int clock_control_bl61x_update_root(const struct device *dev)
 	return ret;
 }
 
-static void clock_control_bl61x_uart_set_clock_enable(uint32_t enable)
+static void clock_control_bl61x_uart_set_clock_enable(bool enable)
 {
 	uint32_t tmp;
 
-	if (enable > 1) {
-		enable = 1;
-	}
 	tmp = sys_read32(GLB_BASE + GLB_UART_CFG0_OFFSET);
-	tmp = (tmp & GLB_UART_CLK_EN_UMSK) | (enable << GLB_UART_CLK_EN_POS);
+	if (enable) {
+		tmp = (tmp & GLB_UART_CLK_EN_UMSK) | (1U << GLB_UART_CLK_EN_POS);
+	} else {
+		tmp = (tmp & GLB_UART_CLK_EN_UMSK) | (0U << GLB_UART_CLK_EN_POS);
+	}
 	sys_write32(tmp, GLB_BASE + GLB_UART_CFG0_OFFSET);
 }
 
@@ -966,7 +969,7 @@ static void clock_control_bl61x_uart_set_clock_enable(uint32_t enable)
  * 160 Mhz PLL: 1
  * XCLK: 2
  */
-static void clock_control_bl61x_uart_set_clock(uint32_t enable, uint32_t clock, uint32_t divider)
+static void clock_control_bl61x_uart_set_clock(bool enable, uint32_t clock, uint32_t divider)
 {
 	uint32_t tmp;
 
@@ -977,7 +980,7 @@ static void clock_control_bl61x_uart_set_clock(uint32_t enable, uint32_t clock, 
 		clock = 2;
 	}
 	/* disable uart clock */
-	clock_control_bl61x_uart_set_clock_enable(0);
+	clock_control_bl61x_uart_set_clock_enable(false);
 
 
 	tmp = sys_read32(GLB_BASE + GLB_UART_CFG0_OFFSET);
