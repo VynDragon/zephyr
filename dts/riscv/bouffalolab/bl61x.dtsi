@@ -243,5 +243,11 @@
 			clock-names = "rc32m", "crystal", "wifipll", "aupll",
 				"root", "bclk", "flash";
 		};
+		psram: memc@20000000 {
+			compatible = "bflb,bl61x-psram";
+			reg = <0x20000000 DT_SIZE_K(4)>;
+			status = "okay";
+			clock-divider = <1>;
+		};
 	};
 };

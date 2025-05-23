@@ -192,15 +192,6 @@ static void disable_interrupt_autostacking(void)
 		: "r"(tmpVal));
 }
 
-/**
- * @brief Perform basic hardware initialization at boot.
- *
- * This needs to be run from the very beginning.
- * So the init priority has to be 0 (zero).
- *
- * @return 0
- */
-
 void soc_early_init_hook(void)
 {
 	uint32_t key;
