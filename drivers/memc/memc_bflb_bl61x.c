@@ -27,7 +27,7 @@ LOG_MODULE_REGISTER(memc_bflb_bl61x, CONFIG_MEMC_LOG_LEVEL);
 #define EFUSE_PSRAM_TRIM_EN_POS 12
 #define EFUSE_PSRAM_TRIM_PARITY_POS 11
 #define EFUSE_PSRAM_TRIM_POS 0
-#define EFUSE_PSRAM_TRIM_LEN 11
+#define EFUSE_PSRAM_TRIM_MSK 0x7FF
 
 #define PSRAM_CONFIG_ADDR 0x20052000
 
@@ -183,7 +183,7 @@ static const uint16_t dqs_delay_trims[16] = {
 static int memc_bflb_bl61x_init_psram(const struct device *dev)
 {
 	const struct device *efuse = DEVICE_DT_GET_ONE(bflb_efuse);
-	uint32_t psram_trim, a, b;
+	uint32_t psram_trim, psram_parity, a, b;
 	uint16_t dqs_d_t;
 	uint16_t check_dat;
 	int err;
@@ -199,8 +199,12 @@ static int memc_bflb_bl61x_init_psram(const struct device *dev)
 		LOG_WRN("No PSRAM trim");
 		return -ENOTSUP;
 	}
-	/* TODO: parity check trim */
-	psram_trim = (psram_trim >> EFUSE_PSRAM_TRIM_POS) & EFUSE_PSRAM_TRIM_LEN;
+	psram_parity = (psram_trim >> EFUSE_PSRAM_TRIM_PARITY_POS) & 1;
+	psram_trim = (psram_trim >> EFUSE_PSRAM_TRIM_POS) & EFUSE_PSRAM_TRIM_MSK;
+	if (psram_parity != (POPCOUNT(psram_trim) & 1)) {
+		LOG_ERR("Bad trim Parity");
+		return -EINVAL;
+	}
 	a = psram_trim & 0xf;
 	b = (psram_trim & 0xf0) >> 4;
 	dqs_d_t = (a + b) >> 1;

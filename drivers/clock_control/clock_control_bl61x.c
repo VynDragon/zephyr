@@ -11,6 +11,8 @@
 #include <zephyr/drivers/syscon.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/dt-bindings/clock/bflb_bl61x_clock.h>
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(clock_control_bl61x, CONFIG_CLOCK_CONTROL_LOG_LEVEL);
 
 
 #include <bouffalolab/bl61x/bflb_soc.h>
@@ -27,6 +29,12 @@
 
 #define CLOCK_TIMEOUT	1024
 #define RC32M_FREQ	(32 * 1000 * 1000)
+#define EFUSE_RC32M_TRIM_OFFSET 0x7C
+#define EFUSE_RC32M_TRIM_EP_OFFSET 0x78
+#define EFUSE_RC32M_TRIM_EP_EN_POS 1
+#define EFUSE_RC32M_TRIM_EP_PARITY_POS 0
+#define EFUSE_RC32M_TRIM_POS 4
+#define EFUSE_RC32M_TRIM_MSK 0xFF0
 
 enum bl61x_clkid {
 	bl61x_clkid_none = -1,
@@ -703,18 +711,33 @@ static void clock_control_bl61x_ungate_pll(uint8_t pll)
 static int clock_control_bl61x_clock_trim_32M(void)
 {
 	uint32_t tmp;
-	uint32_t trim;
+	uint32_t trim, trim_ep;
 	int err;
 	const struct device *efuse = DEVICE_DT_GET_ONE(bflb_efuse);
 
 
-	err = syscon_read_reg(efuse, 0x7C, &trim);
+	err = syscon_read_reg(efuse, EFUSE_RC32M_TRIM_OFFSET, &trim);
 	if (err < 0) {
-		printk("Error: Couldn't read efuses: err: %d.\n", err);
+		LOG_ERR("Error: Couldn't read efuses: err: %d.\n", err);
 		return err;
 	}
-	/* TODO: check trim parity */
-	trim = (trim & 0xFF0) >> 4;
+	err = syscon_read_reg(efuse, EFUSE_RC32M_TRIM_EP_OFFSET, &trim_ep);
+	if (err < 0) {
+		LOG_ERR("Error: Couldn't read efuses: err: %d.\n", err);
+		return err;
+	}
+	if (!((trim_ep >> EFUSE_RC32M_TRIM_EP_EN_POS) & 1)) {
+		LOG_ERR("RC32M trim disabled!");
+		return -EINVAL;
+	}
+
+	trim = (trim & EFUSE_RC32M_TRIM_MSK) >> EFUSE_RC32M_TRIM_POS;
+
+	if (((trim_ep >> EFUSE_RC32M_TRIM_EP_PARITY_POS) & 1) != (POPCOUNT(trim) & 1)) {
+		LOG_ERR("Bad trim parity");
+		return -EINVAL;
+	}
+
 	tmp = sys_read32(PDS_BASE + PDS_RC32M_CTRL0_OFFSET);
 	tmp = (tmp & PDS_RC32M_EXT_CODE_EN_UMSK) | 1 << PDS_RC32M_EXT_CODE_EN_POS;
 	sys_write32(tmp, PDS_BASE + PDS_RC32M_CTRL0_OFFSET);
