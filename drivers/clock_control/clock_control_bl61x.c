@@ -1307,6 +1307,17 @@ BUILD_ASSERT(DT_NODE_HAS_STATUS_OKAY(DT_INST_CLOCKS_CTLR_BY_NAME(0, rc32m)),
 BUILD_ASSERT(!DT_NODE_HAS_STATUS_OKAY(DT_INST_CLOCKS_CTLR_BY_NAME(0, aupll)),
 	     "Audio PLL is unsupported");
 
+BUILD_ASSERT(DT_PROP(DT_INST_CLOCKS_CTLR_BY_NAME(0, rc32m), clock_frequency) == RC32M_FREQ,
+	     "RC32M must be 32M");
+
+#define ASSERT_CRYSTAL_FREQUENCY_VALID(val, str)                                                   \
+	BUILD_ASSERT(val == KHZ(40000) || val == KHZ(38400) || val == KHZ(32000) ||                \
+			     val == KHZ(26000) || val == KHZ(24000),                               \
+		     str)
+
+ASSERT_CRYSTAL_FREQUENCY_VALID(DT_PROP(DT_INST_CLOCKS_CTLR_BY_NAME(0, crystal), clock_frequency),
+			       "Crystal must be 24M, 26M, 32M, 38.4M or 40M");
+
 DEVICE_DT_INST_DEFINE(0, clock_control_bl61x_init, NULL, &clock_control_bl61x_data,
 		      &clock_control_bl61x_config, PRE_KERNEL_1,
 		      CONFIG_CLOCK_CONTROL_INIT_PRIORITY, &clock_control_bl61x_api);

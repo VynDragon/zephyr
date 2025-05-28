@@ -20,13 +20,14 @@
 	clocks {
 		clk_rc32m: clk-rc32m {
 			#clock-cells = <0>;
-			compatible = "bflb,rc32m";
+			compatible = "fixed-clock";
+			clock-frequency = <DT_FREQ_M(32)>;
 			status = "okay";
 		};
 
 		clk_crystal: clk-crystal {
 			#clock-cells = <0>;
-			compatible = "bflb,crystal";
+			compatible = "fixed-clock";
 			clock-frequency = <DT_FREQ_M(32)>;
 			status = "okay";
 		};
