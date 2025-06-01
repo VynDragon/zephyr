@@ -14,3 +14,6 @@ properties:
     type: int
     required: true
     description: Divide root clock by this 8-bits value
+
+  "#clock-cells":
+    const: 0

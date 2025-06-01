@@ -12,3 +12,6 @@ properties:
     type: phandle-array
     required: true
     description: source
+
+  "#clock-cells":
+    const: 0

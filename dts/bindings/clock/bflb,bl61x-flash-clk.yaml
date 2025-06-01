@@ -43,3 +43,6 @@ properties:
     type: boolean
     description: Invert RX Clock Signal. This is a flash controller setting.
       This may be necessary to achieve flash clock higher than XCLK.
+
+  "#clock-cells":
+    const: 0

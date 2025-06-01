@@ -30,3 +30,6 @@ properties:
     type: int
     required: true
     description: Divide source clock by this 8-bits value. Typically 1.
+
+  "#clock-cells":
+    const: 0
