@@ -14,18 +14,6 @@ properties:
     required: true
     description: source
 
-  pll-select:
-    type: int
-    required: true
-    enum:
-      - 0
-      - 1
-      - 2
-      - 3
-    description: |
-      Select PLL divider ID
-      0 = 48M, 1 = 120M, 2 = 160M, 3 = 192M
-
   divider:
     type: int
     required: true

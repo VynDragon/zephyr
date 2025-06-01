@@ -12,6 +12,7 @@
 #include <zephyr/dt-bindings/gpio/gpio.h>
 #include <zephyr/dt-bindings/i2c/i2c.h>
 #include <zephyr/dt-bindings/input/input-event-codes.h>
+#include <dt-bindings/clock/bflb_bl60x_clock.h>
 
 / {
 	#address-cells = <1>;
@@ -33,7 +34,7 @@
 		};
 
 		clk_pll: clk-pll {
-			#clock-cells = <0>;
+			#clock-cells = <1>;
 			compatible = "bflb,bl60x-pll";
 			clocks = <&clk_crystal>;
 			status = "okay";
@@ -42,8 +43,7 @@
 		clk_root: clk-root {
 			#clock-cells = <0>;
 			compatible = "bflb,bl60x-root-clk";
-			clocks = <&clk_pll>;
-			pll-select = <3>;
+			clocks = <&clk_pll BL60X_PLL_48MHz>;
 			divider = <1>;
 			status = "okay";
 		};
@@ -208,10 +208,14 @@
 			reg = <0x40000000 DT_SIZE_K(4)>;
 			#clock-cells = <1>;
 			status = "okay";
-			clocks = <&clk_rc32m>, <&clk_crystal>, <&clk_pll>,
-				<&clk_root>, <&clk_bclk>;
-			clock-names = "rc32m", "crystal", "pll",
-				"root", "bclk";
+			clocks = <&clk_rc32m>, <&clk_crystal>, <&clk_root>, <&clk_bclk>,
+				<&clk_pll BL60X_PLL_INVALID>,
+				<&clk_pll BL60X_PLL_192MHz>, <&clk_pll BL60X_PLL_160MHz>,
+				<&clk_pll BL60X_PLL_120MHz>, <&clk_pll BL60X_PLL_48MHz>;
+			clock-names = "rc32m", "crystal", "root", "bclk",
+				"pll",
+				"pll_192", "pll_160",
+				"pll_120", "pll_48";
 		};
 	};
 };

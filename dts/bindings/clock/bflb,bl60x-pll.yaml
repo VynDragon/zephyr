@@ -14,4 +14,7 @@ properties:
     description: source
 
   "#clock-cells":
-    const: 0
+    const: 1
+
+clock-cells:
+  - select

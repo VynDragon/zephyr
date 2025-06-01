@@ -902,7 +902,7 @@ static struct clock_control_bl60x_data clock_control_bl60x_data = {
 #else
 			.source = bl60x_clkid_clk_rc32m,
 #endif
-			.pll_select = DT_PROP(DT_INST_CLOCKS_CTLR_BY_NAME(0, root), pll_select),
+			.pll_select = DT_CLOCKS_CELL(DT_INST_CLOCKS_CTLR_BY_NAME(0, root), select),
 			.divider = DT_PROP(DT_INST_CLOCKS_CTLR_BY_NAME(0, root), divider),
 		},
 
