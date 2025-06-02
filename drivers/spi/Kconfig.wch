@@ -5,5 +5,7 @@ config SPI_WCH
 	bool "WCH SPI Controller"
 	default y
 	depends on DT_HAS_WCH_SPI_ENABLED
+	select PINCTRL
+	select DMA if SPI_ASYNC
 	help
 	  Enable the SPI peripherals on CH32s

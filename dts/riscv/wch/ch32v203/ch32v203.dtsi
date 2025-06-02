@@ -135,6 +135,8 @@
 			status = "disabled";
 			#address-cells = <1>;
 			#size-cells = <0>;
+			dmas = <&dma1 1>, <&dma1 2>;
+			dma-names = "rx", "tx";
 		};
 
 		spi2: spi@40003800 {
@@ -152,6 +154,16 @@
 			compatible = "wch,rcc";
 			reg = <0x40021000 16>;
 			#clock-cells = <1>;
+		};
+
+		dma1: dma@40020000 {
+			compatible = "wch,wch-dma";
+			reg = <0x40020000 0x90>;
+			clocks = <&rcc CH32V20X_V30X_CLOCK_DMA1>;
+			#dma-cells = <1>;
+			interrupt-parent = <&pfic>;
+			interrupts = <27>, <28>, <29>, <30>, <31>, <32>, <33>;
+			dma-channels = <7>;
 		};
 	};
 };
