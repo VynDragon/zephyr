@@ -16,16 +16,6 @@ properties:
     required: true
     description: source
 
-  pll-select:
-    type: int
-    required: true
-    enum:
-      - 1
-      - 2
-    description: |
-      Select PLL divider ID when relevant
-      For wifi PLL, 1 is 320M and 2 is 240M
-
   divider:
     type: int
     required: true

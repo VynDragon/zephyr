@@ -5,4 +5,12 @@
  */
 
 #include <bouffalolab/bl61x.dtsi>
-#include <dt-bindings/pinctrl/bl616x-pinctrl.h>
+#include <dt-bindings/pinctrl/bl618x-pinctrl.h>
+
+&psram {
+	status = "okay";
+};
+
+&memc {
+	status = "okay";
+};

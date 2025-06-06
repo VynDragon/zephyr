@@ -13,12 +13,8 @@ properties:
     required: true
     description: source
 
-  overclock:
-    type: boolean
-    description: |
-      Overclock PLL to 480MHz for div ID 1 and 360MHz for div ID 2
-      BCLK divider MUST be set so BCLK is 80MHz or slower
-      Breaks most complex peripherals (USB, Wifi)
-
   "#clock-cells":
-    const: 0
+    const: 1
+
+clock-cells:
+  - select

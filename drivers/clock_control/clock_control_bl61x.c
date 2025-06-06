@@ -850,7 +850,7 @@ static void clock_control_bl61x_init_root_as_wifipll(const struct device *dev)
 		clock_control_bl61x_init_wifipll(bl61x_pll_configs, data->wifipll.source, config->crystal_frequency);
 	}
 
-	clock_control_bl61x_select_PLL(4 - data->root.pll_select);
+	clock_control_bl61x_select_PLL(data->root.pll_select);
 
 	/* 2T rom access goes here */
 
@@ -1247,7 +1247,7 @@ static struct clock_control_bl61x_data clock_control_bl61x_data = {
 #else
 		.source = bl61x_clkid_clk_rc32m,
 #endif
-		.pll_select = DT_PROP(DT_INST_CLOCKS_CTLR_BY_NAME(0, root), pll_select),
+		.pll_select = DT_CLOCKS_CELL(DT_INST_CLOCKS_CTLR_BY_NAME(0, root), select) & 0xF,
 		.divider = DT_PROP(DT_INST_CLOCKS_CTLR_BY_NAME(0, root), divider),
 	},
 
@@ -1257,7 +1257,7 @@ static struct clock_control_bl61x_data clock_control_bl61x_data = {
 #else
 		.source = bl61x_clkid_clk_rc32m,
 #endif
-		.overclock = DT_PROP(DT_INST_CLOCKS_CTLR_BY_NAME(0, wifipll), overclock),
+		.overclock = DT_CLOCKS_CELL(DT_INST_CLOCKS_CTLR_BY_NAME(0, root), select) & 0x10,
 	},
 
 	.aupll = {

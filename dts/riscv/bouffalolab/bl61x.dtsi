@@ -13,6 +13,7 @@
 #include <zephyr/dt-bindings/i2c/i2c.h>
 #include <zephyr/dt-bindings/spi/spi.h>
 #include <zephyr/dt-bindings/input/input-event-codes.h>
+#include <dt-bindings/clock/bflb_bl61x_clock.h>
 
 
 / {
@@ -35,14 +36,14 @@
 		};
 
 		clk_wifipll: clk-wifipll {
-			#clock-cells = <0>;
+			#clock-cells = <1>;
 			compatible = "bflb,bl61x-wifipll";
 			clocks = <&clk_crystal>;
 			status = "okay";
 		};
 
 		clk_aupll: clk-aupll {
-			#clock-cells = <0>;
+			#clock-cells = <1>;
 			compatible = "bflb,bl61x-aupll";
 			clocks = <&clk_rc32m>;
 			status = "disabled";
@@ -51,8 +52,7 @@
 		clk_root: clk-root {
 			#clock-cells = <0>;
 			compatible = "bflb,bl61x-root-clk";
-			clocks = <&clk_wifipll>;
-			pll-select = <1>;
+			clocks = <&clk_wifipll BL61X_WIFIPLL_320MHz>;
 			divider = <1>;
 			status = "okay";
 		};
@@ -239,19 +239,35 @@
 			reg = <0x20000000 DT_SIZE_K(4)>;
 			#clock-cells = <1>;
 			status = "okay";
-			clocks = <&clk_rc32m>, <&clk_crystal>, <&clk_wifipll>, <&clk_aupll>,
+			clocks = <&clk_rc32m>, <&clk_crystal>,
+				<&clk_wifipll BL61X_PLL_INVALID>,
+				<&clk_wifipll BL61X_WIFIPLL_320MHz>,
+				<&clk_wifipll BL61X_WIFIPLL_240MHz>,
+				<&clk_wifipll BL61X_WIFIPLL_OC_480MHz>,
+				<&clk_wifipll BL61X_WIFIPLL_OC_360MHz>,
+				<&clk_aupll BL61X_PLL_INVALID>,
+				<&clk_aupll BL61X_AUPLL_DIV1>, <&clk_aupll BL61X_AUPLL_DIV2>,
 				<&clk_root>, <&clk_bclk>, <&clk_flash>;
-			clock-names = "rc32m", "crystal", "wifipll", "aupll",
+			clock-names = "rc32m", "crystal",
+				"wifipll",
+				"wifipll_320",
+				"wifipll_240",
+				"wifipll_480",
+				"wifipll_360",
+				"aupll",
+				"aupll_div1", "aupll_div2",
 				"root", "bclk", "flash";
 		};
 		psram: memory@a8000000 {
 			compatible = "zephyr,memory-region";
 			reg = <0xa8000000 DT_SIZE_M(128)>;
 			zephyr,memory-region = "PSRAM";
+			status = "disabled";
 		};
 		memc: memc {
 			compatible = "bflb,bl61x-psram";
 			clock-divider = <1>;
+			status = "disabled";
 		};
 	};
 };
