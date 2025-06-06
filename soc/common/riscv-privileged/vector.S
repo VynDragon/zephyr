@@ -17,6 +17,37 @@ GTEXT(_isr_wrapper)
 #endif
 
 SECTION_FUNC(vectors, __start)
+	j escape_c906
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+	addi x0, x0, 0
+escape_c906:
 #if defined(CONFIG_RISCV_GP)
 	/* Initialize global pointer */
 	.option push

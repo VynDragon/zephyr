@@ -1,0 +1,57 @@
+/*
+ * Copyright (c) 2025 MASSDRIVER EI (massdriver.space)
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/dts-v1/;
+
+#include <sophgo/cv180x.dtsi>
+#include <zephyr/dt-bindings/gpio/gpio.h>
+
+#include "milkv_duo-pinctrl.dtsi"
+
+/ {
+	model = "Milk-V Duo main processor";
+	compatible = "milkv,duo";
+
+	chosen {
+		zephyr,sram = &sram0;
+		zephyr,console = &uart1;
+		zephyr,shell-uart = &uart1;
+	};
+
+	aliases {
+		led0 = &led;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		led: led {
+			gpios = <&gpioc 24 GPIO_ACTIVE_HIGH>;
+		};
+	};
+
+	soc {
+		sram0: memory@3bc00000 {
+			compatible = "mmio-sram";
+			reg = <0x3bc00000 0x19000>;
+		};
+
+		sram1: memory@3c000000 {
+			compatible = "mmio-sram";
+			reg = <0x3c000000 0x10000>;
+		};
+	};
+};
+
+&gpioc {
+	status = "okay";
+};
+
+&uart1 {
+	status = "okay";
+	pinctrl-0 = <&uart1_default>;
+	pinctrl-names = "default";
+	current-speed = <115200>;
+};

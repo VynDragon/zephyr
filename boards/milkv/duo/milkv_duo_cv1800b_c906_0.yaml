@@ -1,0 +1,15 @@
+identifier: milkv_duo/cv1800b/c906_0
+name: Milk-V Duo main processor
+type: mcu
+arch: riscv
+toolchain:
+  - zephyr
+ram: 768
+supported:
+  - clock
+  - gpio
+  - interrupt-controller
+  - mailbox
+  - pinctrl
+  - pwm
+  - serial
