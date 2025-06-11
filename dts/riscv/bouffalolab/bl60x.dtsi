@@ -43,7 +43,7 @@
 		clk_root: clk-root {
 			#clock-cells = <0>;
 			compatible = "bflb,bl60x-root-clk";
-			clocks = <&clk_pll BL60X_PLL_48MHz>;
+			clocks = <&clk_pll BL60X_PLL_192MHz>;
 			divider = <1>;
 			status = "okay";
 		};
@@ -51,7 +51,7 @@
 		clk_bclk: clk-bclk {
 			#clock-cells = <0>;
 			compatible = "bflb,bclk";
-			divider = <2>;
+			divider = <4>;
 			status = "okay";
 		};
 	};
@@ -209,11 +209,9 @@
 			#clock-cells = <1>;
 			status = "okay";
 			clocks = <&clk_rc32m>, <&clk_crystal>, <&clk_root>, <&clk_bclk>,
-				<&clk_pll BL60X_PLL_INVALID>,
 				<&clk_pll BL60X_PLL_192MHz>, <&clk_pll BL60X_PLL_160MHz>,
 				<&clk_pll BL60X_PLL_120MHz>, <&clk_pll BL60X_PLL_48MHz>;
 			clock-names = "rc32m", "crystal", "root", "bclk",
-				"pll",
 				"pll_192", "pll_160",
 				"pll_120", "pll_48";
 		};

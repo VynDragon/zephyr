@@ -27,7 +27,7 @@ LOG_MODULE_REGISTER(clock_control_bl60x, CONFIG_CLOCK_CONTROL_LOG_LEVEL);
 		     DT_INST_CLOCKS_CTLR_BY_NAME(0, src))
 
 #define CLOCK_TIMEOUT               1024
-#define RC32M_FREQ                  (32 * 1000 * 1000)
+#define RC32M_FREQ                  MHZ(32)
 #define EFUSE_RC32M_TRIM_OFFSET     0x0C
 #define EFUSE_RC32M_TRIM_EN_POS     19
 #define EFUSE_RC32M_TRIM_PARITY_POS 18
@@ -35,7 +35,6 @@ LOG_MODULE_REGISTER(clock_control_bl60x, CONFIG_CLOCK_CONTROL_LOG_LEVEL);
 #define EFUSE_RC32M_TRIM_MSK        0x3FC00
 
 enum bl60x_clkid {
-	bl60x_clkid_none = -1,
 	bl60x_clkid_clk_root = BL60X_CLKID_CLK_ROOT,
 	bl60x_clkid_clk_rc32m = BL60X_CLKID_CLK_RC32M,
 	bl60x_clkid_clk_crystal = BL60X_CLKID_CLK_CRYSTAL,
@@ -892,10 +891,10 @@ static const struct clock_control_bl60x_config clock_control_bl60x_config = {
 
 static struct clock_control_bl60x_data clock_control_bl60x_data = {
 	.crystal_enabled = DT_NODE_HAS_STATUS_OKAY(DT_INST_CLOCKS_CTLR_BY_NAME(0, crystal)),
-	.pll_enabled = DT_NODE_HAS_STATUS_OKAY(DT_INST_CLOCKS_CTLR_BY_NAME(0, pll)),
+	.pll_enabled = DT_NODE_HAS_STATUS_OKAY(DT_INST_CLOCKS_CTLR_BY_NAME(0, pll_192)),
 
 	.root = {
-#if CLK_SRC_IS(root, pll)
+#if CLK_SRC_IS(root, pll_192)
 			.source = bl60x_clkid_clk_pll,
 #elif CLK_SRC_IS(root, crystal)
 			.source = bl60x_clkid_clk_crystal,
@@ -907,7 +906,7 @@ static struct clock_control_bl60x_data clock_control_bl60x_data = {
 		},
 
 	.pll = {
-#if CLK_SRC_IS(pll, crystal)
+#if CLK_SRC_IS(pll_192, crystal)
 			.source = bl60x_clkid_clk_crystal,
 #else
 			.source = bl60x_clkid_clk_rc32m,
@@ -919,14 +918,14 @@ static struct clock_control_bl60x_data clock_control_bl60x_data = {
 		},
 };
 
-BUILD_ASSERT(CLK_SRC_IS(pll, crystal) || CLK_SRC_IS(root, crystal)
+BUILD_ASSERT(CLK_SRC_IS(pll_192, crystal) || CLK_SRC_IS(root, crystal)
 		     ? DT_NODE_HAS_STATUS_OKAY(DT_INST_CLOCKS_CTLR_BY_NAME(0, crystal))
 		     : 1,
 	     "Crystal must be enabled to use it");
 
-BUILD_ASSERT(CLK_SRC_IS(root, pll) ? DT_NODE_HAS_STATUS_OKAY(DT_INST_CLOCKS_CTLR_BY_NAME(0, pll))
-				   : 1,
-	     "PLL must be enabled to use it");
+BUILD_ASSERT(CLK_SRC_IS(root, pll_192) ?
+	DT_NODE_HAS_STATUS_OKAY(DT_INST_CLOCKS_CTLR_BY_NAME(0, pll_192)) : 1,
+	"PLL must be enabled to use it");
 
 BUILD_ASSERT(DT_NODE_HAS_STATUS_OKAY(DT_INST_CLOCKS_CTLR_BY_NAME(0, rc32m)), "RC32M is always on");
 
