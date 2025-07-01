@@ -508,7 +508,8 @@ static void clock_control_bl61x_set_wifipll_source(uint32_t source)
 	sys_write32(tmp, GLB_BASE + GLB_WIFI_PLL_CFG1_OFFSET);
 }
 
-static void clock_control_bl61x_init_wifipll_setup(const bl61x_pll_config *const config)
+static void clock_control_bl61x_init_wifipll_setup(const bl61x_pll_config *const config,
+						   bool overclock)
 {
 	uint32_t tmp;
 
@@ -558,14 +559,25 @@ static void clock_control_bl61x_init_wifipll_setup(const bl61x_pll_config *const
 	| (config->pllSdmin << GLB_WIFIPLL_SDMIN_POS);
 	sys_write32(tmp, GLB_BASE + GLB_WIFI_PLL_CFG6_OFFSET);
 
+	/* We need to overclock those as well for USB to work for some reason */
 	tmp = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG10_OFFSET);
-	tmp = (tmp & GLB_USBPLL_SDMIN_UMSK)
-	| (0x28000 << GLB_USBPLL_SDMIN_POS);
+	if (overclock) {
+		tmp = (tmp & GLB_USBPLL_SDMIN_UMSK)
+		| (0x3C000 << GLB_USBPLL_SDMIN_POS);
+	} else {
+		tmp = (tmp & GLB_USBPLL_SDMIN_UMSK)
+		| (0x28000 << GLB_USBPLL_SDMIN_POS);
+	}
 	sys_write32(tmp, GLB_BASE + GLB_WIFI_PLL_CFG10_OFFSET);
 
 	tmp = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG12_OFFSET);
-	tmp = (tmp & GLB_SSCDIV_SDMIN_UMSK)
-	| (0x28000 << GLB_SSCDIV_SDMIN_POS);
+	if (overclock) {
+		tmp = (tmp & GLB_SSCDIV_SDMIN_UMSK)
+		| (0x3C000 << GLB_SSCDIV_SDMIN_POS);
+	} else {
+		tmp = (tmp & GLB_SSCDIV_SDMIN_UMSK)
+		| (0x28000 << GLB_SSCDIV_SDMIN_POS);
+	}
 	sys_write32(tmp, GLB_BASE + GLB_WIFI_PLL_CFG12_OFFSET);
 
 	tmp = sys_read32(GLB_BASE + GLB_WIFI_PLL_CFG0_OFFSET);
@@ -656,10 +668,14 @@ static void clock_control_bl61x_init_wifipll(const bl61x_pll_config *const *conf
 
 	if (source == BL61X_CLKID_CLK_CRYSTAL) {
 		clock_control_bl61x_set_wifipll_source(1);
-		clock_control_bl61x_init_wifipll_setup(config[clock_control_bl61x_crystal_to_id(crystal_frequency)]);
+		if (config == bl61x_pll_configs_O480M) {
+			clock_control_bl61x_init_wifipll_setup(config[clock_control_bl61x_crystal_to_id(crystal_frequency)], true);
+		} else {
+			clock_control_bl61x_init_wifipll_setup(config[clock_control_bl61x_crystal_to_id(crystal_frequency)], false);
+		}
 	} else {
 		clock_control_bl61x_set_wifipll_source(0);
-		clock_control_bl61x_init_wifipll_setup(config[clock_control_bl61x_crystal_to_id(RC32M_FREQ)]);
+		clock_control_bl61x_init_wifipll_setup(config[clock_control_bl61x_crystal_to_id(RC32M_FREQ)], false);
 	}
 
 	/* enable PLL clock */

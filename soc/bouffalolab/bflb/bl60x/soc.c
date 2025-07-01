@@ -13,7 +13,6 @@
 #include <zephyr/init.h>
 #include <zephyr/irq.h>
 #include <zephyr/kernel.h>
-#include <zephyr/drivers/eeprom.h>
 
 #include <soc.h>
 #include <clic.h>
