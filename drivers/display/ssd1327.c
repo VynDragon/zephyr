@@ -47,6 +47,8 @@ struct ssd1327_config {
 	uint8_t function_selection_b;
 	uint8_t precharge_voltage;
 	uint8_t vcomh_voltage;
+	uint8_t greyscale_table[15];
+	bool greyscale_table_present;
 	bool color_inversion;
 	uint8_t *conversion_buf;
 	size_t conversion_buf_size;
@@ -118,6 +120,12 @@ static inline int ssd1327_set_timing_setting(const struct device *dev)
 	err = config->write_cmd(dev, SSD1327_LINEAR_LUT, NULL, 0);
 	if (err < 0) {
 		return err;
+	}
+	if (config->greyscale_table_present) {
+		err = config->write_cmd(dev, SSD1327_SET_LUT, config->greyscale_table, 15);
+		if (err < 0) {
+			return err;
+		}
 	}
 	err = config->write_cmd(dev, SSD1327_SET_PRECHARGE_VOLTAGE, &config->precharge_voltage, 1);
 	if (err < 0) {
@@ -452,6 +460,16 @@ static DEVICE_API(display, ssd1327_driver_api) = {
 #define SSD1327_CONV_BUFFER_SIZE(node_id)                                                          \
 	DIV_ROUND_UP(DT_PROP(node_id, width) * CONFIG_SSD1327_CONV_BUFFER_LINES, 2)
 
+
+#define SSD1327_GREYSCALE_TABLE_YES(node_id)                                                       \
+	.greyscale_table = DT_PROP(node_id, greyscale_table), .greyscale_table_present = true
+
+#define SSD1327_GREYSCALE_TABLE_NO(node_id) .greyscale_table_present = false
+
+#define SSD1327_GREYSCALE_TABLE(node_id)                                                           \
+	COND_CODE_1(DT_NODE_HAS_PROP(node_id, greyscale_table), \
+	(SSD1327_GREYSCALE_TABLE_YES(node_id)), (SSD1327_GREYSCALE_TABLE_NO(node_id)))
+
 #define SSD1327_DEFINE_I2C(node_id)                                                                \
 	static uint8_t conversion_buf##node_id[SSD1327_CONV_BUFFER_SIZE(node_id)];                 \
 	static struct ssd1327_data data##node_id;                                                  \
@@ -470,6 +488,7 @@ static DEVICE_API(display, ssd1327_driver_api) = {
 		.function_selection_b = DT_PROP(node_id, function_selection_b),                    \
 		.precharge_voltage = DT_PROP(node_id, precharge_voltage),                          \
 		.vcomh_voltage = DT_PROP(node_id, vcomh_voltage),                                  \
+		SSD1327_GREYSCALE_TABLE(node_id),                                                  \
 		.write_cmd = ssd1327_write_bus_cmd_i2c,                                            \
 		.write_pixels = ssd1327_write_pixels_i2c,                                          \
 		.conversion_buf = conversion_buf##node_id,                                         \
@@ -499,6 +518,7 @@ static DEVICE_API(display, ssd1327_driver_api) = {
 		.function_selection_b = DT_PROP(node_id, function_selection_b),                    \
 		.precharge_voltage = DT_PROP(node_id, precharge_voltage),                          \
 		.vcomh_voltage = DT_PROP(node_id, vcomh_voltage),                                  \
+		SSD1327_GREYSCALE_TABLE(node_id),                                                  \
 		.write_cmd = ssd1327_write_bus_cmd_mipi,                                           \
 		.write_pixels = ssd1327_write_pixels_mipi,                                         \
 		.conversion_buf = conversion_buf##node_id,                                         \
