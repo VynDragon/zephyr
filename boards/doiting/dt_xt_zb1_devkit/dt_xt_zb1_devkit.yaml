@@ -18,4 +18,5 @@ supported:
   - uart
   - dma
   - flash
+  - spi
 vendor: doiting
