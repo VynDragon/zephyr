@@ -33,4 +33,13 @@
 			input-schmitt-enable;
 		};
 	};
+
+	i2c0_default: i2c0_default {
+		group1 {
+			pinmux = <GPIO11_I2C_SDA>,
+				 <GPIO12_I2C_SCL>;
+			bias-pull-up;
+			input-schmitt-enable;
+		};
+	};
 };
