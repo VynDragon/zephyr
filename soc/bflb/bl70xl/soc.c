@@ -1,0 +1,108 @@
+/*
+ * Copyright The Zephyr Project Contributors
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/**
+ * @file
+ * @brief Bouffalo Lab BL70XL SoC initialization code
+ */
+
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/init.h>
+#include <zephyr/irq.h>
+
+#include <clic.h>
+#include <bflb_soc.h>
+#include <glb_reg.h>
+#include <hbn_reg.h>
+
+void soc_early_init_hook(void)
+{
+	uint32_t *p;
+	uint32_t i = 0;
+	uint32_t tmp;
+
+	/* Clear PDS fastboot flag (HBN_RSV0) immediately.
+	 * HBN registers survive normal resets (always-on domain). If a
+	 * previous PDS cycle left the flag set, the ROM bootloader would
+	 * jump to a stale fastboot address on every subsequent boot,
+	 * preventing new firmware from running. PM code re-sets this flag
+	 * only right before PDS entry.
+	 */
+	sys_write32(0, HBN_BASE + HBN_RSV0_OFFSET);
+
+	/* disable hardware_pullup_pull_down (reg_en_hw_pu_pd = 0) */
+	tmp = sys_read32(HBN_BASE + HBN_IRQ_MODE_OFFSET);
+	tmp = tmp & HBN_REG_EN_HW_PU_PD_UMSK;
+	sys_write32(tmp, HBN_BASE + HBN_IRQ_MODE_OFFSET);
+
+#ifdef CONFIG_BT_BFLB_BL70XL
+	/*
+	 * BLE Exchange Memory allocation.
+	 * GLB_EM_SEL encoding: 0x0=0KB, 0x3=8KB, 0xF=16KB.
+	 * The EM is mapped at 0x28000000 in the BLE MAC address space.
+	 * m8s1p (8 connections) needs 16KB; all others use 8KB.
+	 */
+#if defined(CONFIG_BFLB_BL70XL_BLE_EM_16K)
+#define BLE_EM_SEL_VAL 0xFU
+#else
+#define BLE_EM_SEL_VAL 0x3U
+#endif
+	tmp = sys_read32(GLB_BASE + GLB_SEAM_MISC_OFFSET);
+	tmp = (tmp & GLB_EM_SEL_UMSK) | (BLE_EM_SEL_VAL << GLB_EM_SEL_POS);
+	sys_write32(tmp, GLB_BASE + GLB_SEAM_MISC_OFFSET);
+#else
+	/* 'seam' 0kb, undocumented */
+	tmp = sys_read32(GLB_BASE + GLB_SEAM_MISC_OFFSET);
+	tmp = (tmp & GLB_EM_SEL_UMSK) | (0U << GLB_EM_SEL_POS);
+	sys_write32(tmp, GLB_BASE + GLB_SEAM_MISC_OFFSET);
+#endif
+
+	/* Clear all interrupts */
+	p = (uint32_t *)(CLIC_HART0_ADDR + CLIC_INTIE);
+
+	for (i = 0; i < (IRQn_LAST + 3) / 4; i++) {
+		p[i] = 0;
+	}
+
+	p = (uint32_t *)(CLIC_HART0_ADDR + CLIC_INTIP);
+
+	for (i = 0; i < (IRQn_LAST + 3) / 4; i++) {
+		p[i] = 0;
+	}
+}
+
+void sys_arch_reboot(int type)
+{
+	ARG_UNUSED(type);
+
+	uint32_t tmp;
+
+	/* Switch root clock to RC32M for safe reset */
+	tmp = sys_read32(HBN_BASE + HBN_GLB_OFFSET);
+	tmp &= HBN_ROOT_CLK_SEL_UMSK;
+	sys_write32(tmp, HBN_BASE + HBN_GLB_OFFSET);
+
+	/* Reset HCLK/BCLK dividers to 0 */
+	tmp = sys_read32(GLB_BASE + GLB_CLK_CFG0_OFFSET);
+	tmp &= ~(GLB_REG_BCLK_DIV_MSK | GLB_REG_HCLK_DIV_MSK);
+	sys_write32(tmp, GLB_BASE + GLB_CLK_CFG0_OFFSET);
+
+	/* Clear reset bits first, then set SYS + CPU reset via SWRST_CFG2 */
+	tmp = sys_read32(GLB_BASE + GLB_SWRST_CFG2_OFFSET);
+	tmp &= ~(GLB_REG_CTRL_SYS_RESET_MSK | GLB_REG_CTRL_CPU_RESET_MSK |
+		 GLB_REG_CTRL_PWRON_RST_MSK);
+	sys_write32(tmp, GLB_BASE + GLB_SWRST_CFG2_OFFSET);
+
+	tmp = sys_read32(GLB_BASE + GLB_SWRST_CFG2_OFFSET);
+	tmp |= GLB_REG_CTRL_SYS_RESET_MSK | GLB_REG_CTRL_CPU_RESET_MSK;
+	sys_write32(tmp, GLB_BASE + GLB_SWRST_CFG2_OFFSET);
+
+	/* Wait for reset */
+	while (1) {
+		__asm__ volatile("wfi");
+	}
+}

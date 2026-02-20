@@ -1,0 +1,28 @@
+/*
+ * Copyright The Zephyr Project Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Device Tree for Bouffalo Labs BL70XL DVK (Development Kit)
+ */
+
+#include <zephyr/dt-bindings/pinctrl/bl70xl-pinctrl.h>
+
+&pinctrl {
+	uart0_default: uart0_default {
+		group1 {
+			pinmux = <BFLB_PINMUX(14, uart0, tx, periph)>,
+				 <BFLB_PINMUX(15, uart0, rx, periph)>;
+			bias-pull-up;
+			input-schmitt-enable;
+		};
+	};
+
+	uart0_sleep: uart0_sleep {
+		group1 {
+			pinmux = <BFLB_PINMUX(14, uart0, tx, periph)>,
+				 <BFLB_PINMUX(15, uart0, rx, periph)>;
+			bias-high-impedance;
+		};
+	};
+
+};

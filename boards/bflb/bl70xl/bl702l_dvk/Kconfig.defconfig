@@ -1,0 +1,9 @@
+# Copyright The Zephyr Project Contributors
+# SPDX-License-Identifier: Apache-2.0
+
+if BOARD_BL702L_DVK
+
+config BOARD
+	default "bl702l_dvk"
+
+endif # BOARD_BL702L_DVK

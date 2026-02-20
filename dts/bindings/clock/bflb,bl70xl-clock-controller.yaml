@@ -1,0 +1,15 @@
+# Copyright The Zephyr Project Contributors
+# SPDX-License-Identifier: Apache-2.0
+
+description: Bouffalolab BL70XL Clock Controller
+
+compatible: "bflb,bl70xl-clock-controller"
+
+include: [base.yaml, clock-controller.yaml]
+
+properties:
+  "#clock-cells":
+    const: 1
+
+clock-cells:
+  - id

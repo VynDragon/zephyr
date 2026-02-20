@@ -80,9 +80,9 @@ static void power_bflb_setup_bor(const struct device *dev)
 	sys_write32(tmp, config->base_hbn + HBN_BOR_CFG_OFFSET);
 }
 
-#elif defined(CONFIG_SOC_SERIES_BL60X) || defined(CONFIG_SOC_SERIES_BL70X)
+#elif defined(CONFIG_SOC_SERIES_BL60X) || defined(CONFIG_SOC_SERIES_BL70X) || defined(CONFIG_SOC_SERIES_BL70XL)
 
-#ifdef CONFIG_SOC_SERIES_BL70X
+#if defined(CONFIG_SOC_SERIES_BL70X) || defined(CONFIG_SOC_SERIES_BL70XL)
 #define BOR_CFG_OFFSET HBN_MISC_OFFSET
 #else
 #define BOR_CFG_OFFSET HBN_BOR_CFG_OFFSET

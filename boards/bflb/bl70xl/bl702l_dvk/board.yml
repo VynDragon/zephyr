@@ -1,0 +1,9 @@
+# Copyright The Zephyr Project Contributors
+# SPDX-License-Identifier: Apache-2.0
+
+board:
+  name: bl702l_dvk
+  full_name: Bouffalo Labs BL70XL Development Kit
+  vendor: bflb
+  socs:
+    - name: bl704l22q2h
