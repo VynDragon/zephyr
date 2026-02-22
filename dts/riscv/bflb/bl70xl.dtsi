@@ -1,8 +1,7 @@
 /*
  * Copyright The Zephyr Project Contributors
- * SPDX-License-Identifier: Apache-2.0
  *
- * Device Tree Include for BL70XL SoC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <freq.h>
@@ -107,7 +106,6 @@
 			reg = <0x200bff8 0x8 0x2004000 0x8>;
 			reg-names = "mtime", "mtimecmp";
 			interrupts-extended = <&ictrl 7>;
-			status = "okay";
 		};
 
 		itcm: itcm@22020000 {
@@ -122,7 +120,6 @@
 			ranges = <0x40000000 0x40000000 0x1000>;
 			#address-cells = <1>;
 			#size-cells = <1>;
-			status = "okay";
 
 			gpio0: gpio@40000000 {
 				compatible = "bflb,bl60x_70x-gpio";
@@ -161,12 +158,6 @@
 			interrupt-parent = <&clic>;
 		};
 
-		cache: cache@40009000 {
-			reg = <0x40009000 DT_SIZE_K(4)>;
-			compatible = "bflb,l1c";
-			dcache-ways-disabled = <0>;
-		};
-
 		efuse: efuse@40007000 {
 			compatible = "bflb,efuse";
 			reg = <0x40007000 0x1000>;
@@ -174,15 +165,11 @@
 			size = <128>;
 		};
 
-		dtcm: dtcm@4201E000 {
-			compatible = "zephyr,memory-region", "mmio-sram";
-			reg = <0x4201E000 DT_SIZE_K(8)>;
-			zephyr,memory-region = "DTCM";
-		};
-
-		sram0: memory@42024000 {
-			compatible = "mmio-sram";
-			reg = <0x42024000 DT_SIZE_K(64)>;
+		cache: cache@40009000 {
+			reg = <0x40009000 DT_SIZE_K(4)>;
+			compatible = "bflb,l1c";
+			dcache-ways-disabled = <0>;
+			status = "okay";
 		};
 
 		uart0: uart@4000a000 {
@@ -231,6 +218,7 @@
 			reg = <0x4000c000 0x1000>;
 			#dma-cells = <2>;
 			dma-channels = <4>;
+			status = "disabled";
 
 			interrupts = <31 0>;
 			interrupt-parent = <&clic>;
@@ -268,6 +256,11 @@
 		retram: memory@40010000 {
 			compatible = "mmio-sram";
 			reg = <0x40010000 DT_SIZE_K(4)>;
+		};
+
+		sram0: memory@42024000 {
+			compatible = "mmio-sram";
+			reg = <0x42024000 DT_SIZE_K(64)>;
 		};
 	};
 

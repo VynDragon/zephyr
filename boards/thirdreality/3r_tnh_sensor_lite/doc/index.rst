@@ -8,11 +8,13 @@ Overview
 
 The ThirdReality Temperature and Humidity Sensor Lite integrates the BL704L SoC from bouffalolab.
 Internally, the device breaks out of the pinout for JTAG, as well as UART and the bootstrap pin,
-making it a worthwhile device for development.
+making it a perfectly suited for development.
 BL704L is a highly integrated 802.15.4 (Zigbee/Thread/Matter) and BLE combo chipset for IoT applications.
 
 Hardware
 ********
+
+Pins 17-20 are broken out on the JTAG header.
 
 For more information about the BouffaloLab BL704L MCU and the device:
 

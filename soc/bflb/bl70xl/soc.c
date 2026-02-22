@@ -57,6 +57,8 @@ void soc_early_init_hook(void)
 	for (i = 0; i < (IRQn_LAST + 3) / 4; i++) {
 		p[i] = 0;
 	}
+
+	sys_cache_data_flush_and_invd_all();
 }
 
 void sys_arch_reboot(int type)

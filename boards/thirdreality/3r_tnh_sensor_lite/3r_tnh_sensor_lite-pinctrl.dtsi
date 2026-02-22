@@ -24,12 +24,12 @@
 		};
 	};
 
-	// i2c0_default: i2c0_default {
-	// 	group1 {
-	// 		pinmux = <GPIO10_I2C_SCL>,
-	// 			 <GPIO11_I2C_SDA>;
-	// 		bias-pull-up;
-	// 		input-schmitt-enable;
-	// 	};
-	// };
+	i2c0_default: i2c0_default {
+		group1 {
+			pinmux = <GPIO22_I2C_SCL>,
+				 <GPIO29_I2C_SDA>;
+			bias-pull-up;
+			input-schmitt-enable;
+		};
+	};
 };
