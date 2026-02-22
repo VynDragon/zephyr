@@ -13,6 +13,7 @@
 #include <zephyr/device.h>
 #include <zephyr/init.h>
 #include <zephyr/irq.h>
+#include <zephyr/cache.h>
 
 #include <clic.h>
 #include <bflb_soc.h>
@@ -39,27 +40,10 @@ void soc_early_init_hook(void)
 	tmp = tmp & HBN_REG_EN_HW_PU_PD_UMSK;
 	sys_write32(tmp, HBN_BASE + HBN_IRQ_MODE_OFFSET);
 
-#ifdef CONFIG_BT_BFLB_BL70XL
-	/*
-	 * BLE Exchange Memory allocation.
-	 * GLB_EM_SEL encoding: 0x0=0KB, 0x3=8KB, 0xF=16KB.
-	 * The EM is mapped at 0x28000000 in the BLE MAC address space.
-	 * m8s1p (8 connections) needs 16KB; all others use 8KB.
-	 */
-#if defined(CONFIG_BFLB_BL70XL_BLE_EM_16K)
-#define BLE_EM_SEL_VAL 0xFU
-#else
-#define BLE_EM_SEL_VAL 0x3U
-#endif
-	tmp = sys_read32(GLB_BASE + GLB_SEAM_MISC_OFFSET);
-	tmp = (tmp & GLB_EM_SEL_UMSK) | (BLE_EM_SEL_VAL << GLB_EM_SEL_POS);
-	sys_write32(tmp, GLB_BASE + GLB_SEAM_MISC_OFFSET);
-#else
 	/* 'seam' 0kb, undocumented */
 	tmp = sys_read32(GLB_BASE + GLB_SEAM_MISC_OFFSET);
 	tmp = (tmp & GLB_EM_SEL_UMSK) | (0U << GLB_EM_SEL_POS);
 	sys_write32(tmp, GLB_BASE + GLB_SEAM_MISC_OFFSET);
-#endif
 
 	/* Clear all interrupts */
 	p = (uint32_t *)(CLIC_HART0_ADDR + CLIC_INTIE);

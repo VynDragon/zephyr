@@ -142,10 +142,12 @@ static void power_bflb_reset_irq_srcs(const struct device *dev)
 	tmp &= HBN_IRQ_BOR_EN_UMSK;
 	sys_write32(tmp, config->base_hbn + HBN_IRQ_MODE_OFFSET);
 
+#if !defined(CONFIG_SOC_SERIES_BL70XL)
 	tmp = sys_read32(config->base_hbn + HBN_PIR_CFG_OFFSET);
 	/* Disable PIR IRQ */
 	tmp &= HBN_PIR_EN_UMSK;
 	sys_write32(tmp, config->base_hbn + HBN_PIR_CFG_OFFSET);
+#endif
 }
 
 static int power_bflb_init(const struct device *dev)

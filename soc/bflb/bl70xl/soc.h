@@ -1,5 +1,4 @@
 /*
- * Copyright (c) 2021-2025 ATL Electronics
  * Copyright The Zephyr Project Contributors
  *
  * SPDX-License-Identifier: Apache-2.0

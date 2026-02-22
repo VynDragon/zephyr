@@ -48,12 +48,28 @@ int main(void)
 		return 0;
 	}
 
-	ret = gpio_pin_configure_dt(&button, GPIO_INPUT);
-	if (ret != 0) {
-		printk("Error %d: failed to configure %s pin %d\n",
-		       ret, button.port->name, button.pin);
-		return 0;
+
+	for (int i = 0; i < 32; i++) {
+		if (i != 14 && i != 15 && (i < 4 || i > 6) && i != 10 && i!= 11 && i != 12 && i != 13 && i != 31 && i < 16) {
+			ret = gpio_pin_configure(button.port, i, GPIO_INPUT | GPIO_PULL_UP );
+			if (ret != 0) {
+				printk("Error %d: failed to configure %s pin %d\n",
+				ret, button.port->name, i);
+			}
+		}
 	}
+
+	uint32_t tmp;
+
+	while (1) {
+		ret = gpio_port_get(button.port, &tmp);
+		if (ret != 0) {
+			printk("Fail get");
+		}
+		printf("%x\n", tmp);
+		k_msleep(100);
+	}
+
 
 	ret = gpio_pin_interrupt_configure_dt(&button,
 					      GPIO_INT_EDGE_TO_ACTIVE);
