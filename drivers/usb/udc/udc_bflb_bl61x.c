@@ -47,8 +47,6 @@ LOG_MODULE_REGISTER(udc_bflb_bl61x, CONFIG_UDC_DRIVER_LOG_LEVEL);
 
 #define DT_DRV_COMPAT bflb_bl61x_udc
 
-#define UBFBL61X_EVT_CHECK_EP_TIME(size) K_MSEC((1-size/1200) * size)
-
 struct udc_bflb_bl61x_config {
 	uint32_t base;
 	size_t num_of_eps;
@@ -63,10 +61,6 @@ struct udc_bflb_bl61x_data {
 	bool ep_is_in[5];
 	bool setup_received;
 	k_timepoint_t reset_expiration;
-	/* Workaround for the first few packets not triggering the interrupt
-	 * when very quickly interacting with the USB
-	 */
-	uint32_t wa_reset_packet_count;
 };
 
 enum udc_bflb_bl61x_ev_type {
@@ -76,8 +70,6 @@ enum udc_bflb_bl61x_ev_type {
 	UBFBL61X_EVT_CTRL_END,
 	/* packet dma complete for specific endpoint */
 	UBFBL61X_EVT_END,
-	/* Workaround for interrupts not triggering and other EP timeouts */
-	UBFBL61X_EVT_CHECK_EP,
 };
 
 struct udc_bflb_bl61x_ev {
@@ -142,6 +134,11 @@ static void udc_bflb_bl61x_ctrl_ack(const struct device *const dev)
 	tmp = sys_read32(cfg->base + USB_DEV_CXCFE_OFFSET);
 	tmp |= USB_CX_DONE;
 	sys_write32(tmp, cfg->base + USB_DEV_CXCFE_OFFSET);
+	tmp = sys_read32(cfg->base +
+				USB_DEV_MISG0_OFFSET);
+	tmp &= ~USB_MCX_SETUP_INT;
+	sys_write32(tmp,
+			cfg->base + USB_DEV_MISG0_OFFSET);
 }
 
 static void udc_bflb_bl61x_ep_ack(const struct device *const dev, const uint8_t ep_idx)
@@ -325,13 +322,15 @@ static void udc_bflb_bl61x_vdma_startread(const struct device *const dev,
 	sys_write32((uint32_t)buf, cfg->base + USB_VDMA_F0PS2_OFFSET
 		+ (fifo_idx - 1) * USB_BL61X_FX_X_OFFSET);
 
+	sys_cache_data_flush_and_invd_range(buf, len);
+
+	//sys_write32(1U << fifo_idx, cfg->base + USB_DEV_ISG3_OFFSET);
+
 	tmp = sys_read32(cfg->base + USB_VDMA_F0PS1_OFFSET
 		+ (fifo_idx - 1) * USB_BL61X_FX_X_OFFSET);
 	tmp |= USB_VDMA_START_CXF;
 	sys_write32(tmp, cfg->base + USB_VDMA_F0PS1_OFFSET
 		+ (fifo_idx - 1) * USB_BL61X_FX_X_OFFSET);
-
-	sys_cache_data_flush_and_invd_range(buf, len);
 }
 
 static void udc_bflb_bl61x_vdma_startwrite(const struct device *const dev,
@@ -354,6 +353,8 @@ static void udc_bflb_bl61x_vdma_startwrite(const struct device *const dev,
 
 	sys_write32((uint32_t)data, cfg->base + USB_VDMA_F0PS2_OFFSET
 		+ (fifo_idx - 1) * USB_BL61X_FX_X_OFFSET);
+
+	//sys_write32(1U << fifo_idx, cfg->base + USB_DEV_ISG3_OFFSET);
 
 	tmp = sys_read32(cfg->base + USB_VDMA_F0PS1_OFFSET
 		+ (fifo_idx - 1) * USB_BL61X_FX_X_OFFSET);
@@ -379,13 +380,15 @@ static void udc_bflb_bl61x_vdma_startread_ctrl(const struct device *const dev,
 
 	sys_write32((uint32_t)buf, cfg->base + USB_VDMA_CXFPS2_OFFSET);
 
+	sys_cache_data_flush_and_invd_range(buf, len);
+
+	//sys_write32(USB_VDMA_CMPLT_CXF, cfg->base + USB_DEV_ISG3_OFFSET);
+
 	priv->ep_is_in[0] = false;
 
 	tmp = sys_read32(cfg->base + USB_VDMA_CXFPS1_OFFSET);
 	tmp |= USB_VDMA_START_CXF;
 	sys_write32(tmp, cfg->base + USB_VDMA_CXFPS1_OFFSET);
-
-	sys_cache_data_flush_and_invd_range(buf, len);
 }
 
 static void udc_bflb_bl61x_vdma_startwrite_ctrl(const struct device *const dev,
@@ -405,6 +408,8 @@ static void udc_bflb_bl61x_vdma_startwrite_ctrl(const struct device *const dev,
 	sys_write32(tmp, cfg->base + USB_VDMA_CXFPS1_OFFSET);
 
 	sys_write32((uint32_t)data, cfg->base + USB_VDMA_CXFPS2_OFFSET);
+
+	//sys_write32(USB_VDMA_CMPLT_CXF, cfg->base + USB_DEV_ISG3_OFFSET);
 
 	priv->ep_is_in[0] = true;
 
@@ -487,6 +492,7 @@ static void udc_bflb_bl61x_ctrl_dout_start(const struct device *const dev, const
 	buf = udc_ctrl_alloc(dev, USB_CONTROL_EP_OUT, size);
 	if (buf == NULL) {
 		udc_submit_event(dev, UDC_EVT_ERROR, -ENOMEM);
+		return;
 	}
 
 	udc_buf_put(ep_cfg, buf);
@@ -509,6 +515,7 @@ static void udc_bflb_bl61x_ctrl_din_start(const struct device *const dev)
 	buf = udc_buf_peek(udc_get_ep_cfg(dev, USB_CONTROL_EP_IN));
 	if (buf == NULL) {
 		udc_submit_event(dev, UDC_EVT_ERROR, -ENODATA);
+		return;
 	}
 
 	LOG_DBG("start DMA for buf %p, data %p, len %i", (void *)buf, (void *)buf->data, buf->len);
@@ -518,18 +525,32 @@ static void udc_bflb_bl61x_ctrl_din_start(const struct device *const dev)
 static int udc_bflb_bl61x_ctrl_evt_end(const struct device *const dev)
 {
 	struct udc_bflb_bl61x_data *const priv = udc_get_private(dev);
+	const struct udc_bflb_bl61x_config *const cfg = dev->config;
 	struct net_buf *buf;
 	int err;
+	uint32_t tmp;
 
 	if (priv->setup_received) {
 		/* setup stage */
 		buf = udc_buf_get(udc_get_ep_cfg(dev, USB_CONTROL_EP_OUT));
+
+		if (buf == NULL) {
+			/* Setup buf was drained by a bus reset — stale event */
+			LOG_WRN("Setup buf drained by reset");
+			priv->setup_received = false;
+			tmp = sys_read32(cfg->base + USB_DEV_MISG0_OFFSET);
+			tmp &= ~USB_MCX_SETUP_INT;
+			sys_write32(tmp, cfg->base + USB_DEV_MISG0_OFFSET);
+			return 0;
+		}
+
 		udc_ctrl_update_stage(dev, buf);
 		priv->setup_received = false;
 
 		if (udc_ctrl_stage_is_data_in(dev)) {
-			return udc_ctrl_submit_s_in_status(dev);
+			err = udc_ctrl_submit_s_in_status(dev);
 		} else if (udc_ctrl_stage_is_data_out(dev)) {
+			err = 0;
 			udc_bflb_bl61x_ctrl_dout_start(dev, udc_data_stage_length(buf));
 		} else if (udc_ctrl_stage_is_no_data(dev)) {
 			struct usb_setup_packet *spkg = (struct usb_setup_packet *)buf->data;
@@ -537,23 +558,52 @@ static int udc_bflb_bl61x_ctrl_evt_end(const struct device *const dev)
 			if (spkg->bRequest == USB_SREQ_SET_ADDRESS) {
 				udc_bflb_bl61x_set_address(dev, spkg->wValue);
 			}
-			return udc_ctrl_submit_s_status(dev);
+			err =  udc_ctrl_submit_s_status(dev);
+		} else {
+			err = -EINVAL;
 		}
+
+		/* Re-enable setup interrupt after submit completes */
+		tmp = sys_read32(cfg->base + USB_DEV_MISG0_OFFSET);
+		tmp &= ~USB_MCX_SETUP_INT;
+		sys_write32(tmp, cfg->base + USB_DEV_MISG0_OFFSET);
+
+		return err;
 	} else if (udc_ctrl_stage_is_data_out(dev)) {
 		buf = udc_buf_get(udc_get_ep_cfg(dev, USB_CONTROL_EP_OUT));
 		udc_ctrl_update_stage(dev, buf);
 		return udc_ctrl_submit_s_out_status(dev, buf);
 	} else if (udc_ctrl_stage_is_data_in(dev)) {
 		buf = udc_buf_get(udc_get_ep_cfg(dev, USB_CONTROL_EP_IN));
+
+		if (buf == NULL) {
+			LOG_ERR("No buf for DATA_IN completion");
+			return -ENODATA;
+		}
+
 		net_buf_unref(buf);
 		buf = udc_buf_get(udc_get_ep_cfg(dev, USB_CONTROL_EP_OUT));
 		udc_ctrl_update_stage(dev, buf);
 		if (udc_ctrl_stage_is_status_out(dev)) {
 			buf = udc_ctrl_alloc(dev, USB_CONTROL_EP_OUT, 0U);
+			if (buf == NULL) {
+				return -ENOMEM;
+			}
 			err = udc_ctrl_submit_status(dev, buf);
 			udc_ctrl_update_stage(dev, buf);
-			net_buf_unref(buf);
 			return err;
+		}
+		net_buf_unref(buf);
+	} else if (udc_ctrl_stage_is_no_data(dev) ||
+		   udc_ctrl_stage_is_status_in(dev)) {
+		/*
+		 * CX_COMEND after status IN ZLP was sent.
+		 * Notify USB stack and transition to SETUP.
+		 */
+		buf = udc_buf_get(udc_get_ep_cfg(dev, USB_CONTROL_EP_IN));
+		if (buf != NULL) {
+			udc_ctrl_submit_status(dev, buf);
+			udc_ctrl_update_stage(dev, buf);
 		}
 	} else {
 		LOG_ERR("Completed VDMA transfer of Unknown Stage");
@@ -581,13 +631,14 @@ static void udc_bflb_bl61x_ep_dout_start(const struct device *const dev,
 	struct net_buf *buf;
 	uint8_t ep_idx = USB_EP_GET_IDX(ep_cfg->addr);
 
-	LOG_DBG("dout start ep 0x%02x", ep_cfg->addr);
-
 	if (priv->ep_is_in[ep_idx]) {
 		LOG_ERR("Unexpected ep 0x%02x dout token", ep_cfg->addr);
 	}
 
 	buf = udc_buf_peek(ep_cfg);
+
+	LOG_DBG("dout start ep 0x%02x with buf size %u len %u", ep_cfg->addr, buf->size, buf->len);
+
 	if (buf == NULL) {
 		LOG_ERR("No buffer for OUT ep 0x%02x", ep_cfg->addr);
 		udc_submit_event(dev, UDC_EVT_ERROR, -ENOBUFS);
@@ -595,11 +646,6 @@ static void udc_bflb_bl61x_ep_dout_start(const struct device *const dev,
 		priv->ep_is_in[ep_idx] = false;
 		udc_bflb_bl61x_vdma_startread(dev,
 			udc_bflb_bl61x_ep_get_fifo(ep_cfg), buf->data, buf->size);
-		if (priv->wa_reset_packet_count > 0) {
-			udc_bflb_bl61x_ev_submit(dev, ep_cfg->addr, UBFBL61X_EVT_CHECK_EP,
-					 UBFBL61X_EVT_CHECK_EP_TIME(buf->size));
-			priv->wa_reset_packet_count--;
-		}
 	}
 }
 
@@ -610,13 +656,14 @@ static void udc_bflb_bl61x_ep_din_start(const struct device *const dev,
 	struct net_buf *buf;
 	const uint8_t ep_idx = USB_EP_GET_IDX(ep_cfg->addr);
 
-	LOG_DBG("din start ep 0x%02x", ep_cfg->addr);
-
 	if (!priv->ep_is_in[ep_idx]) {
 		LOG_ERR("Unexpected ep 0x%02x din token", ep_cfg->addr);
 	}
 
 	buf = udc_buf_peek(ep_cfg);
+
+	LOG_DBG("din start ep 0x%02x with buf size %u len %u", ep_cfg->addr, buf->size, buf->len);
+
 	if (buf == NULL) {
 		LOG_ERR("No buffer for IN ep 0x%02x", ep_cfg->addr);
 		udc_submit_event(dev, UDC_EVT_ERROR, -ENOBUFS);
@@ -624,19 +671,16 @@ static void udc_bflb_bl61x_ep_din_start(const struct device *const dev,
 		priv->ep_is_in[ep_idx] = true;
 		udc_bflb_bl61x_vdma_startwrite(dev,
 			udc_bflb_bl61x_ep_get_fifo(ep_cfg), buf->data, buf->len);
-		if (priv->wa_reset_packet_count > 0) {
-			udc_bflb_bl61x_ev_submit(dev, ep_cfg->addr, UBFBL61X_EVT_CHECK_EP,
-					 UBFBL61X_EVT_CHECK_EP_TIME(buf->len));
-			priv->wa_reset_packet_count--;
-		}
 	}
 }
 
 static int udc_bflb_bl61x_ep_evt_end(const struct device *const dev,
 				     struct udc_ep_config *const ep_cfg)
 {
+	const uint8_t ep_idx = USB_EP_GET_IDX(ep_cfg->addr);
 	struct net_buf *buf;
 	uint32_t remain = 0;
+	size_t len;
 
 	buf = udc_buf_get(ep_cfg);
 	LOG_DBG("Event end for 0x%02x got buf %lx, len %u, size %u",
@@ -646,11 +690,18 @@ static int udc_bflb_bl61x_ep_evt_end(const struct device *const dev,
 	}
 	if (USB_EP_DIR_IS_OUT(ep_cfg->addr)) {
 		remain = udc_bflb_bl61x_ep_remain(dev, udc_bflb_bl61x_ep_get_fifo(ep_cfg));
+		len = buf->size - remain;
+		if (remain > buf->size) {
+			len = 0;
+		}
 		LOG_DBG("%u bytes transferred out of %u, %u bytes remaining",
-			ep_cfg->mps - remain, ep_cfg->mps, remain);
-		net_buf_add(buf, ep_cfg->mps - remain);
+			 len, buf->size, remain);
+		net_buf_add(buf, len);
 	} else {
 		net_buf_pull(buf, buf->len);
+		if (udc_get_buf_info(buf)->zlp) {
+			udc_bflb_bl61x_ep_ack(dev, ep_idx);
+		}
 	}
 
 	return udc_submit_ep_event(dev, buf, 0);
@@ -662,6 +713,11 @@ static void udc_bflb_bl61x_work_handler_xfer(const struct device *const dev,
 	struct udc_bflb_bl61x_data *const priv = udc_get_private(dev);
 	const struct net_buf *buf = udc_buf_peek(ep_cfg);
 	const uint8_t ep_idx = USB_EP_GET_IDX(ep_cfg->addr);
+
+	if (buf == NULL) {
+		LOG_ERR("No buffer queued for ep 0x%02x xfer", ep_cfg->addr);
+		return;
+	}
 
 	if (USB_EP_DIR_IS_OUT(ep_cfg->addr)) {
 		priv->ep_is_in[ep_idx] = false;
@@ -681,26 +737,7 @@ static void udc_bflb_bl61x_work_handler_xfer(const struct device *const dev,
 	}
 }
 
-static void udc_bflb_bl61x_work_handler_check(const struct device *const dev,
-					      struct udc_ep_config *const ep_cfg)
-{
-	const struct udc_bflb_bl61x_config *const cfg = dev->config;
-	int err;
-	uint32_t done = sys_read32(cfg->base + USB_DEV_ISG3_OFFSET)
-			& (1U << udc_bflb_bl61x_ep_get_fifo(ep_cfg));
 
-	if (udc_ep_is_busy(ep_cfg)) {
-		err = udc_bflb_bl61x_ep_evt_end(dev, ep_cfg);
-		udc_ep_set_busy(ep_cfg, false);
-		if (unlikely(err)) {
-			udc_submit_event(dev, UDC_EVT_ERROR, err);
-		}
-		sys_write32(done, cfg->base + USB_DEV_ISG3_OFFSET);
-	} else {
-		/* Not busy, interrupt worked, we have nothing to do */
-		return;
-	}
-}
 static void udc_bflb_bl61x_work_handler(struct k_work *item)
 {
 	struct k_work_delayable *item_delayable = k_work_delayable_from_work(item);
@@ -728,9 +765,6 @@ static void udc_bflb_bl61x_work_handler(struct k_work *item)
 			break;
 		case UBFBL61X_EVT_XFER:
 			udc_bflb_bl61x_work_handler_xfer(ev->dev, ep_cfg);
-			break;
-		case UBFBL61X_EVT_CHECK_EP:
-			udc_bflb_bl61x_work_handler_check(ev->dev, ep_cfg);
 			break;
 		default:
 			break;
@@ -779,7 +813,7 @@ static int udc_bflb_bl61x_ep_enqueue(const struct device *const dev,
 {
 	const uint8_t ep_idx = USB_EP_GET_IDX(config->addr);
 
-	LOG_DBG("%p enqueue %p for ep 0x%02x", dev, buf, config->addr);
+	LOG_DBG("%p enqueue %p len %u for ep 0x%02x", dev, buf, buf->len, config->addr);
 
 	if (config->stat.halted) {
 		LOG_DBG("ep 0x%02x halted", config->addr);
@@ -787,17 +821,19 @@ static int udc_bflb_bl61x_ep_enqueue(const struct device *const dev,
 	}
 
 	if (udc_ep_is_busy(config)) {
+		LOG_DBG("ep 0x%02x busy", config->addr);
 		return -EBUSY;
 	}
 
 	if (ep_idx == 0) {
-		if (USB_EP_DIR_IS_OUT(config->addr)) {
+		if (buf->len == 0) {
+			udc_bflb_bl61x_ctrl_ack(dev);
+			udc_ctrl_update_stage(dev, buf);
+			udc_ctrl_submit_status(dev, buf);
+			udc_bflb_bl61x_ctrl_ack(dev);
+		} else if (USB_EP_DIR_IS_OUT(config->addr)) {
 			udc_buf_put(config, buf);
 			udc_bflb_bl61x_ctrl_dout_start(dev, udc_data_stage_length(buf));
-		} else if (buf->len == 0) {
-			udc_bflb_bl61x_ctrl_ack(dev);
-			udc_ctrl_submit_status(dev, buf);
-			udc_ctrl_update_stage(dev, buf);
 		} else {
 			udc_buf_put(config, buf);
 			udc_bflb_bl61x_ctrl_din_start(dev);
@@ -816,14 +852,26 @@ static int udc_bflb_bl61x_ep_enqueue(const struct device *const dev,
 }
 
 static int udc_bflb_bl61x_ep_dequeue(const struct device *const dev,
-				   struct udc_ep_config *const cfg)
+				   struct udc_ep_config *const ep_cfg)
 {
+	const struct udc_bflb_bl61x_config *const cfg = dev->config;
 	unsigned int lock_key;
 	struct net_buf *buf;
+	uint32_t tmp;
+	uint32_t fifo_idx = udc_bflb_bl61x_ep_get_fifo(ep_cfg);
 
 	lock_key = irq_lock();
 
-	buf = udc_buf_get_all(cfg);
+	tmp = sys_read32(cfg->base + USB_VDMA_F0PS1_OFFSET
+		+ (fifo_idx - 1) * USB_BL61X_FX_X_OFFSET);
+	tmp &= ~USB_VDMA_LEN_CXF_MASK;
+	tmp &= ~USB_VDMA_IO_CXF;
+	tmp &= ~USB_VDMA_TYPE_CXF;
+	tmp &= ~USB_VDMA_START_CXF;
+	sys_write32(tmp, cfg->base + USB_VDMA_F0PS1_OFFSET
+		+ (fifo_idx - 1) * USB_BL61X_FX_X_OFFSET);
+
+	buf = udc_buf_get_all(ep_cfg);
 	if (buf != NULL) {
 		udc_submit_ep_event(dev, buf, -ECONNABORTED);
 	}
@@ -858,8 +906,8 @@ static int udc_bflb_bl61x_ep_enable(const struct device *const dev,
 			udc_bflb_bl61x_ep_setfifo(dev, ep_idx, 1, USB_BL61X_EP_DIR_OUT);
 			udc_bflb_bl61x_fifo_setep(dev, ep_idx, 1, USB_BL61X_FIFO_DIR_BID);
 			udc_bflb_bl61x_fifo_setep(dev, ep_idx, 2, USB_BL61X_FIFO_DIR_BID);
-			udc_bflb_bl61x_fifo_configure(dev, 0, config, 1, true);
-			udc_bflb_bl61x_fifo_configure(dev, 1, config, 1, false);
+			udc_bflb_bl61x_fifo_configure(dev, 1, config, 1, true);
+			udc_bflb_bl61x_fifo_configure(dev, 2, config, 1, false);
 		} else if (ep_idx == 2) {
 			udc_bflb_bl61x_ep_setfifo(dev, ep_idx, 3, USB_BL61X_EP_DIR_IN);
 			udc_bflb_bl61x_ep_setfifo(dev, ep_idx, 3, USB_BL61X_EP_DIR_OUT);
@@ -886,9 +934,31 @@ static int udc_bflb_bl61x_ep_enable(const struct device *const dev,
 static int udc_bflb_bl61x_ep_disable(const struct device *const dev,
 				   struct udc_ep_config *const config)
 {
+	const struct udc_bflb_bl61x_config *const cfg = dev->config;
+	const uint8_t ep_idx = USB_EP_GET_IDX(config->addr);
 	LOG_DBG("Disable ep 0x%02x", config->addr);
 
-	return -ENOTSUP;
+
+	if (ep_idx == 0) {
+		return 0;
+	}
+
+	/* Reset the FIFO(s) associated with this endpoint */
+	if (config->mps > USB_BL61X_HSFIFOCAP) {
+		if (ep_idx == 1) {
+			udc_bflb_bl61x_fifo_reset(dev, 1);
+			udc_bflb_bl61x_fifo_reset(dev, 2);
+		} else if (ep_idx == 2) {
+			udc_bflb_bl61x_fifo_reset(dev, 3);
+			udc_bflb_bl61x_fifo_reset(dev, 4);
+		}
+	} else {
+		udc_bflb_bl61x_fifo_reset(dev, ep_idx);
+	}
+
+	udc_ep_set_busy(config, false);
+
+	return 0;
 }
 
 
@@ -1360,16 +1430,26 @@ static void udc_bflb_bl61x_isr(const struct device *const dev)
 				LOG_ERR("Control command abort");
 			}
 
-			/* we use the flag to check in and not get double setup,
-			 * better to miss a setup than
-			 * have the memory leak this creates
-			 */
-			if (group_intstatus & USB_CX_SETUP_INT && !priv->setup_received) {
+			if (group_intstatus & USB_CX_SETUP_INT) {
+				/* Mask setup interrupt until processing
+				 * completes. Without this, the host's setup
+				 * retries flood the ISR and starve the work
+				 * queue that processes them.
+				 */
+				tmp = sys_read32(cfg->base +
+						 USB_DEV_MISG0_OFFSET);
+				tmp |= USB_MCX_SETUP_INT;
+				sys_write32(tmp,
+					    cfg->base + USB_DEV_MISG0_OFFSET);
+
+				/* Setup packet implies bus is active */
+				if (udc_is_suspended(dev)) {
+					udc_set_suspended(dev, false);
+				}
+
 				priv->ep_is_in[0] = false;
 				priv->setup_received = true;
 				udc_bflb_bl61x_ctrl_setup_start(dev);
-			} else if (group_intstatus & USB_CX_SETUP_INT) {
-				LOG_ERR("Double Setup");
 			}
 
 			if (group_intstatus & USB_CX_COMFAIL_INT) {
@@ -1394,32 +1474,70 @@ static void udc_bflb_bl61x_isr(const struct device *const dev)
 			if (group_intstatus & USB_SUSP_INT) {
 				sys_write32(USB_SUSP_INT, cfg->base + USB_DEV_ISG2_OFFSET);
 
-				udc_bflb_bl61x_fifo_reset_ctrl(dev);
-				udc_bflb_bl61x_fifo_reset(dev, 1);
-				udc_bflb_bl61x_fifo_reset(dev, 2);
-				udc_bflb_bl61x_fifo_reset(dev, 3);
-				udc_bflb_bl61x_fifo_reset(dev, 4);
-
 				udc_set_suspended(dev, true);
 				udc_submit_event(dev, UDC_EVT_SUSPEND, 0);
 			}
 
-			/* resumed */
-			if (group_intstatus & USB_RESM_INT) {
-				sys_write32(USB_RESM_INT, cfg->base + USB_DEV_ISG2_OFFSET);
+			/* resumed — only act on genuine resume after suspend */
+			if ((group_intstatus & USB_RESM_INT) &&
+			    udc_is_suspended(dev)) {
+				sys_write32(USB_RESM_INT,
+					    cfg->base + USB_DEV_ISG2_OFFSET);
+				LOG_DBG("USB resumed");
 
 				udc_set_suspended(dev, false);
 				udc_submit_event(dev, UDC_EVT_RESUME, 0);
+			} else if (group_intstatus & USB_RESM_INT) {
+				/* Clear the spurious RESM status bit */
+				sys_write32(USB_RESM_INT,
+					    cfg->base + USB_DEV_ISG2_OFFSET);
 			}
 
 			if (group_intstatus & USBRST_INT) {
 				sys_write32(USBRST_INT, cfg->base + USB_DEV_ISG2_OFFSET);
 
+				/* Clear AFT_CONF - device returns to default
+				 * state */
+				tmp = sys_read32(cfg->base + USB_DEV_ADR_OFFSET);
+				tmp &= ~USB_AFT_CONF;
+				sys_write32(tmp, cfg->base + USB_DEV_ADR_OFFSET);
+
 				udc_bflb_bl61x_fifo_reset_ctrl(dev);
 				udc_bflb_bl61x_fifo_reset(dev, 1);
 				udc_bflb_bl61x_fifo_reset(dev, 2);
 				udc_bflb_bl61x_fifo_reset(dev, 3);
 				udc_bflb_bl61x_fifo_reset(dev, 4);
+
+				/* Clear any spurious VDMA completions from FIFO
+				 * reset */
+				sys_write32(0x1FU,
+					    cfg->base + USB_DEV_ISG3_OFFSET);
+
+				/* Clear stale setup state and drain any buffers
+				 * left from an interrupted control transfer.
+				 */
+				priv->setup_received = false;
+				{
+					struct net_buf *stale;
+
+					while ((stale = udc_buf_get(udc_get_ep_cfg(
+							dev,
+							USB_CONTROL_EP_OUT))) !=
+					       NULL) {
+						net_buf_unref(stale);
+					}
+					while ((stale = udc_buf_get(udc_get_ep_cfg(
+							dev,
+							USB_CONTROL_EP_IN))) !=
+					       NULL) {
+						net_buf_unref(stale);
+					}
+				}
+
+				/* Bus reset implies bus is active */
+				if (udc_is_suspended(dev)) {
+					udc_set_suspended(dev, false);
+				}
 
 				tmp = sys_read32(cfg->base + USB_DEV_SMT_OFFSET);
 				tmp &= ~USB_SOFMT_MASK;
@@ -1429,6 +1547,14 @@ static void udc_bflb_bl61x_isr(const struct device *const dev)
 					tmp |= USB_BL61X_TIMER_AFTER_RESET_FS;
 				}
 				sys_write32(tmp, cfg->base + USB_DEV_SMT_OFFSET);
+
+				/* Re-enable setup interrupt (may have been
+				 * masked) */
+				tmp = sys_read32(cfg->base +
+						 USB_DEV_MISG0_OFFSET);
+				tmp &= ~USB_MCX_SETUP_INT;
+				sys_write32(tmp,
+					    cfg->base + USB_DEV_MISG0_OFFSET);
 
 				priv->reset_expiration =
 					sys_timepoint_calc(USB_BL61X_TIMER_AFTER_RESET_T);
@@ -1541,7 +1667,6 @@ static const struct udc_api udc_bflb_bl61x_api = {
 										\
 	static struct udc_bflb_bl61x_data udc_priv_##n = {			\
 		.setup_received = false,					\
-		.wa_reset_packet_count = 12					\
 	};									\
 										\
 	static struct udc_data udc_data_##n = {					\

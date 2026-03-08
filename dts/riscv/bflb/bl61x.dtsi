@@ -434,7 +434,7 @@
 			maximum-speed = "high-speed";
 			status = "disabled";
 
-			interrupts = <37 2>;
+			interrupts = <37 8>;
 			interrupt-parent = <&clic>;
 		};
 
