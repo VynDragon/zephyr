@@ -6,6 +6,7 @@ zephyr_library()
 
 # zephyr-keep-sorted-start
 zephyr_library_sources_ifdef(CONFIG_CDNS_SDHC sdhc_cdns_ll.c sdhc_cdns.c)
+zephyr_library_sources_ifdef(CONFIG_SDHC_BFLB sdhc_bflb.c)
 zephyr_library_sources_ifdef(CONFIG_IMX_USDHC imx_usdhc.c)
 zephyr_library_sources_ifdef(CONFIG_INTEL_EMMC_HOST intel_emmc_host.c)
 zephyr_library_sources_ifdef(CONFIG_MCUX_SDIF mcux_sdif.c)

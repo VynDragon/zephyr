@@ -427,6 +427,15 @@
 			size = <512>;
 		};
 
+		sdhc0: sdhc@20060000 {
+			compatible = "bflb,sdhc";
+			reg = <0x20060000 0x200>;
+			status = "disabled";
+
+			interrupts = <33 1>;
+			interrupt-parent = <&clic>;
+		};
+
 		usbd: usbd@20072000 {
 			compatible = "bflb,bl61x-udc";
 			reg = <0x20072000 0x1000>;
@@ -435,8 +444,9 @@
 			status = "disabled";
 
 			interrupts = <37 8>;
-			interrupt-parent = <&clic>;
 		};
+
+
 
 		sram0: memory@62fc0000 {
 			compatible = "mmio-sram";
