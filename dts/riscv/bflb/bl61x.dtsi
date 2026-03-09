@@ -444,9 +444,8 @@
 			status = "disabled";
 
 			interrupts = <37 8>;
+			interrupt-parent = <&clic>;
 		};
-
-
 
 		sram0: memory@62fc0000 {
 			compatible = "mmio-sram";

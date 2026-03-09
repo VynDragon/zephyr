@@ -887,16 +887,17 @@ static int udc_bflb_bl61x_ep_enable(const struct device *const dev,
 	const struct udc_bflb_bl61x_config *const cfg = dev->config;
 	uint32_t tmp;
 	const uint8_t ep_idx = USB_EP_GET_IDX(config->addr);
+	uint16_t mps = config->mps < 512 ? 512 : config->mps;
 
 	LOG_DBG("Enable ep 0x%02x", config->addr);
 
 	if (USB_EP_DIR_IS_OUT(config->addr)) {
-		udc_bflb_bl61x_ep_set_out_mps(dev, ep_idx, config->mps);
+		udc_bflb_bl61x_ep_set_out_mps(dev, ep_idx, mps);
 	} else {
-		udc_bflb_bl61x_ep_set_in_mps(dev, ep_idx, config->mps);
+		udc_bflb_bl61x_ep_set_in_mps(dev, ep_idx, mps);
 	}
 
-	if (config->mps > USB_BL61X_HSFIFOCAP) {
+	if (mps > USB_BL61X_HSFIFOCAP) {
 		if (ep_idx > 2) {
 			LOG_DBG("We need to use 2 FIFO per ep if mps > 512");
 			return -ENOTSUP;
