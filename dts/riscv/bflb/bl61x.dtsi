@@ -437,9 +437,8 @@
 		};
 
 		usbd: usbd@20072000 {
-			compatible = "bflb,bl61x-udc";
+			compatible = "bflb,udc-2";
 			reg = <0x20072000 0x1000>;
-			num-bidir-endpoints = <5>;
 			maximum-speed = "high-speed";
 			status = "disabled";
 
