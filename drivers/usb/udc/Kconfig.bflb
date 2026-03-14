@@ -18,19 +18,17 @@ if UDC_BFLB_V2
 
 choice UDC_BFLB_V2_FIFO_SETUP
 	bool "How many FIFOs are used per endpoint"
-	default UDC_BFLB_V2_FIFO_MONODIR
+	default UDC_BFLB_V2_FIFO_BIDIR
 
 config UDC_BFLB_V2_FIFO_MONODIR
 	bool "Use a FIFO per endpoint direction"
 	help
-	  Use one FIFO per endpoint direction: This is the most reliable and fastest, but limits
-	  usable endpoints to two.
+	  Use one FIFO per endpoint direction: Limits usable endpoints to two.
 
 config UDC_BFLB_V2_FIFO_BIDIR
 	bool "Use a FIFO for both endpoint directions"
 	help
-	  Use a single FIFO for both endpoint direction: This is less reliable and slower,
-	  but allows using all endpoints.
+	  Use a single FIFO for both endpoint direction.
 
 endchoice
 
