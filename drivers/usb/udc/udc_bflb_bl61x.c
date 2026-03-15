@@ -607,6 +607,18 @@ static int udc_bflb_v2_ctrl_xfer_done(const struct device *const dev)
 		udc_ep_buf_set_setup(buf);
 		net_buf_add(buf, 8);
 
+		/* Read setup packet directly from CX FIFO register port without the need for VDMA */
+		tmp = sys_read32(cfg->base + USB_DMA_TFN_OFFSET);
+		tmp |= USB_ACC_CXF_HOV;
+		sys_write32(tmp, cfg->base + USB_DMA_TFN_OFFSET);
+
+		priv->setup_packet[0] = sys_read32(cfg->base + USB_DMA_CPS3_OFFSET);
+		priv->setup_packet[1] = sys_read32(cfg->base + USB_DMA_CPS3_OFFSET);
+
+		tmp = sys_read32(cfg->base + USB_DMA_TFN_OFFSET);
+		tmp &= ~USB_ACC_CXF_HOV;
+		sys_write32(tmp, cfg->base + USB_DMA_TFN_OFFSET);
+
 		memcpy(buf->data, priv->setup_packet, sizeof(priv->setup_packet));
 
 		udc_ctrl_update_stage(dev, buf);
@@ -789,10 +801,11 @@ static void udc_bflb_v2_out_chunk_done(const struct device *dev, struct udc_ep_c
 	 * bytes than the buffer can hold (FIFO-first approach).
 	 */
 	chunk = priv->out_vdma_len[fifo];
-	if (chunk == 0U) {
-		chunk = net_buf_tailroom(buf);
+	if (chunk < remain) {
+		received = 0;
+	} else {
+		received = chunk - remain;
 	}
-	received = chunk - remain;
 
 	sys_cache_data_invd_range(buf->data + buf->len, received);
 
@@ -815,7 +828,8 @@ static void udc_bflb_v2_in_chunk_done(const struct device *dev, struct udc_ep_co
 {
 	const uint8_t fifo = udc_bflb_v2_ep_to_fifo(ep_cfg);
 	struct net_buf *buf = udc_buf_peek(ep_cfg);
-	uint32_t remain, chunk, sent;
+	uint32_t remain, sent;
+	uint32_t chunk;
 
 	if (buf == NULL) {
 		LOG_ERR("No buf for IN chunk ep 0x%02x", ep_cfg->addr);
@@ -826,6 +840,7 @@ static void udc_bflb_v2_in_chunk_done(const struct device *dev, struct udc_ep_co
 	remain = udc_bflb_v2_ep_remain(dev, fifo);
 	chunk = MIN(buf->len, udc_mps_ep_size(ep_cfg));
 	sent = chunk - remain;
+
 
 	net_buf_pull(buf, sent);
 
@@ -845,7 +860,8 @@ static void udc_bflb_v2_work_handler_xfer(const struct device *const dev,
 	struct net_buf *buf = udc_buf_peek(ep_cfg);
 	uint8_t fifo;
 #ifdef CONFIG_UDC_BFLB_V2_FIFO_BIDIR
-	uint32_t remain;
+	const struct udc_bflb_v2_config *const cfg = dev->config;
+	uint32_t remain, tmp;
 	uint8_t in_addr;
 	struct udc_ep_config *in_cfg;
 #endif
@@ -890,6 +906,10 @@ static void udc_bflb_v2_work_handler_xfer(const struct device *const dev,
 			udc_bflb_v2_vdma_stop(dev, fifo);
 			udc_bflb_v2_fifo_reset(dev, fifo);
 			priv->fifo_active[fifo] = false;
+
+			tmp = sys_read32(cfg->base + USB_DEV_MISG1_OFFSET);
+			tmp |= (3U << (2U * (fifo - 1U)));
+			sys_write32(tmp, cfg->base + USB_DEV_MISG1_OFFSET);
 
 			if (in_cfg != NULL && udc_ep_is_busy(in_cfg)) {
 				udc_ep_set_busy(in_cfg, false);
@@ -1011,6 +1031,7 @@ static void udc_bflb_v2_work_handler(struct k_work *item)
 		case UDC_BFLB_V2_EVT_XFER:
 			udc_bflb_v2_work_handler_xfer(ev->dev, ep_cfg);
 			break;
+
 		default:
 			break;
 		}
@@ -1060,10 +1081,6 @@ static int udc_bflb_v2_ep_enqueue(const struct device *const dev,
 				  struct net_buf *buf)
 {
 	const uint8_t ep_idx = USB_EP_GET_IDX(config->addr);
-
-	if (udc_ep_is_busy(config)) {
-		return -EBUSY;
-	}
 
 	if (ep_idx == 0) {
 		if (USB_EP_DIR_IS_OUT(config->addr)) {
@@ -1812,18 +1829,6 @@ static void udc_bflb_v2_isr(const struct device *const dev)
 				if (udc_is_suspended(dev)) {
 					udc_set_suspended(dev, false);
 				}
-
-				/* Read setup packet directly from CX FIFO register port without the need for VDMA */
-				tmp = sys_read32(cfg->base + USB_DMA_TFN_OFFSET);
-				tmp |= USB_ACC_CXF_HOV;
-				sys_write32(tmp, cfg->base + USB_DMA_TFN_OFFSET);
-
-				priv->setup_packet[0] = sys_read32(cfg->base + USB_DMA_CPS3_OFFSET);
-				priv->setup_packet[1] = sys_read32(cfg->base + USB_DMA_CPS3_OFFSET);
-
-				tmp = sys_read32(cfg->base + USB_DMA_TFN_OFFSET);
-				tmp &= ~USB_ACC_CXF_HOV;
-				sys_write32(tmp, cfg->base + USB_DMA_TFN_OFFSET);
 
 				priv->ep_is_in[0] = false;
 				priv->setup_received = true;
