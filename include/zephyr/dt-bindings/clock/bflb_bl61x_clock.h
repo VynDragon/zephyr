@@ -35,11 +35,11 @@
 /** RC32K Clock */
 #define BL61X_CLKID_CLK_RC32K	BFLB_CLKID_CLK_RC32K
 /** WIFIPLL clock, the standard root frequency of this PLL is 960MHz */
-#define BL61X_CLKID_CLK_WIFIPLL BFLB_CLKID_CLK_PRIVATE
+#define BL61X_CLKID_CLK_WIFIPLL BFLB_CLKID_CLK_XLL
 /** AUPLL clock, it has no standard root frequency */
-#define BL61X_CLKID_CLK_AUPLL   (BFLB_CLKID_CLK_PRIVATE + 1)
+#define BL61X_CLKID_CLK_AUPLL   (BFLB_CLKID_CLK_PRIVATE)
 /** This clock is muxed off the PLLs to provide 160MHz */
-#define BL61X_CLKID_CLK_160M    (BFLB_CLKID_CLK_PRIVATE + 2)
+#define BL61X_CLKID_CLK_160M    (BFLB_CLKID_CLK_PRIVATE + 1)
 
 /** ID 0, AUPLL / 2  */
 #define BL61X_AUPLL_ID_DIV2	0

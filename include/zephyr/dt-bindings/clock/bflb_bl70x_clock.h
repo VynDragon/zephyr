@@ -24,7 +24,7 @@
 /** RC32K Clock */
 #define BL70X_CLKID_CLK_RC32K	BFLB_CLKID_CLK_RC32K
 /** DLL clock, the standard root frequency of the DLL is 288MHz */
-#define BL70X_CLKID_CLK_DLL     BFLB_CLKID_CLK_PRIVATE
+#define BL70X_CLKID_CLK_DLL     BFLB_CLKID_CLK_XLL
 
 /** ID 0, DLL 57MHz output  */
 #define BL70X_DLL_57MHz		0

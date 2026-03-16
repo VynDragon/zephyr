@@ -29,15 +29,17 @@
 #define BFLB_CLKID_CLK_XTAL32K	5
 /** RC32K Clock */
 #define BFLB_CLKID_CLK_RC32K	6
+/** First P/DLL */
+#define BFLB_CLKID_CLK_XLL	7
 /** Start of soc-specific clock ID entries */
-#define BFLB_CLKID_CLK_PRIVATE	7
+#define BFLB_CLKID_CLK_PRIVATE	8
 
 /** Pass to clock API to switch root clock to RC32M  */
 #define BFLB_FORCE_ROOT_RC32M	32
 /** Pass to clock API to switch root clock to Crystal  */
 #define BFLB_FORCE_ROOT_CRYSTAL	33
-/** Pass to clock API to switch root clock to dts-configured PLL  */
-#define BFLB_FORCE_ROOT_PLL	34
+/** Pass to clock API to switch root clock to dts-configured P/DLL  */
+#define BFLB_FORCE_ROOT_XLL	34
 
 /** Constant frequency of RC32M */
 #define BFLB_RC32M_FREQUENCY	(DT_FREQ_M(32))

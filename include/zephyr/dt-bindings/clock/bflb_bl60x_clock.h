@@ -78,7 +78,7 @@
 /** RC32K Clock */
 #define BL60X_CLKID_CLK_RC32K	BFLB_CLKID_CLK_RC32K
 /** PLL clock, the standard root frequency of the PLL is 480MHz */
-#define BL60X_CLKID_CLK_PLL	BFLB_CLKID_CLK_PRIVATE
+#define BL60X_CLKID_CLK_PLL	BFLB_CLKID_CLK_XLL
 
 /** The reference top frequency for the PLL at the root clock (PLL root / 2.5 here) */
 #define BL60X_PLL_TOP_FREQ	(DT_FREQ_M(192))
