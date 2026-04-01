@@ -1,0 +1,74 @@
+# Copyright (c) 2026 MASSDRIVER EI
+# SPDX-License-Identifier: Apache-2.0
+
+title: Bouffalolab Serial Flash controller device
+
+description: |
+  Bouffalolab Serial Flash controller device
+  QPI (Quad I/O for everything) mode is unsupported by the driver
+  Continuous read support is experimental.
+
+compatible: "bflb,sf-device"
+
+include: pinctrl-device.yaml
+
+properties:
+  reg:
+    required: true
+
+  sf-pad:
+    type: int
+    required: true
+    description: |
+      Which pad is this device holding. This is directly related to which pins are used.
+      Pad 1 is the embedded flash, Pad 2 and Pad 3 are almost always external.
+    enum:
+      - 1
+      - 2
+      - 3
+
+  spi-bus-mode:
+    type: int
+    required: true
+    description: |
+     The width and mode of SPI bus to which the device is connected.
+     Numbers refer to the number of line used in each direction.
+
+     Possible values are:
+      - IO <0> = 1 In (to the device), 1 Out (from the device)
+      - DO <1> = 1 In, 2 Out
+      - QO <2> = 1 In, 4 Out
+      - DIO <3> = 2 In, 2 Out
+      - QIO <4> = 4 In, 4 Out
+    enum:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+
+  read-command:
+    type: int
+    description: |
+      SPI command to use for memory-mapped reading.
+
+  read-dummy-cycles:
+    type: int
+    description: |
+      Dummy cycles for automatic read mode. They are expressed in bytes.
+
+  continuous-read-command:
+    type: int
+    description: |
+      Enable continuous read using this command setting.
+
+  write-command:
+    type: int
+    description: |
+      SPI command to use for memory-mapped writing. Device must not require explicit or page sized
+      erase.
+
+  write-dummy-cycles:
+    type: int
+    description: |
+      Dummy cycles for automatic write mode. They are expressed in bytes.

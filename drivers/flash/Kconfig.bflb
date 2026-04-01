@@ -4,11 +4,12 @@
 config SOC_FLASH_BFLB
 	bool "Bouffalolab flash driver"
 	default y
-	depends on DT_HAS_BFLB_FLASH_CONTROLLER_ENABLED
+	depends on DT_HAS_BFLB_SF_CONTROLLER_ENABLED
 	select FLASH_HAS_DRIVER_ENABLED
 	select FLASH_HAS_PAGE_LAYOUT
 	select FLASH_HAS_EXPLICIT_ERASE
 	select CODE_DATA_RELOCATION
+	select FLASH_JESD216
 	help
 	  Enables Bouffalolab flash driver for the flash controller
 

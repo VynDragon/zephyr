@@ -1,0 +1,22 @@
+# Copyright (c) 2026 MASSDRIVER EI
+# SPDX-License-Identifier: Apache-2.0
+
+title: Bouffalolab Serial Flash controller Flash
+
+description: Bouffalolab Serial Flash controller Flash
+
+compatible: "bflb,sf-flash"
+
+include:
+  - flash-controller.yaml
+  - soc-nv-flash.yaml
+  - "bflb,sf-device.yaml"
+  - "jedec,spi-nor-common.yaml"
+
+properties:
+  use-sfdp:
+    type: boolean
+    description: |
+      Fetch commands from flash using SFDP instead of using defaults (Recommended).
+      In the case of setting both 'override-bank1' and this, bank1 will use the sdfp command
+      matching the spi-bus-mode selected first, the override command second if it is unavailable.
