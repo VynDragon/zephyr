@@ -19,4 +19,4 @@ properties:
     description: |
       Fetch commands from flash using SFDP instead of using defaults (Recommended).
       In the case of setting both 'override-bank1' and this, bank1 will use the sdfp command
-      matching the spi-bus-mode selected first, the override command second if it is unavailable.
+      matching the spi-bus-mode selected first, then override with dts command if it is set.

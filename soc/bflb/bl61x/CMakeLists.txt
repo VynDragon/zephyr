@@ -18,3 +18,5 @@ zephyr_code_relocate_ifdef(CONFIG_CLOCK_CONTROL_BOUFFALOLAB_BL61X
   LIBRARY drivers__clock_control LOCATION ITCM NOKEEP)
 zephyr_code_relocate_ifdef(CONFIG_SOC_FLASH_BFLB FILES ${ZEPHYR_BASE}/drivers/flash/flash_bflb.c
   LOCATION ITCM NOKEEP)
+zephyr_code_relocate_ifdef(CONFIG_SOC_FLASH_BFLB FILES ${ZEPHYR_BASE}/drivers/flash/jesd216.c
+  LOCATION ITCM NOKEEP)

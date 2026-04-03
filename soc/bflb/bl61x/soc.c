@@ -60,21 +60,21 @@ void system_sysmap_init(void)
 	sysmap_base += SYSMAP_ENTRY_OFFSET;
 
 	// /* 5. flashes (2x64M) 0xA0000000~0xA8000000: Weak-Order, Cacheable, Non-Bufferable */
-	// sys_write32(BL616_FLASH2_XIP_BUSREMAP_END >> SYSMAP_BASE_SHIFT,
-	// 	    (sysmap_base + SYSMAP_ADDR_OFFSET));
-	// sys_write32(SYSMAP_ATTR_CACHE_ABLE, (sysmap_base + SYSMAP_FLAGS_OFFSET));
-	// sysmap_base += SYSMAP_ENTRY_OFFSET;
-
-	/* 5. flash (64M) 0xA0000000~0xA8000000: Weak-Order, Cacheable, Non-Bufferable */
-	sys_write32(BL616_FLASH_XIP_BUSREMAP_END >> SYSMAP_BASE_SHIFT,
+	sys_write32(BL616_FLASH2_XIP_BUSREMAP_END >> SYSMAP_BASE_SHIFT,
 		    (sysmap_base + SYSMAP_ADDR_OFFSET));
 	sys_write32(SYSMAP_ATTR_CACHE_ABLE, (sysmap_base + SYSMAP_FLAGS_OFFSET));
 	sysmap_base += SYSMAP_ENTRY_OFFSET;
 
-	sys_write32(BL616_PSRAM_BUSREMAP_BASE >> SYSMAP_BASE_SHIFT,
-		    (sysmap_base + SYSMAP_ADDR_OFFSET));
-	sys_write32(SYSMAP_ATTR_STRONG_ORDER, (sysmap_base + SYSMAP_FLAGS_OFFSET));
-	sysmap_base += SYSMAP_ENTRY_OFFSET;
+	/* 5. flash (64M) 0xA0000000~0xA8000000: Weak-Order, Cacheable, Non-Bufferable */
+	// sys_write32(BL616_FLASH_XIP_BUSREMAP_END >> SYSMAP_BASE_SHIFT,
+	// 	    (sysmap_base + SYSMAP_ADDR_OFFSET));
+	// sys_write32(SYSMAP_ATTR_CACHE_ABLE, (sysmap_base + SYSMAP_FLAGS_OFFSET));
+	// sysmap_base += SYSMAP_ENTRY_OFFSET;
+ //
+	// sys_write32(BL616_PSRAM_BUSREMAP_BASE >> SYSMAP_BASE_SHIFT,
+	// 	    (sysmap_base + SYSMAP_ADDR_OFFSET));
+	// sys_write32(SYSMAP_ATTR_STRONG_ORDER, (sysmap_base + SYSMAP_FLAGS_OFFSET));
+	// sysmap_base += SYSMAP_ENTRY_OFFSET;
 
 
 	/* 6. psram(128M (4M)) 0xA8000000~0xB0000000(0xA8400000):

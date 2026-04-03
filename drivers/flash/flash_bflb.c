@@ -15,9 +15,8 @@
  * commands and writing/reading data directly. The control is done via the System bus (normal bus
  * used to talk to peripherals).
  * Direct mode is achieved in different ways:
- * On E24 cpus SoCs (BL60x, BL70x/L), only one System bus interace is available, and so
- * memory-mapped access must be disabled whenever manual control is required. Switching is done via
- * a bank selection flag.
+ * On E24 cpus SoCs (BL60x, BL70x/L), only one System bus interace is available. Switching is done
+ * via a bank selection flag.
  * On e907 CPUs (BL61x/CL, BL808...), two system buses are available. The second bus is selected
  * by enabling it and turning on its selection flag, then enabling system bus mode on the interface.
  *
@@ -27,7 +26,6 @@
  * As a summary:
  * - One Instruction Bus (IAHB) interface which handles reading both banks from memory access.
  * - One or Two System Bus (SAHB) interfaces which handles reading both or one bank with the CPU
- *
  *
  * Burst wrap:
  * - Defines the size of a continuous read command's wrap, eg the minimum read size
@@ -64,6 +62,7 @@
 #include <zephyr/drivers/clock_control/clock_control_bflb_common.h>
 
 #include "spi_nor.h"
+#include "jesd216.h"
 
 #if defined(CONFIG_SOC_SERIES_BL60X) || defined(CONFIG_SOC_SERIES_BL70X) || \
 	defined(CONFIG_SOC_SERIES_BL70XL)
@@ -73,7 +72,7 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(flash_bflb, CONFIG_FLASH_LOG_LEVEL);
 
-#define ERASE_VALUE	0xFF
+#define ERASE_VALUE		0xFF
 
 #ifdef CONFIG_SOC_SERIES_BL60X
 #define BFLB_XIP_BASE_BANK1	BL602_FLASH_XIP_BASE
@@ -100,334 +99,19 @@ LOG_MODULE_REGISTER(flash_bflb, CONFIG_FLASH_LOG_LEVEL);
 #define BFLB_FLASH_CONTROLLER_BUSY_TIMEOUT	200
 #define BFLB_FLASH_CHIP_BUSY_TIMEOUT		5000
 
-#define BFLB_FLASH_FLASH_BLOCK_PROTECT_MSK	0x1C
-
 #define BFLB_FLASH_SF_BUF_SIZE			256
 
 #define BFLB_FLASH_ADDR_SIZE			3
 #define BFLB_FLASH_ADDR_SIZE_32B		4
 #define BFLB_FLASH_ADDR_SIZE_CONTREAD_ADD	1
 
-#define BFLB_FLASH_AUTO_READ_DEFAULT		SPI_NOR_CMD_READ_FAST
-#define BFLB_FLASH_AUTO_READ_DMYCY_DEFAULT	1
+/* This is a midrange value */
+#define BFLB_INIT_RESET_WAIT_MS			12
 
 #define FLASH_READ32(address)		(*((volatile uint32_t *)(address)))
 #define FLASH_WRITE32(value, address)	(*((volatile uint32_t *)(address))) = value;
 
-#define BFLB_FLASH_MAGIC_1 "BFNP"
-#define BFLB_FLASH_MAGIC_2 "FCFG"
-
-struct bflb_flash_magic_1 {
-	char magic[4];
-	uint32_t revision;
-} __packed;
-
-struct bflb_flash_magic_2 {
-	char magic[4];
-} __packed;
-
-/* Raw flash configuration data structure */
-struct bflb_header_flash_cfg {
-/* Serial flash interface mode, bit0-3:spi mode, bit4:unwrap, bit5:32-bits addr mode support */
-	uint8_t  io_mode;
-/* Support continuous read mode, bit0:continuous read mode support, bit1:read mode cfg */
-	uint8_t  c_read_support;
-/* SPI clock delay, bit0-3:delay,bit4-6:pad delay */
-	uint8_t  clk_delay;
-/* SPI clock phase invert, bit0:clck invert, bit1:rx invert, bit2-4:pad delay, bit5-7:pad delay */
-	uint8_t  clk_invert;
-/* Flash enable reset command */
-	uint8_t  reset_en_cmd;
-/* Flash reset command */
-	uint8_t  reset_cmd;
-/* Flash reset continuous read command */
-	uint8_t  reset_c_read_cmd;
-/* Flash reset continuous read command size */
-	uint8_t  reset_c_read_cmd_size;
-/* JEDEC ID command */
-	uint8_t  jedec_id_cmd;
-/* JEDEC ID command dummy clock */
-	uint8_t  jedec_id_cmd_dmy_clk;
-#if defined(CONFIG_SOC_SERIES_BL70X) || defined(CONFIG_SOC_SERIES_BL60X) || \
-	defined(CONFIG_SOC_SERIES_BL70XL)
-/* QPI JEDEC ID command */
-	uint8_t  qpi_jedec_id_cmd;
-/* QPI JEDEC ID command dummy clock */
-	uint8_t  qpi_jedec_id_cmd_dmy_clk;
-#else
-/* Enter 32-bits addr command */
-	uint8_t  enter_32bits_addr_cmd;
-/* Exit 32-bits addr command */
-	uint8_t  exit_32bits_addr_cmd;
-#endif
-/* (x * 1024) bytes */
-	uint8_t  sector_size;
-/* Manufacturer ID */
-	uint8_t  mid;
-/* Page size */
-	uint16_t page_size;
-/* Chip erase cmd */
-	uint8_t  chip_erase_cmd;
-/* Sector erase command */
-	uint8_t  sector_erase_cmd;
-/* Block 32K erase command*/
-	uint8_t  blk32_erase_cmd;
-/* Block 64K erase command */
-	uint8_t  blk64_erase_cmd;
-/* Write enable command, needed before every erase or program, or register write */
-	uint8_t  write_enable_cmd;
-/* Page program command */
-	uint8_t  page_program_cmd;
-/* QIO page program cmd */
-	uint8_t  qpage_program_cmd;
-/* QIO page program address mode */
-	uint8_t  qpp_addr_mode;
-/* Fast read command */
-	uint8_t  fast_read_cmd;
-/* Fast read command dummy clock */
-	uint8_t  fr_dmy_clk;
-/* QPI fast read command */
-	uint8_t  qpi_fast_read_cmd;
-/* QPI fast read command dummy clock */
-	uint8_t  qpi_fr_dmy_clk;
-/* Fast read dual output command */
-	uint8_t  fast_read_do_cmd;
-/* Fast read dual output command dummy clock */
-	uint8_t  fr_do_dmy_clk;
-/* Fast read dual io command */
-	uint8_t  fast_read_dio_cmd;
-/* Fast read dual io command dummy clock */
-	uint8_t  fr_dio_dmy_clk;
-/* Fast read quad output command */
-	uint8_t  fast_read_qo_cmd;
-/* Fast read quad output command dummy clock */
-	uint8_t  fr_qo_dmy_clk;
-/* Fast read quad io command */
-	uint8_t  fast_read_qio_cmd;
-/* Fast read quad io command dummy clock */
-	uint8_t  fr_qio_dmy_clk;
-/* QPI fast read quad io command */
-	uint8_t  qpi_fast_read_qio_cmd;
-/* QPI fast read QIO dummy clock */
-	uint8_t  qpi_fr_qio_dmy_clk;
-/* QPI program command */
-	uint8_t  qpi_page_program_cmd;
-/* Enable write volatile reg */
-	uint8_t  write_vreg_enable_cmd;
-/* Write enable register index */
-	uint8_t  wr_enable_index;
-/* Quad mode enable register index */
-	uint8_t  qe_index;
-/* Busy status register index */
-	uint8_t  busy_index;
-/* Write enable register bit pos */
-	uint8_t  wr_enable_bit;
-/* Quad enable register bit pos */
-	uint8_t  qe_bit;
-/* Busy status register bit pos */
-	uint8_t  busy_bit;
-/* Register length of write enable */
-	uint8_t  wr_enable_write_reg_len;
-/* Register length of write enable status */
-	uint8_t  wr_enable_read_reg_len;
-/* Register length of quad enable */
-	uint8_t  qe_write_reg_len;
-/* Register length of quad enable status */
-	uint8_t  qe_read_reg_len;
-/* Release power down command */
-	uint8_t  release_powerdown;
-/* Register length of contain busy status */
-	uint8_t  busy_read_reg_len;
-/* Read register command buffer */
-	uint8_t  read_reg_cmd[4];
-/* Write register command buffer */
-	uint8_t  write_reg_cmd[4];
-/* Enter qpi command */
-	uint8_t  enter_qpi;
-/* Exit qpi command */
-	uint8_t  exit_qpi;
-/* Config data for continuous read mode */
-	uint8_t  c_read_mode;
-/* Config data for exit continuous read mode */
-	uint8_t  c_rexit;
-/* Enable burst wrap command */
-	uint8_t  burst_wrap_cmd;
-/* Enable burst wrap command dummy clock */
-	uint8_t  burst_wrap_cmd_dmy_clk;
-/* Data and address mode for this command */
-	uint8_t  burst_wrap_data_mode;
-/* Data to enable burst wrap */
-	uint8_t  burst_wrap_data;
-/* Disable burst wrap command */
-	uint8_t  de_burst_wrap_cmd;
-/* Disable burst wrap command dummy clock */
-	uint8_t  de_burst_wrap_cmd_dmy_clk;
-/* Data and address mode for this command */
-	uint8_t  de_burst_wrap_data_mode;
-/* Data to disable burst wrap */
-	uint8_t  de_burst_wrap_data;
-/* Typical 4K(usually) erase time */
-	uint16_t time_e_sector;
-/* Typical 32K erase time */
-	uint16_t time_e_32k;
-/* Typical 64K erase time */
-	uint16_t time_e_64k;
-/* Typical Page program time */
-	uint16_t time_page_pgm;
-/* Typical Chip erase time in ms */
-	uint16_t time_ce;
-/* Release power down command delay time for wake up */
-	uint8_t  pd_delay;
-/* QE set data */
-	uint8_t  qe_data;
-} __packed;
-
-struct bflb_flash_header {
-	struct bflb_flash_magic_1 magic_1;
-	struct bflb_flash_magic_2 magic_2;
-	struct bflb_header_flash_cfg flash_cfg;
-	uint32_t flash_cfg_crc;
-} __packed;
-
-struct bflb_flash_command {
-/* Read write 0: read 1 : write */
-	uint8_t rw;
-/* Command mode 0: 1 line, 1: 4 lines */
-	uint8_t cmd_mode;
-/* SPI mode 0: IO 1: DO 2: QO 3: DIO 4: QIO */
-	uint8_t spi_mode;
-/* Address size */
-	uint8_t addr_size;
-/* Dummy clocks */
-	uint8_t dummy_clks;
-/* Transfer number of bytes */
-	uint32_t nb_data;
-/* Command buffer */
-	uint32_t cmd_buf[2];
-};
-
-struct flash_bflb_device_commands {
-	/* Auto = commands used with instruction bus (= XIP / memory mapped access) */
-	uint8_t auto_read;
-	uint8_t auto_read_dmycy;
-	uint8_t auto_write;
-	uint8_t auto_write_dmycy;
-	/* Manual = commands used with system bus (= CPU command access) */
-	uint8_t manual_read;
-	/* Left so fast read can be used */
-	uint8_t manual_read_dmycy;
-	/* Up to 4 read/write registers commands */
-	uint8_t read_reg[4];
-	uint8_t write_reg[4];
-	uint8_t contread_on;
-	uint8_t contread_off;
-	uint8_t burstwrap;
-	uint8_t burstwrap_dmycy;
-	uint8_t burstwrap_on_data;
-	uint8_t burstwrap_off_data;
-	uint8_t write_enable;
-	uint8_t page_program;
-	uint8_t quad_page_program;
-	uint8_t sector_erase;
-	uint8_t block_erase;
-	uint8_t enter_32bits_addr;
-	uint8_t exit_32bits_addr;
-	/* Extended ops */
-	uint8_t reset_enable;
-	uint8_t reset;
-	uint8_t powerdown;
-	uint8_t release_powerdown;
-};
-
-/* Register access
- * Index indicates which register command to use
- * Bit indicates position of the bit in the register of size len
- * Len indicates the length to interact with: Some flash require reading each register
- * separately, but write all at once (MX25Lxxx45G for example).
- */
-struct flash_bflb_device_registers {
-	uint8_t write_enable_index;
-	uint8_t write_enable_bit;
-	uint8_t write_enable_read_len;
-	uint8_t quad_enable_index;
-	uint8_t quad_enable_bit;
-	uint8_t quad_enable_read_len;
-	uint8_t quad_enable_write_len;
-	uint8_t busy_index;
-	uint8_t busy_bit;
-	uint8_t busy_read_len;
-};
-
-struct flash_bflb_device_cfg {
-	/* SPI modes to use */
-	uint8_t auto_spi_mode;
-	uint8_t manual_spi_mode;
-	struct flash_bflb_device_commands cmd;
-	struct flash_bflb_device_registers reg;
-	uint32_t size;
-	uint32_t page_size;
-	uint32_t sector_size;
-	uint32_t block_size;
-	uint8_t jedec_id[3];
-	bool addr_32bits;
-};
-
-enum flash_bflb_nxip_message_id {
-	NXIP_MSG_NONE = -1,
-	NXIP_MSG_READ_INVALID = 0,
-	NXIP_MSG_BAD_BUS_IAHB,
-	NXIP_MSG_BAD_BUS_SAHB,
-	NXIP_MSG_BAD_QE,
-	NXIP_MSG_BUSY,
-	NXIP_MSG_BUSY_FLASH,
-	NXIP_MSG_MAX
-};
-
-struct flash_bflb_controller_data {
-	bool override_bank1;
-	struct bflb_header_flash_cfg flash_header_cfg;
-};
-
-enum flash_bflb_bank {
-	BANK1 = 1,
-	BANK2 = 2,
-	BANKMAX
-};
-
-enum flash_bflb_pad {
-	PAD1 = 1,
-	PAD2 = 2,
-	PAD3 = 3,
-	PADMAX
-};
-
-enum flash_bflb_bus_mode {
-	BUS_NIO = 0,
-	BUS_DO = 1,
-	BUS_QO = 2,
-	BUS_DIO = 3,
-	BUS_QIO = 4,
-};
-
-struct flash_bflb_data {
-	uintptr_t reg;
-	struct flash_bflb_controller_data *controller;
-	struct flash_bflb_device_cfg cfg;
-	enum flash_bflb_nxip_message_id nxip_message;
-	uint32_t nxip_message_args[3];
-	uint32_t last_flash_offset;
-	enum flash_bflb_bank bank;
-	enum flash_bflb_pad pad;
-	uintptr_t xip_base;
-	uintptr_t xip_end;
-	struct k_mutex sahb_mutex;
-	struct flash_pages_layout layout;
-	struct flash_parameters parameters;
-};
-
-struct flash_bflb_config {
-	const struct pinctrl_dev_config *pincfg;
-};
+#include "flash_bflb.h"
 
 typedef void (*flash_bflb_nxip_message)(uint32_t arg1, uint32_t arg2, uint32_t arg3);
 
@@ -461,6 +145,31 @@ static void flash_bflb_nxip_message_busy_flash(uint32_t arg1, uint32_t arg2, uin
 	LOG_ERR("Flash is busy!");
 }
 
+static void flash_bflb_nxip_message_bad_sfdp(uint32_t arg1, uint32_t arg2, uint32_t arg3)
+{
+	LOG_ERR("Serial Flash Discovery Protocol error, code: %u %x", arg1, arg2);
+}
+
+static void flash_bflb_nxip_message_sad_sfdp(uint32_t arg1, uint32_t arg2, uint32_t arg3)
+{
+	LOG_WRN("Serial Flash Discovery Protocol unexpected, code: %u %x", arg1, arg2);
+}
+
+static void flash_bflb_nxip_message_notsup_sfdp(uint32_t arg1, uint32_t arg2, uint32_t arg3)
+{
+	LOG_ERR("Discovered flash cannot be supported, dw %u bits %x", arg1, arg2);
+}
+
+static void flash_bflb_nxip_message_sadsup_sfdp(uint32_t arg1, uint32_t arg2, uint32_t arg3)
+{
+	LOG_WRN("Discovered flash cannot be supported fully, dw %u bits %x", arg1, arg2);
+}
+
+static void flash_bflb_nxip_message_initseq_fail(uint32_t arg1, uint32_t arg2, uint32_t arg3)
+{
+	LOG_ERR("Initialization sequence failed, %x %x %x", arg1, arg2, arg3);
+}
+
 static const flash_bflb_nxip_message flash_bflb_nxip_messages[NXIP_MSG_MAX] = {
 	[NXIP_MSG_READ_INVALID] = flash_bflb_nxip_message_read_invalid,
 	[NXIP_MSG_BAD_BUS_IAHB] = flash_bflb_nxip_message_bad_bus_iahb,
@@ -468,6 +177,11 @@ static const flash_bflb_nxip_message flash_bflb_nxip_messages[NXIP_MSG_MAX] = {
 	[NXIP_MSG_BAD_QE] = flash_bflb_nxip_message_bad_qe,
 	[NXIP_MSG_BUSY] = flash_bflb_nxip_message_busy,
 	[NXIP_MSG_BUSY_FLASH] = flash_bflb_nxip_message_busy_flash,
+	[NXIP_MSG_BAD_SFDP] = flash_bflb_nxip_message_bad_sfdp,
+	[NXIP_MSG_SAD_SFDP] = flash_bflb_nxip_message_sad_sfdp,
+	[NXIP_MSG_NOTSUP_SFDP] = flash_bflb_nxip_message_notsup_sfdp,
+	[NXIP_MSG_SADSUP_SFDP] = flash_bflb_nxip_message_sadsup_sfdp,
+	[NXIP_MSG_INITSEQ_FAIL] = flash_bflb_nxip_message_initseq_fail,
 };
 
 static void flash_bflb_nxip_message_set(struct flash_bflb_data *data,
@@ -559,11 +273,33 @@ static void flash_bflb_set_default_read_default(struct flash_bflb_data *data)
 	break;
 	case BUS_DIO:
 		data->cfg.cmd.auto_read = SPI_NOR_CMD_2READ;
-		data->cfg.cmd.auto_read_dmycy = 2;
+		data->cfg.cmd.auto_read_dmycy = 1;
 	break;
 	case BUS_QIO:
 		data->cfg.cmd.auto_read = SPI_NOR_CMD_4READ;
-		data->cfg.cmd.auto_read_dmycy = 2;
+		data->cfg.cmd.auto_read_dmycy = 1;
+	break;
+	}
+}
+
+static enum flash_bflb_bus_mode flash_bflb_pick_next_worse_xip(enum flash_bflb_bus_mode mode)
+{
+	switch (mode) {
+	default:
+	case BUS_NIO:
+		return BUS_NIO;
+	break;
+	case BUS_DO:
+		return BUS_NIO;
+	break;
+	case BUS_DIO:
+		return BUS_DO;
+	break;
+	case BUS_QO:
+		return BUS_DIO;
+	break;
+	case BUS_QIO:
+		return BUS_QO;
 	break;
 	}
 }
@@ -666,6 +402,8 @@ static void flash_bflb_if2_enable(struct flash_bflb_data *data, bool enable)
 
 static uintptr_t flash_bflb_set_sahb(struct flash_bflb_data *data)
 {
+	uint32_t tmp;
+
 	k_mutex_lock(&data->sahb_mutex, K_FOREVER);
 
 	if (data->bank == BANK2){
@@ -676,6 +414,20 @@ static uintptr_t flash_bflb_set_sahb(struct flash_bflb_data *data)
 	} else {
 
 		flash_bflb_if2_enable(data, false);
+
+		/* Select pad similarly
+		 * Remember this also sets it for IAHB operation
+		 */
+		if (data->pad != PAD1) {
+			tmp = FLASH_READ32(GLB_BASE + GLB_PARM_CFG0_OFFSET);
+			tmp &= ~GLB_SEL_EMBEDDED_SFLASH_MSK;
+			FLASH_WRITE32(tmp, GLB_BASE + GLB_PARM_CFG0_OFFSET);
+		}
+
+		tmp = FLASH_READ32(data->reg + SF_CTRL_2_OFFSET);
+		tmp &= ~SF_CTRL_SF_IF_PAD_SEL_MSK;
+		tmp |= (data->pad - 1U) << SF_CTRL_SF_IF_PAD_SEL_POS;
+		FLASH_WRITE32(tmp, data->reg + SF_CTRL_2_OFFSET);
 
 		return data->reg + SF_CTRL_SF_IF_SAHB_0_OFFSET;
 	}
@@ -696,7 +448,13 @@ static void flash_bflb_release_sahb(struct flash_bflb_data *data)
 
 static uintptr_t flash_bflb_set_sahb(struct flash_bflb_data *data)
 {
+	uint32_t tmp;
 	k_mutex_lock(&data->sahb_mutex, K_FOREVER);
+
+	tmp = FLASH_READ32(data->reg + SF_CTRL_2_OFFSET);
+	tmp &= ~SF_CTRL_SF_IF_PAD_SEL_MSK;
+	tmp |= (data->pad - 1U) << SF_CTRL_SF_IF_PAD_SEL_POS;
+	FLASH_WRITE32(tmp, data->reg + SF_CTRL_2_OFFSET);
 
 	return data->reg + SF_CTRL_SF_IF_SAHB_0_OFFSET;
 }
@@ -715,6 +473,8 @@ static uintptr_t flash_bflb_set_sahb(struct flash_bflb_data *data)
 	else {
 		tmp &= ~SF_CTRL_SF_IF_0_BK_SEL_MSK;
 	}
+	tmp &= ~SF_CTRL_SF_IF_PAD_SEL_MSK;
+	tmp |= (data->pad - 1U) << SF_CTRL_SF_IF_PAD_SEL_POS;
 	FLASH_WRITE32(tmp, data->reg + SF_CTRL_2_OFFSET);
 
 	return data->reg + SF_CTRL_SF_IF_SAHB_0_OFFSET;
@@ -801,22 +561,6 @@ static int flash_bflb_set_bus(struct flash_bflb_data *data, uint8_t bus)
 	}
 
 	FLASH_WRITE32(tmp, data->reg + SF_CTRL_1_OFFSET);
-
-	return 0;
-}
-
-static uint8_t flash_bflb_admode_to_spimode(uint8_t addr_mode, uint8_t data_mode)
-{
-	__ASSERT(addr_mode < 3, "addr_mode unhandled");
-	__ASSERT(data_mode < 3, "data_mode unhandled");
-
-	if (addr_mode == 0) {
-		return data_mode;
-	} else if (addr_mode == 1) {
-		return 3;
-	} else if (addr_mode == 2) {
-		return 4;
-	}
 
 	return 0;
 }
@@ -1107,6 +851,20 @@ static int flash_bflb_send_command(struct flash_bflb_data *data, struct bflb_fla
 	return ret;
 }
 
+static int flash_bflb_flash_send_triplet(struct flash_bflb_data *data, uint8_t cmd, uint32_t cdata,
+					uint8_t len)
+{
+	struct bflb_flash_command triplet = {0};
+
+	flash_bflb_xip_memcpy((uint8_t *)&cdata, (uint8_t *)SF_CTRL_BUF_BASE, len);
+
+	triplet.spi_mode = data->cfg.manual_spi_mode;
+	triplet.cmd_buf[0] = (uint32_t)cmd << 24;
+	triplet.nb_data = len;
+	triplet.rw = 1;
+
+	return flash_bflb_send_command(data, &triplet);
+}
 
 static int flash_bflb_flash_read_register(struct flash_bflb_data *data, uint8_t index, uint8_t *out,
 	uint8_t len)
@@ -1212,18 +970,47 @@ static int flash_bflb_enable_writable(struct flash_bflb_data *data)
 		return ret;
 	}
 
-	/* check writable */
-	ret = flash_bflb_flash_read_register(data, data->cfg.reg.write_enable_index,
-		(uint8_t *)&write_reg, data->cfg.reg.write_enable_read_len);
-	if (ret != 0) {
-		return ret;
-	}
+	if (data->cfg.reg.write_enable_read_len) {
+		/* check writable */
+		ret = flash_bflb_flash_read_register(data, data->cfg.reg.write_enable_index,
+			(uint8_t *)&write_reg, data->cfg.reg.write_enable_read_len);
+		if (ret != 0) {
+			return ret;
+		}
 
-	if ((write_reg & BIT(data->cfg.reg.write_enable_bit)) != 0) {
+		if ((write_reg & BIT(data->cfg.reg.write_enable_bit)) != 0) {
+			return 0;
+		}
+	} else {
 		return 0;
 	}
 
 	return -EIO;
+}
+
+static void flash_bflb_set_32b_enabled(struct flash_bflb_data *data, bool yes)
+{
+	uint32_t tmp;
+
+	tmp = FLASH_READ32(data->reg + SF_CTRL_0_OFFSET);
+	if (yes) {
+		tmp |= SF_CTRL_SF_IF_32B_ADR_EN_MSK;
+	} else {
+		tmp &= ~SF_CTRL_SF_IF_32B_ADR_EN_MSK;
+	}
+	FLASH_WRITE32(tmp, data->reg + SF_CTRL_0_OFFSET);
+}
+
+static int flash_bflb_enable_32baddr(struct flash_bflb_data *data)
+{
+	struct bflb_flash_command enable_32baddr = {0};
+
+	flash_bflb_set_32b_enabled(data, true);
+
+	enable_32baddr.spi_mode = data->cfg.manual_spi_mode;
+	enable_32baddr.cmd_buf[0] = data->cfg.cmd.enter_32bits_addr << 24 ;
+
+	return flash_bflb_send_command(data, &enable_32baddr);
 }
 
 static int flash_bflb_enable_qspi(struct flash_bflb_data *data)
@@ -1372,6 +1159,11 @@ static int flash_bflb_save_xip_state(const struct device *dev)
 		}
 	}
 
+	/* Samely */
+	if (data->controller->addr_32bits && data->cfg.cmd.enter_32bits_addr) {
+		flash_bflb_enable_32baddr(data);
+	}
+
 	/* disable burst with wrap*/
 	if (data->cfg.cmd.burstwrap != 0) {
 		ret = flash_bflb_flash_disable_burst(data);
@@ -1392,6 +1184,11 @@ static bool flash_bflb_flash_busy_wait(struct flash_bflb_data *data)
 {
 	uint8_t tmp_bus = 0xFF;
 	uint32_t counter = 0;
+
+	/* Cannot check if busy */
+	if (data->cfg.reg.busy_read_len == 0) {
+		return false;
+	}
 
 	while ((tmp_bus & BIT(data->cfg.reg.busy_bit)) != 0 && counter <
 		BFLB_FLASH_CHIP_BUSY_TIMEOUT * 20000) {
@@ -1425,7 +1222,7 @@ static int flash_bflb_xip_init(struct flash_bflb_data *data)
 	xip_cmd.nb_data = 32;
 
 	/* 3 for 24 bits, 4 for 32 bits */
-	if (data->cfg.addr_32bits) {
+	if (data->controller->addr_32bits) {
 		xip_cmd.addr_size = BFLB_FLASH_ADDR_SIZE_32B;
 	} else {
 		xip_cmd.addr_size = BFLB_FLASH_ADDR_SIZE;
@@ -1436,18 +1233,19 @@ static int flash_bflb_xip_init(struct flash_bflb_data *data)
 	) {
 		is_command = false;
 		xip_cmd.addr_size += BFLB_FLASH_ADDR_SIZE_CONTREAD_ADD;
-		if (data->cfg.addr_32bits) {
+		if (data->controller->addr_32bits) {
 			xip_cmd.cmd_buf[0] = 0;
 			xip_cmd.cmd_buf[1] = data->cfg.cmd.contread_on << 24;
 		} else {
 			xip_cmd.cmd_buf[0] = data->cfg.cmd.contread_on;
 		}
 
-		flash_bflb_xip_memcpy((uint8_t *)&xip_cmd, (uint8_t *)&cont_read_init_cmd, sizeof(xip_cmd));
+		flash_bflb_xip_memcpy((uint8_t *)&xip_cmd,
+				      (uint8_t *)&cont_read_init_cmd, sizeof(xip_cmd));
 		/* Align */
 		cont_read_init_cmd.nb_data = 4;
 		cont_read_init_cmd.cmd_buf[0] = data->cfg.cmd.auto_read << 24;
-		if (data->cfg.addr_32bits) {
+		if (data->controller->addr_32bits) {
 			cont_read_init_cmd.cmd_buf[1] = data->cfg.cmd.contread_on << 16;
 		} else {
 			cont_read_init_cmd.cmd_buf[1] = data->cfg.cmd.contread_on << 24;
@@ -1480,10 +1278,6 @@ static int flash_bflb_xip_init(struct flash_bflb_data *data)
 		return ret;
 	}
 
-	// if (data->bank == BANK2) {
-	// 	xip_cmd.addr_size--;
-	// }
-
 	return flash_bflb_set_command_iahb(data, &xip_cmd, is_command);
 }
 
@@ -1500,7 +1294,7 @@ static int flash_bflb_autowrite_init(struct flash_bflb_data *data)
 	autowrite_cmd.nb_data = 32;
 
 	/* 3 for 24 bits, 4 for 32 bits */
-	if (data->cfg.addr_32bits) {
+	if (data->controller->addr_32bits) {
 		autowrite_cmd.addr_size = BFLB_FLASH_ADDR_SIZE_32B;
 	} else {
 		autowrite_cmd.addr_size = BFLB_FLASH_ADDR_SIZE;
@@ -1533,6 +1327,10 @@ static int flash_bflb_restore_xip_state(struct flash_bflb_data *data)
 		if (ret != 0) {
 			goto exit_here;
 		}
+	}
+
+	if (data->controller->addr_32bits && data->cfg.cmd.enter_32bits_addr != 0) {
+		flash_bflb_enable_32baddr(data);
 	}
 
 	ret = flash_bflb_xip_init(data);
@@ -1575,7 +1373,7 @@ static int flash_bflb_read_sahb_do(struct flash_bflb_data *data, off_t address, 
 	read_cmd.dummy_clks = data->cfg.cmd.manual_read_dmycy;
 	read_cmd.cmd_buf[0] = data->cfg.cmd.manual_read << 24;
 
-	if (data->cfg.addr_32bits) {
+	if (data->controller->addr_32bits) {
 		read_cmd.addr_size = BFLB_FLASH_ADDR_SIZE_32B;
 	} else {
 		read_cmd.addr_size = BFLB_FLASH_ADDR_SIZE;
@@ -1592,7 +1390,7 @@ static int flash_bflb_read_sahb_do(struct flash_bflb_data *data, off_t address, 
 
 		read_cmd.cmd_buf[0] &= ~0xFFFFFF;
 
-		if (data->cfg.addr_32bits) {
+		if (data->controller->addr_32bits) {
 			read_cmd.cmd_buf[0] |= (address + i) >> 8;
 			read_cmd.cmd_buf[1] = (address + i) << 24;
 		} else {
@@ -1687,7 +1485,7 @@ static int flash_bflb_read(const struct device *dev, off_t address, void *buffer
 		return -ENOTSUP;
 	}
 
-	/* interrupting would break, likely to access XIP*/
+	/* interrupting would break, likely to access XIP */
 	locker = irq_lock();
 
 	/* get XIP offset / where code really is in flash, usually 0x2000 */
@@ -1786,24 +1584,10 @@ static int flash_bflb_write(const struct device *dev,
 		return ret;
 	}
 
-	/* Check if the flash chip is OK to write to */
-	ret = flash_bflb_flash_read_register(data, 0, (uint8_t *)(&tmp), 1);
-	if (ret != 0) {
-		goto exit_here;
-	}
-	if ((tmp & BFLB_FLASH_FLASH_BLOCK_PROTECT_MSK) != 0) {
-		ret = -EINVAL;
-		goto exit_here;
-	}
-
-	if (data->cfg.manual_spi_mode == BUS_QIO || data->cfg.manual_spi_mode == BUS_QO) {
-		write_cmd.cmd_buf[0] = data->cfg.cmd.quad_page_program << 24;
-	} else {
-		write_cmd.cmd_buf[0] = data->cfg.cmd.page_program << 24;
-	}
-
+	write_cmd.spi_mode = BUS_NIO;
+	write_cmd.cmd_buf[0] = data->cfg.cmd.page_program << 24;
 	write_cmd.rw = 1;
-	if (data->cfg.addr_32bits) {
+	if (data->controller->addr_32bits) {
 		write_cmd.addr_size = BFLB_FLASH_ADDR_SIZE_32B;
 	} else {
 		write_cmd.addr_size = BFLB_FLASH_ADDR_SIZE;
@@ -1831,7 +1615,7 @@ static int flash_bflb_write(const struct device *dev,
 
 		write_cmd.cmd_buf[0] &= ~0xFFFFFF;
 
-		if (data->cfg.addr_32bits) {
+		if (data->controller->addr_32bits) {
 			write_cmd.cmd_buf[0] |= (address + i) >> 8;
 			write_cmd.cmd_buf[1] = (address + i) << 24;
 		} else {
@@ -1903,8 +1687,8 @@ static int flash_bflb_erase(const struct device *dev, off_t start, size_t len)
 		return ret;
 	}
 
-	erase_cmd.rw = 0;
-	if (data->cfg.addr_32bits) {
+	erase_cmd.spi_mode = BUS_NIO;
+	if (data->controller->addr_32bits) {
 		erase_cmd.addr_size = BFLB_FLASH_ADDR_SIZE_32B;
 	} else {
 		erase_cmd.addr_size = BFLB_FLASH_ADDR_SIZE;
@@ -1918,7 +1702,7 @@ static int flash_bflb_erase(const struct device *dev, off_t start, size_t len)
 		}
 
 		erase_cmd.cmd_buf[0] = data->cfg.cmd.sector_erase << 24;
-		if (data->cfg.addr_32bits) {
+		if (data->controller->addr_32bits) {
 			erase_cmd.cmd_buf[0] |= (i * data->cfg.sector_size) >> 8;
 			erase_cmd.cmd_buf[1] = (i * data->cfg.sector_size) << 24;
 		} else {
@@ -2006,7 +1790,7 @@ static int flash_bflb_get_jedec_id_internal(struct flash_bflb_data *data, uint8_
 	get_jedecid.spi_mode = BUS_NIO;
 	get_jedecid.cmd_buf[0] = SPI_NOR_CMD_RDID << 24;
 	get_jedecid.nb_data = 3;
-	get_jedecid.addr_size = 3;
+	get_jedecid.addr_size = BFLB_FLASH_ADDR_SIZE;
 
 	ret = flash_bflb_send_command(data, &get_jedecid);
 	if (ret < 0) {
@@ -2042,6 +1826,53 @@ static int flash_bflb_reset(struct flash_bflb_data *data)
 	return 0;
 }
 
+int flash_bflb_read_sfdp_internal(struct flash_bflb_data *data, off_t offset,
+				  uint8_t *o_data, size_t len)
+{
+	struct bflb_flash_command read_sfdp = {0};
+	int ret;
+	size_t read = 0;
+	size_t cur_len;
+
+
+	read_sfdp.spi_mode = BUS_NIO;
+	read_sfdp.cmd_buf[0] = JESD216_CMD_READ_SFDP << 24;
+	read_sfdp.addr_size = BFLB_FLASH_ADDR_SIZE;
+	read_sfdp.dummy_clks = 1;
+
+	while (read < len) {
+
+		cur_len = BFLB_FLASH_SF_BUF_SIZE - ((offset + read) % BFLB_FLASH_SF_BUF_SIZE);
+
+		if (cur_len > len - read) {
+			cur_len = len - read;
+		}
+
+		read_sfdp.cmd_buf[0] &= ~0xFFFFFF;
+		read_sfdp.nb_data = cur_len;
+		read_sfdp.cmd_buf[0] |= (offset + read);
+
+		ret = flash_bflb_send_command(data, &read_sfdp);
+		if (ret < 0) {
+			return ret;
+		}
+
+		flash_bflb_xip_memcpy((uint8_t *)SF_CTRL_BUF_BASE, o_data + read, cur_len);
+
+		read += cur_len;
+
+		if (flash_bflb_busy_wait(data)) {
+			return -EBUSY;
+		}
+
+		if (flash_bflb_flash_busy_wait(data)) {
+			return -EBUSY;
+		}
+	}
+
+	return 0;
+}
+
 #if defined(CONFIG_FLASH_JESD216_API)
 
 static int flash_bflb_get_jedec_id(const struct device *dev, uint8_t *id)
@@ -2063,21 +1894,45 @@ static int flash_bflb_get_jedec_id(const struct device *dev, uint8_t *id)
 	}
 
 	ret = flash_bflb_get_jedec_id_internal(data, id);
-	if (ret != 0) {
-		goto exit_here;
-	}
 
-exit_here:
 	flash_bflb_restore_xip_state(data);
 	irq_unlock(locker);
 
 	return ret;
 }
 
-int flash_bflb_read_sfdp(const struct device *dev, off_t offset,
-			      void *data, size_t len)
+int flash_bflb_read_sfdp(const struct device *dev, off_t offset, void *o_data, size_t len)
 {
-	return 0;
+	struct flash_bflb_data *data = dev->data;
+	unsigned int locker;
+	int ret;
+
+	if (len == 0) {
+		return 0;
+	}
+
+	if ((offset + len) > 0xFFFFFF) {
+		return -EINVAL;
+	}
+
+	if (flash_bflb_is_in_xip(data, &flash_bflb_read_sfdp)) {
+		return -ENOTSUP;
+	}
+
+	locker = irq_lock();
+
+	ret = flash_bflb_save_xip_state(dev);
+	if (ret != 0) {
+		irq_unlock(locker);
+		return ret;
+	}
+
+	ret = flash_bflb_read_sfdp_internal(data, offset, o_data, len)
+
+	flash_bflb_restore_xip_state(data);
+	irq_unlock(locker);
+
+	return ret;
 }
 
 #endif
@@ -2185,8 +2040,6 @@ static int flash_bflb_init_bootbank(struct flash_bflb_data *data)
 		data->controller->flash_header_cfg.de_burst_wrap_data;
 	data->cfg.cmd.write_enable = data->controller->flash_header_cfg.write_enable_cmd;
 	data->cfg.cmd.page_program = data->controller->flash_header_cfg.page_program_cmd;
-	data->cfg.cmd.quad_page_program =
-		data->controller->flash_header_cfg.qpage_program_cmd;
 	data->cfg.cmd.sector_erase = data->controller->flash_header_cfg.sector_erase_cmd;
 	data->cfg.cmd.block_erase = data->controller->flash_header_cfg.blk32_erase_cmd;
 #if defined(CONFIG_SOC_SERIES_BL61X)
@@ -2277,6 +2130,284 @@ static void SF_Ctrl_Set_IO_Delay(struct flash_bflb_data *data, uint8_t doDelay, 
 	FLASH_WRITE32(tmp, offset + SF_CTRL_IO_DLY_4_OFFSET);
 }
 
+static int flash_bflb_discovery(struct flash_bflb_data *data, uint8_t jedec_id[3])
+{
+	struct jesd216_sfdp_header sfdp_header;
+	struct jesd216_param_header cur_header;
+	struct jesd216_param_header bfp_header;
+	struct jesd216_param_header vendor_header;
+	struct jesd216_param_header qio_header;
+	bool got_bfp = false;
+	bool got_qio = false;
+	bool got_vendor = false;
+	int ret;
+	uint32_t tmp;
+	uint32_t i_ph = 0;
+
+	ret = flash_bflb_read_sfdp_internal(data, 0, (void *)&(sfdp_header),
+					    sizeof(struct jesd216_sfdp_header));
+	if (ret != 0) {
+		return ret;
+	}
+
+	tmp = jesd216_sfdp_magic(&sfdp_header);
+
+	if (tmp != JESD216_SFDP_MAGIC) {
+		flash_bflb_nxip_message_set(data, NXIP_MSG_BAD_SFDP, 1, tmp, 0);
+		return -EINVAL;
+	}
+
+	/* Set these jedec defaults since this indeed a flash */
+	data->cfg.reg.write_enable_index = 0;
+	data->cfg.reg.write_enable_bit = 1;
+	data->cfg.reg.write_enable_read_len = 1;
+
+	while (i_ph < sfdp_header.nph)
+	{
+
+		ret = flash_bflb_read_sfdp_internal(data, sizeof(struct jesd216_sfdp_header)
+						    + i_ph * sizeof(struct jesd216_param_header),
+						    (void *)&(cur_header),
+						    sizeof(struct jesd216_param_header));
+		if (ret != 0) {
+			flash_bflb_nxip_message_set(data, NXIP_MSG_BAD_SFDP, 2, i_ph, 0);
+			return ret;
+		}
+
+		tmp = jesd216_param_id(&cur_header);
+
+		if (tmp == JESD216_SFDP_PARAM_ID_BFP) {
+			got_bfp = true;
+			flash_bflb_xip_memcpy((uint8_t *)&cur_header, (uint8_t *)&bfp_header,
+					      sizeof(struct jesd216_param_header));
+		} else if (tmp == JESD216_SFDP_PARAM_ID_4B_ADDR_INSTR) {
+			got_qio = true;
+			flash_bflb_xip_memcpy((uint8_t *)&cur_header, (uint8_t *)&qio_header,
+					      sizeof(struct jesd216_param_header));
+		} else if (tmp == jedec_id[0]) {
+			got_vendor = true;
+			flash_bflb_xip_memcpy((uint8_t *)&cur_header, (uint8_t *)&vendor_header,
+					      sizeof(struct jesd216_param_header));
+		}
+
+		i_ph++;
+	}
+
+	if (got_bfp) {
+		union {
+			uint32_t dw[20];
+			struct jesd216_bfp bfp;
+		} bfp_u;
+		const struct jesd216_bfp *bfp = &bfp_u.bfp;
+		struct jesd216_bfp_dw14 dw14;
+		struct jesd216_bfp_dw15 dw15;
+		struct jesd216_instr instr;
+		struct jesd216_erase_type etp;
+		bool read_ok = false;
+
+		ret = flash_bflb_read_sfdp_internal(data, jesd216_param_addr(&bfp_header),
+						    (void *)bfp_u.dw,
+						    MIN(sizeof(uint32_t) * bfp_header.len_dw,
+							sizeof(bfp_u.dw)));
+		if (ret != 0) {
+			flash_bflb_nxip_message_set(data, NXIP_MSG_BAD_SFDP, 3, 0, 0);
+			return ret;
+		}
+
+		data->cfg.size = jesd216_bfp_density(bfp) / 8U;
+
+		/* Pick best supported fast read */
+		do {
+			switch (data->cfg.auto_spi_mode) {
+			default:
+			case BUS_NIO:
+				read_ok = true;
+				tmp = JESD216_MODE_111;
+			break;
+			case BUS_DO:
+				if ((bfp_u.dw[0] & BIT(16)) == 0) {
+					data->cfg.auto_spi_mode =
+						flash_bflb_pick_next_worse_xip(
+							data->cfg.auto_spi_mode);
+					flash_bflb_nxip_message_set(data, NXIP_MSG_SADSUP_SFDP, 1,
+								    BIT(16), 0);
+				} else {
+					tmp = JESD216_MODE_112;
+					read_ok = true;
+				}
+			break;
+			case BUS_DIO:
+				if ((bfp_u.dw[0] & BIT(20)) == 0) {
+					data->cfg.auto_spi_mode =
+						flash_bflb_pick_next_worse_xip(
+							data->cfg.auto_spi_mode);
+					flash_bflb_nxip_message_set(data, NXIP_MSG_SADSUP_SFDP, 1,
+								    BIT(20), 0);
+				} else {
+					tmp = JESD216_MODE_122;
+					read_ok = true;
+				}
+			break;
+			case BUS_QO:
+				if ((bfp_u.dw[0] & BIT(22)) == 0) {
+					data->cfg.auto_spi_mode =
+						flash_bflb_pick_next_worse_xip(
+							data->cfg.auto_spi_mode);
+					flash_bflb_nxip_message_set(data, NXIP_MSG_SADSUP_SFDP, 1,
+								    BIT(22), 0);
+				} else {
+					tmp = JESD216_MODE_114;
+					read_ok = true;
+				}
+			break;
+			case BUS_QIO:
+				if ((bfp_u.dw[0] & BIT(21)) == 0) {
+					data->cfg.auto_spi_mode =
+						flash_bflb_pick_next_worse_xip(
+							data->cfg.auto_spi_mode);
+					flash_bflb_nxip_message_set(data, NXIP_MSG_SADSUP_SFDP, 1,
+								    BIT(21), 0);
+				} else {
+					tmp = JESD216_MODE_144;
+					read_ok = true;
+				}
+			break;
+			}
+		} while (!read_ok);
+
+		ret = jesd216_bfp_read_support(&bfp_header, bfp, tmp, &instr);
+		if (ret < 0) {
+			flash_bflb_nxip_message_set(data, NXIP_MSG_BAD_SFDP, 2, tmp, 0);
+			return ret;
+		}
+		if (ret == 0) {
+			if (data->cfg.cmd.auto_read == 0) {
+				flash_bflb_set_default_read_default(data);
+			}
+		} else {
+			ret = 0;
+			if (data->cfg.cmd.auto_read == 0) {
+				data->cfg.cmd.auto_read = instr.instr;
+			}
+			/* Dummy cycles come in package of 8 */
+			if (data->cfg.cmd.auto_read_dmycy == 0) {
+				data->cfg.cmd.auto_read_dmycy = instr.wait_states / 8;
+
+				if (instr.wait_states % 8 != 0) {
+					flash_bflb_nxip_message_set(data, NXIP_MSG_SADSUP_SFDP, 3, 0xFF, 0);
+				}
+			}
+		}
+
+		/* Cannot support non-uniform erase */
+		if ((bfp_u.dw[0] & GENMASK(1, 0)) == GENMASK(1, 0)) {
+			flash_bflb_nxip_message_set(data, NXIP_MSG_SADSUP_SFDP, 1, 0x7, 0);
+		} else {
+			data->cfg.cmd.sector_erase =
+				(bfp_u.dw[0] & JESD216_SFDP_BFP_DW1_4KERASEINSTR_MASK)
+				>> JESD216_SFDP_BFP_DW1_4KERASEINSTR_SHFT;
+		}
+
+		data->cfg.page_size = jesd216_bfp_page_size(&bfp_header, bfp);
+
+		/* Busy bit infos */
+		ret = jesd216_bfp_decode_dw14(&bfp_header, bfp, &dw14);
+		if (ret == 0) {
+			if (dw14.poll_options & BIT(1)) {
+				data->cfg.reg.busy_index = 3;
+				data->cfg.cmd.read_reg[3] = SPI_NOR_CMD_RDFLSR;
+				data->cfg.reg.busy_bit = 7;
+			} else {
+				data->cfg.reg.busy_bit = 0;
+				data->cfg.reg.busy_read_len = 1;
+				data->cfg.reg.busy_index = 0;
+			}
+		} else {
+			flash_bflb_nxip_message_set(data, NXIP_MSG_SAD_SFDP,
+						    JESD216_SFDP_PARAM_ID_BFP, 14, 0);
+		}
+
+		ret = jesd216_bfp_decode_dw15(&bfp_header, bfp, &dw15);
+		if (ret == 0) {
+			switch(dw15.qer) {
+			case JESD216_DW15_QER_S2B1v5:
+			case JESD216_DW15_QER_S2B1v4:
+			case JESD216_DW15_QER_S2B1v1:
+				data->cfg.reg.quad_enable_bit = 1;
+				data->cfg.reg.quad_enable_index = 1;
+				data->cfg.reg.quad_enable_write_len = 2;
+				data->cfg.reg.quad_enable_read_len = 1;
+			break;
+			case JESD216_DW15_QER_S1B6:
+				data->cfg.reg.quad_enable_bit = 6;
+				data->cfg.reg.quad_enable_index = 0;
+				data->cfg.reg.quad_enable_write_len = 1;
+				data->cfg.reg.quad_enable_read_len = 1;
+			break;
+			case JESD216_DW15_QER_S2B1v6:
+				data->cfg.reg.quad_enable_bit = 1;
+				data->cfg.reg.quad_enable_index = 1;
+				data->cfg.reg.quad_enable_write_len = 1;
+				data->cfg.reg.quad_enable_read_len = 1;
+			break;
+			default:
+			break;
+			}
+		} else {
+			ret = 0;
+			flash_bflb_nxip_message_set(data, NXIP_MSG_SAD_SFDP,
+						    JESD216_SFDP_PARAM_ID_BFP, 15, 0);
+		}
+
+
+		tmp = jesd216_bfp_addrbytes(bfp);
+		if (tmp == JESD216_SFDP_BFP_DW1_ADDRBYTES_VAL_3B4B
+		    || tmp == JESD216_SFDP_BFP_DW1_ADDRBYTES_VAL_4B) {
+			struct jesd216_bfp_dw16 dw16;
+
+			ret = jesd216_bfp_decode_dw16(&bfp_header, bfp, &dw16);
+			if (ret != 0) {
+				flash_bflb_nxip_message_set(data, NXIP_MSG_SAD_SFDP,
+						    JESD216_SFDP_PARAM_ID_BFP, 16, 0);
+			} else {
+				if ((dw16.enter_4ba & GENMASK(1, 0)) != 0) {
+					data->cfg.cmd.enter_32bits_addr = SPI_NOR_CMD_4BA;
+				} else {
+					data->cfg.cmd.enter_32bits_addr = 0;
+				}
+				if ((dw16.exit_4ba & GENMASK(1, 0)) != 0) {
+					data->cfg.cmd.exit_32bits_addr = 0xE9;
+				} else {
+					data->cfg.cmd.enter_32bits_addr = 0;
+				}
+
+				if ((dw16.sr1_interface & GENMASK(1,0)) != 0
+				    || (dw16.sr1_interface & GENMASK(4,3)) != 0) {
+					data->cfg.cmd.write_enable = SPI_NOR_CMD_WREN;
+				} else if ((dw16.sr1_interface & BIT(2)) != 0) {
+					data->cfg.cmd.write_enable = SPI_NOR_CMD_CLRFLSR;
+				}
+			}
+		} else {
+			data->controller->addr_32bits = false;
+		}
+
+	} else {
+		flash_bflb_nxip_message_set(data, NXIP_MSG_SAD_SFDP, 1,
+					    JESD216_SFDP_PARAM_ID_BFP, 0);
+	}
+
+	return ret;
+}
+
+static int flash_bflb_handle_quirky_devices(struct flash_bflb_data *data, uint8_t)
+{
+	/* Restore XIP temporarily */
+	flash_bflb_set_bus(data, 1);
+	//flash_bflb_release_sahb(data);
+
+}
+
 static int flash_bflb_init(const struct device *dev)
 {
 	const struct flash_bflb_config *cfg = dev->config;
@@ -2289,20 +2420,24 @@ static int flash_bflb_init(const struct device *dev)
 
 	k_mutex_init(&data->sahb_mutex);
 
+	if (cfg->pincfg->state_cnt != 0) {
+		ret = pinctrl_apply_state(cfg->pincfg, PINCTRL_STATE_DEFAULT);
+		if (ret != 0) {
+			return ret;
+		}
+	}
+
 	if (data->bank == BANK1) {
 		ret = flash_bflb_init_bootbank(data);
 		if (ret != 0) {
 			return ret;
 		}
 	} else {
-		ret = pinctrl_apply_state(cfg->pincfg, PINCTRL_STATE_DEFAULT);
-		if (ret != 0) {
-			return ret;
-		}
 
-		if (data->cfg.cmd.auto_read == BFLB_FLASH_AUTO_READ_DEFAULT
-		    && data->cfg.cmd.auto_read_dmycy == BFLB_FLASH_AUTO_READ_DMYCY_DEFAULT)
-		flash_bflb_set_default_read_default(data);
+		if (data->cfg.cmd.auto_read == 0
+		    && data->cfg.cmd.auto_read_dmycy == 0) {
+			flash_bflb_set_default_read_default(data);
+		}
 		/* Enable bank2 */
 		tmp = FLASH_READ32(data->reg + SF_CTRL_2_OFFSET);
 		tmp |= SF_CTRL_SF_IF_BK2_EN_MSK;
@@ -2353,13 +2488,43 @@ static int flash_bflb_init(const struct device *dev)
 		return ret;
 	}
 
-	flash_bflb_reset(data);
-
 	ret = flash_bflb_get_jedec_id_internal(data, jedec_id);
+	if (ret != 0 || *jedec_id == 0 || *jedec_id == 0xFFFFF) {
+		/* Try a reset */
+		flash_bflb_reset(data);
+		/* Wait because we might not have enough informations yet to check for busyness */
+		flash_bflb_busy_wait(data);
+		ret = flash_bflb_get_jedec_id_internal(data, jedec_id);
+	}
 	if (ret != 0) {
 		goto exit_nxip_bad;
 	}
+	if (*jedec_id == 0 || *jedec_id == 0xFFFFF) {
+		goto exit_nxip_bad_jedec;
+	}
 
+	if (data->use_sfdp) {
+		ret = flash_bflb_discovery(data, jedec_id);
+		if (ret != 0) {
+			goto exit_nxip_bad;
+		}
+	} /*else if (data->bank == BANK2) {
+		ret = flash_bflb_handle_quirky_devices(data);
+	}*/
+
+	for (uint32_t i = 0; i < data->init_seq_len; i += 3) {
+		ret = flash_bflb_flash_send_triplet(data, data->init_seq[i],
+						    data->init_seq[i + 1],
+						    data->init_seq[i + 2]);
+		flash_bflb_busy_wait(data);
+		if (ret != 0) {
+			flash_bflb_nxip_message_set(data, NXIP_MSG_INITSEQ_FAIL, data->init_seq[i],
+						    data->init_seq[i + 1], data->init_seq[i + 2]);
+			break;
+		}
+	}
+
+exit_nxip_bad_jedec:
 	ret = flash_bflb_restore_xip_state(data);
 	irq_unlock(locker);
 
@@ -2383,6 +2548,19 @@ static int flash_bflb_init(const struct device *dev)
 		disp_2 = sys_be32_to_cpu(disp_2) >> 8;
 		LOG_WRN("JEDEC ID (%x) does not match device's (%x)", disp_1, disp_2);
 	}
+
+	LOG_DBG("Discovered at %s: size %d spi_modes: %d %d auto_read: %x, %d dmycy, %s %s",
+		data->bank == BANK2 ? "bank 2" : "bank 1",
+		data->cfg.size,
+		data->cfg.auto_spi_mode, data->cfg.manual_spi_mode,
+		data->cfg.cmd.auto_read, data->cfg.cmd.auto_read_dmycy,
+		data->cfg.cmd.enter_32bits_addr ? "4B addr support," : "",
+		data->cfg.reg.quad_enable_read_len ? "QE bit" : "");
+
+	if (data->cfg.reg.quad_enable_read_len) {
+		LOG_DBG("QE: bit %d index %d read_len %d, write_len %d", data->cfg.reg.quad_enable_bit, data->cfg.reg.quad_enable_index, data->cfg.reg.quad_enable_read_len, data->cfg.reg.quad_enable_write_len);
+	}
+
 
 	return ret;
 
@@ -2410,10 +2588,8 @@ static DEVICE_API(flash, flash_bflb_api) = {
 #define FLASH_BFLB_DEVICE_SET_CMDS(_n)							\
 	.cfg.auto_spi_mode = DT_PROP(_n, spi_bus_mode),					\
 	.cfg.manual_spi_mode = BUS_NIO,							\
-	.cfg.cmd.auto_read = DT_PROP_OR(_n, read_command,				\
-					BFLB_FLASH_AUTO_READ_DEFAULT),			\
-	.cfg.cmd.auto_read_dmycy = DT_PROP_OR(_n, read_dummy_cycles,			\
-					      BFLB_FLASH_AUTO_READ_DMYCY_DEFAULT),	\
+	.cfg.cmd.auto_read = DT_PROP_OR(_n, read_command, 0),				\
+	.cfg.cmd.auto_read_dmycy = DT_PROP_OR(_n, read_dummy_cycles, 0),		\
 	.cfg.cmd.auto_write = DT_PROP_OR(_n, write_command, 0),				\
 	.cfg.cmd.auto_write_dmycy = DT_PROP_OR(_n, write_dummy_cycles, 0),		\
 	.cfg.cmd.manual_read = SPI_NOR_CMD_READ,					\
@@ -2427,7 +2603,6 @@ static DEVICE_API(flash, flash_bflb_api) = {
 	.cfg.cmd.burstwrap = 0,								\
 	.cfg.cmd.write_enable = SPI_NOR_CMD_WREN,					\
 	.cfg.cmd.page_program = SPI_NOR_CMD_PP,						\
-	.cfg.cmd.quad_page_program = SPI_NOR_CMD_PP_1_1_4,				\
 	.cfg.cmd.sector_erase = SPI_NOR_CMD_SE,						\
 	.cfg.cmd.block_erase = SPI_NOR_CMD_BE_32K,					\
 	.cfg.cmd.enter_32bits_addr = SPI_NOR_CMD_4BA,					\
@@ -2457,6 +2632,8 @@ static DEVICE_API(flash, flash_bflb_api) = {
 		     "Bank 1 does not support writing.");				\
 	BUILD_ASSERT(FLASH_BFLB_DEVICE_IS_BANK2(_n) ?					\
 		(DT_NODE_HAS_PROP(_n, pinctrl_0)) : true, "Bank 2 must have pinctrl");	\
+	BUILD_ASSERT(DT_PROP_LEN_OR(_n, initialization_sequence, 0) % 3 == 0,		\
+		     "Initialization sequence must be command data datalen triplets");	\
 	PINCTRL_DT_DEFINE(_n);								\
 	static struct flash_bflb_data flash_bflb_data_##_n = {				\
 		.reg = DT_REG_ADDR(_controller_n),					\
@@ -2471,6 +2648,9 @@ static DEVICE_API(flash, flash_bflb_api) = {
 		.layout.pages_size = DT_PROP(_n, erase_block_size),			\
 		.parameters.write_block_size = DT_PROP(_n, write_block_size),		\
 		.parameters.erase_value = ERASE_VALUE,					\
+		.use_sfdp = DT_PROP(_n, use_sfdp),					\
+		.init_seq = (uint32_t[]) DT_PROP_OR(_n, initialization_sequence, {}),	\
+		.init_seq_len = DT_PROP_LEN_OR(_n, initialization_sequence, 0),		\
 	};										\
 	static const struct flash_bflb_config flash_bflb_config_##_n = {		\
 		.pincfg = PINCTRL_DT_DEV_CONFIG_GET(_n),				\
@@ -2484,6 +2664,7 @@ static DEVICE_API(flash, flash_bflb_api) = {
 #define FLASH_BFLB_CONTROLLER_INIT(_n)							\
 	static struct flash_bflb_controller_data flash_bflb_controller_data_##_n = {	\
 		.override_bank1 = DT_PROP(_n, override_bank1),				\
+		.addr_32bits = DT_PROP(_n, use_32b_addresses),				\
 	};										\
 	DT_FOREACH_CHILD_STATUS_OKAY_VARGS(_n, FLASH_BFLB_DEVICE_DEFINE, _n)		\
 	BUILD_ASSERT(DT_CHILD_NUM(_n) <= 2, "Only 2 banks available");			\

@@ -21,3 +21,8 @@ properties:
     description: |
       Force using DTS provided settings instead of the flash header's for bank1's settings.
 
+  use-32b-addresses:
+    type: boolean
+    description: |
+      Enables using 32 bits length addresses. Must be supported by all devices connected.
+

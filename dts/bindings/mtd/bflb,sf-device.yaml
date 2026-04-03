@@ -21,7 +21,8 @@ properties:
     required: true
     description: |
       Which pad is this device holding. This is directly related to which pins are used.
-      Pad 1 is the embedded flash, Pad 2 and Pad 3 are almost always external.
+      Pad 1 is usually the embedded flash, Pad 2 and Pad 3 are usually external.
+      Main exception is BL70x where the default embedded pad is SF2.
     enum:
       - 1
       - 2
@@ -55,7 +56,7 @@ properties:
   read-dummy-cycles:
     type: int
     description: |
-      Dummy cycles for automatic read mode. They are expressed in bytes.
+      Dummy cycles for automatic read mode. They are expressed in bytes (8 cycles).
 
   continuous-read-command:
     type: int
@@ -71,4 +72,11 @@ properties:
   write-dummy-cycles:
     type: int
     description: |
-      Dummy cycles for automatic write mode. They are expressed in bytes.
+      Dummy cycles for automatic write mode. They are expressed in bytes (8 cycles).
+
+  initialization-sequence:
+    type: array
+    description: |
+      Triples of command, data, datalength writes to set things up at setup time. For example to clear
+      out block protection, or setup dummy timing. up to 4 bytes of data can be sent at once.
+      Remember the byte order is inverted (right to left)
