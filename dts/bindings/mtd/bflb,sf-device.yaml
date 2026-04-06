@@ -7,6 +7,7 @@ description: |
   Bouffalolab Serial Flash controller device
   QPI (Quad I/O for everything) mode is unsupported by the driver
   Continuous read support is experimental.
+  Big struggle with QIO and DIO.
 
 compatible: "bflb,sf-device"
 

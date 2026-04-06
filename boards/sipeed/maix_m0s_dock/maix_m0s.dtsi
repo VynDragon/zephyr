@@ -32,25 +32,41 @@
 	clock-frequency = <DT_FREQ_M(320)>;
 };
 
+&clk_flash {
+	divider = <1>;
+};
+
 &flashctrl {
+	override-bank1;
+
 	flash0: flash@a0000000 {
-		compatible = "soc-nv-flash", "gd,25lq32d";
+		compatible = "bflb,sf-flash", "gd,25lq32d";
 		reg = <0xa0000000 (0x400000 - 0x2000)>;
+		ranges = <0x0 0xa0000000 (0x400000 - 0x2000)>;
+		#address-cells = <1>;
+		#size-cells = <1>;
 		write-block-size = <256>;
 		erase-block-size = <DT_SIZE_K(4)>;
+		spi-bus-mode = <2>;
+		sf-pad = <1>;
+		read-delay = <1>;
+		use-sfdp;
 
 		partitions {
-			compatible = "fixed-partitions";
+			compatible = "soc-nv-flash";
+			ranges;
 			#address-cells = <1>;
 			#size-cells = <1>;
 
 			slot0_partition: partition@0 {
+				compatible = "zephyr,mapped-partition";
 				label = "image-0";
 				reg = <0x00000000 0x00100000>;
 				read-only;
 			};
 
 			storage_partition: partition@100000 {
+				compatible = "zephyr,mapped-partition";
 				label = "storage";
 				reg = <0x00100000 (0x300000 - 0x2000)>;
 			};

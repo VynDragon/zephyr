@@ -346,6 +346,54 @@ static __nxipfunc void flash_bflb_l1c_wrap(bool enable)
 
 #if defined(CONFIG_SOC_SERIES_BL61X)
 
+static __nxipfunc void flash_bflb_select_pads(struct flash_bflb_data *data,
+					      enum flash_bflb_pad bank1, enum flash_bflb_pad bank2)
+{
+	uint32_t tmp;
+
+	if (bank1 == PAD1 || bank2 == PAD1) {
+		tmp = FLASH_READ32(GLB_BASE + GLB_PARM_CFG0_OFFSET);
+		tmp |= GLB_SEL_EMBEDDED_SFLASH_MSK;
+		FLASH_WRITE32(tmp, GLB_BASE + GLB_PARM_CFG0_OFFSET);
+	} else {
+		tmp = FLASH_READ32(GLB_BASE + GLB_PARM_CFG0_OFFSET);
+		tmp &= ~GLB_SEL_EMBEDDED_SFLASH_MSK;
+		FLASH_WRITE32(tmp, GLB_BASE + GLB_PARM_CFG0_OFFSET);
+	}
+
+	tmp = FLASH_READ32(data->reg + SF_CTRL_2_OFFSET);
+	tmp &= ~SF_CTRL_SF_IF_BK_SWAP_MSK;
+
+	if (bank1 == PAD1 && bank2 == PAD2) {
+		tmp &= ~SF_CTRL_SF_IF_PAD_SEL_MSK;
+		tmp |= 0 << SF_CTRL_SF_IF_PAD_SEL_POS;
+	} else if (bank1 == PAD2 && bank2 == PAD3) {
+		tmp &= ~SF_CTRL_SF_IF_PAD_SEL_MSK;
+		tmp |= 1U << SF_CTRL_SF_IF_PAD_SEL_POS;
+	} else if (bank1 == PAD3 && bank2 == PAD1) {
+		tmp &= ~SF_CTRL_SF_IF_PAD_SEL_MSK;
+		tmp |= 2U << SF_CTRL_SF_IF_PAD_SEL_POS;
+	} else if (bank1 == PAD2 && bank2 == PAD1) {
+		tmp &= ~SF_CTRL_SF_IF_PAD_SEL_MSK;
+		tmp |= 0U << SF_CTRL_SF_IF_PAD_SEL_POS;
+		tmp |= SF_CTRL_SF_IF_BK_SWAP_MSK;
+		tmp |= SF_CTRL_SF_IF_BK2_EN_MSK;
+	} else if (bank1 == PAD3 && bank2 == PAD2) {
+		tmp &= ~SF_CTRL_SF_IF_PAD_SEL_MSK;
+		tmp |= 1U << SF_CTRL_SF_IF_PAD_SEL_POS;
+		tmp |= SF_CTRL_SF_IF_BK_SWAP_MSK;
+	} else if (bank1 == PAD1 && bank2 == PAD3) {
+		tmp &= ~SF_CTRL_SF_IF_PAD_SEL_MSK;
+		tmp |= 2U << SF_CTRL_SF_IF_PAD_SEL_POS;
+		tmp |= SF_CTRL_SF_IF_BK_SWAP_MSK;
+	}
+
+	FLASH_WRITE32(tmp, data->reg + SF_CTRL_2_OFFSET);
+}
+
+/* IF2 is independant from IAHB so can also optionally access the last pad while the 2 others are
+ * memory-mapped.
+ */
 static __nxipfunc void flash_bflb_if2_enable(struct flash_bflb_data *data, bool enable)
 {
 	uint32_t tmp;
@@ -401,11 +449,9 @@ static __nxipfunc void flash_bflb_if2_enable(struct flash_bflb_data *data, bool 
 
 static __nxipfunc uintptr_t flash_bflb_set_sahb(struct flash_bflb_data *data)
 {
-	uint32_t tmp;
-
 	k_mutex_lock(&data->sahb_mutex, K_FOREVER);
 
-	if (data->bank == BANK2){
+	if (data->bank == BANK2) {
 
 		flash_bflb_if2_enable(data, true);
 
@@ -414,27 +460,13 @@ static __nxipfunc uintptr_t flash_bflb_set_sahb(struct flash_bflb_data *data)
 
 		flash_bflb_if2_enable(data, false);
 
-		/* Select pad similarly
-		 * Remember this also sets it for IAHB operation
-		 */
-		if (data->pad != PAD1) {
-			tmp = FLASH_READ32(GLB_BASE + GLB_PARM_CFG0_OFFSET);
-			tmp &= ~GLB_SEL_EMBEDDED_SFLASH_MSK;
-			FLASH_WRITE32(tmp, GLB_BASE + GLB_PARM_CFG0_OFFSET);
-		}
-
-		tmp = FLASH_READ32(data->reg + SF_CTRL_2_OFFSET);
-		tmp &= ~SF_CTRL_SF_IF_PAD_SEL_MSK;
-		tmp |= (data->pad - 1U) << SF_CTRL_SF_IF_PAD_SEL_POS;
-		FLASH_WRITE32(tmp, data->reg + SF_CTRL_2_OFFSET);
-
 		return data->reg + SF_CTRL_SF_IF_SAHB_0_OFFSET;
 	}
 }
 
 static __nxipfunc void flash_bflb_release_sahb(struct flash_bflb_data *data)
 {
-	if (data->bank == BANK2){
+	if (data->bank == BANK2) {
 		flash_bflb_if2_enable(data, false);
 	}
 
@@ -445,20 +477,59 @@ static __nxipfunc void flash_bflb_release_sahb(struct flash_bflb_data *data)
 
 #if defined(CONFIG_SOC_SERIES_BL60X)
 
-static __nxipfunc uintptr_t flash_bflb_set_sahb(struct flash_bflb_data *data)
+static __nxipfunc void flash_bflb_select_pads(struct flash_bflb_data *data,
+					      enum flash_bflb_pad bank1, enum flash_bflb_pad bank2)
 {
 	uint32_t tmp;
-	k_mutex_lock(&data->sahb_mutex, K_FOREVER);
 
 	tmp = FLASH_READ32(data->reg + SF_CTRL_2_OFFSET);
 	tmp &= ~SF_CTRL_SF_IF_PAD_SEL_MSK;
-	tmp |= (data->pad - 1U) << SF_CTRL_SF_IF_PAD_SEL_POS;
+	tmp |= (bank1 - 1U)<< SF_CTRL_SF_IF_PAD_SEL_POS;
 	FLASH_WRITE32(tmp, data->reg + SF_CTRL_2_OFFSET);
+}
+
+static __nxipfunc uintptr_t flash_bflb_set_sahb(struct flash_bflb_data *data)
+{
+	k_mutex_lock(&data->sahb_mutex, K_FOREVER);
 
 	return data->reg + SF_CTRL_SF_IF_SAHB_0_OFFSET;
 }
 
 #else
+
+static __nxipfunc void flash_bflb_select_pads(struct flash_bflb_data *data,
+					      enum flash_bflb_pad bank1, enum flash_bflb_pad bank2)
+{
+	uint32_t tmp;
+
+	tmp = FLASH_READ32(data->reg + SF_CTRL_2_OFFSET);
+	tmp &= ~SF_CTRL_SF_IF_BK_SWAP_MSK;
+
+	if (bank1 == PAD1 && bank2 == PAD2) {
+		tmp &= ~SF_CTRL_SF_IF_PAD_SEL_MSK;
+		tmp |= 0 << SF_CTRL_SF_IF_PAD_SEL_POS;
+	} else if (bank1 == PAD2 && bank2 == PAD3) {
+		tmp &= ~SF_CTRL_SF_IF_PAD_SEL_MSK;
+		tmp |= 1U << SF_CTRL_SF_IF_PAD_SEL_POS;
+	} else if (bank1 == PAD3 && bank2 == PAD1) {
+		tmp &= ~SF_CTRL_SF_IF_PAD_SEL_MSK;
+		tmp |= 2U << SF_CTRL_SF_IF_PAD_SEL_POS;
+	} else if (bank1 == PAD2 && bank2 == PAD1) {
+		tmp &= ~SF_CTRL_SF_IF_PAD_SEL_MSK;
+		tmp |= 0U << SF_CTRL_SF_IF_PAD_SEL_POS;
+		tmp |= SF_CTRL_SF_IF_BK_SWAP_MSK;
+	} else if (bank1 == PAD3 && bank2 == PAD2) {
+		tmp &= ~SF_CTRL_SF_IF_PAD_SEL_MSK;
+		tmp |= 1U << SF_CTRL_SF_IF_PAD_SEL_POS;
+		tmp |= SF_CTRL_SF_IF_BK_SWAP_MSK;
+	} else if (bank1 == PAD1 && bank2 == PAD3) {
+		tmp &= ~SF_CTRL_SF_IF_PAD_SEL_MSK;
+		tmp |= 2U << SF_CTRL_SF_IF_PAD_SEL_POS;
+		tmp |= SF_CTRL_SF_IF_BK_SWAP_MSK;
+	}
+
+	FLASH_WRITE32(tmp, data->reg + SF_CTRL_2_OFFSET);
+}
 
 static __nxipfunc uintptr_t flash_bflb_set_sahb(struct flash_bflb_data *data)
 {
@@ -472,8 +543,6 @@ static __nxipfunc uintptr_t flash_bflb_set_sahb(struct flash_bflb_data *data)
 	else {
 		tmp &= ~SF_CTRL_SF_IF_0_BK_SEL_MSK;
 	}
-	tmp &= ~SF_CTRL_SF_IF_PAD_SEL_MSK;
-	tmp |= (data->pad - 1U) << SF_CTRL_SF_IF_PAD_SEL_POS;
 	FLASH_WRITE32(tmp, data->reg + SF_CTRL_2_OFFSET);
 
 	return data->reg + SF_CTRL_SF_IF_SAHB_0_OFFSET;
@@ -492,7 +561,7 @@ static __nxipfunc void flash_bflb_release_sahb(struct flash_bflb_data *data)
 
 static __nxipfunc uintptr_t flash_bflb_get_if(struct flash_bflb_data *data)
 {
-	if (data->bank == BANK2){
+	if (data->bank == BANK2) {
 		return data->reg + SF_CTRL_SF_IF2_CTRL_0_OFFSET;
 	} else {
 		return data->reg;
@@ -524,7 +593,7 @@ static __nxipfunc bool flash_bflb_busy_wait(struct flash_bflb_data *data)
 	while ((FLASH_READ32(flash_bflb_get_if(data) + SF_CTRL_SF_IF_SAHB_0_OFFSET)
 		& SF_CTRL_SF_IF_BUSY_MSK) != 0
 		&& counter < BFLB_FLASH_CONTROLLER_BUSY_TIMEOUT * 20000) {
-		clock_bflb_settle();
+		__asm__ volatile (".rept 20 ; nop ; .endr");
 		counter++;
 	}
 
@@ -920,42 +989,6 @@ static __nxipfunc int flash_bflb_flash_disable_continuous_read(struct flash_bflb
 	return flash_bflb_send_command(data, &disable_continuous_read);
 }
 
-static __nxipfunc int flash_bflb_flash_disable_burst(struct flash_bflb_data *data)
-{
-	uint32_t tmp;
-	struct bflb_flash_command disable_burstwrap = {0};
-
-	flash_bflb_l1c_wrap(false);
-
-	disable_burstwrap.dummy_clks = data->cfg.cmd.burstwrap_dmycy;
-	disable_burstwrap.spi_mode = data->cfg.auto_spi_mode;
-	disable_burstwrap.cmd_buf[0] = data->cfg.cmd.burstwrap << 24;
-	disable_burstwrap.nb_data = 1;
-	disable_burstwrap.rw = 1;
-	tmp = data->cfg.cmd.burstwrap_off_data;
-	FLASH_WRITE32(tmp, SF_CTRL_BUF_BASE);
-
-	return flash_bflb_send_command(data, &disable_burstwrap);
-}
-
-static __nxipfunc int flash_bflb_flash_enable_burst(struct flash_bflb_data *data)
-{
-	uint32_t tmp;
-	struct bflb_flash_command enable_burstwrap = {0};
-
-	flash_bflb_l1c_wrap(true);
-
-	enable_burstwrap.dummy_clks = data->cfg.cmd.burstwrap_dmycy;
-	enable_burstwrap.spi_mode = data->cfg.auto_spi_mode;
-	enable_burstwrap.cmd_buf[0] = data->cfg.cmd.burstwrap << 24;
-	enable_burstwrap.nb_data = 1;
-	enable_burstwrap.rw = 1;
-	tmp = data->cfg.cmd.burstwrap_on_data;
-	FLASH_WRITE32(tmp, SF_CTRL_BUF_BASE);
-
-	return flash_bflb_send_command(data, &enable_burstwrap);
-}
-
 static __nxipfunc int flash_bflb_enable_writable(struct flash_bflb_data *data)
 {
 	struct bflb_flash_command write_enable = {0};
@@ -977,7 +1010,8 @@ static __nxipfunc int flash_bflb_enable_writable(struct flash_bflb_data *data)
 			return ret;
 		}
 
-		if ((write_reg & BIT(data->cfg.reg.write_enable_bit)) != 0) {
+		if ((((uint8_t *)&write_reg)[data->cfg.reg.write_enable_read_len - 1]
+			& BIT(data->cfg.reg.write_enable_bit)) != 0) {
 			return 0;
 		}
 	} else {
@@ -985,6 +1019,35 @@ static __nxipfunc int flash_bflb_enable_writable(struct flash_bflb_data *data)
 	}
 
 	return -EIO;
+}
+
+static __nxipfunc int flash_bflb_flash_set_burst(struct flash_bflb_data *data, bool yes)
+{
+	struct bflb_flash_command enable_burstwrap = {0};
+	int ret;
+	uint32_t tmp;
+
+	flash_bflb_l1c_wrap(true);
+
+	ret = flash_bflb_enable_writable(data);
+	if (ret != 0) {
+		return ret;
+	}
+
+	/* Burst wrap commands are usually in QO mode */
+	enable_burstwrap.spi_mode = BUS_QIO;
+	enable_burstwrap.dummy_clks = data->cfg.cmd.burstwrap_dmycy;
+	enable_burstwrap.cmd_buf[0] = data->cfg.cmd.burstwrap << 24;
+	enable_burstwrap.nb_data = 1;
+	enable_burstwrap.rw = 1;
+	if (yes) {
+		tmp = data->cfg.cmd.burstwrap_on_data;
+	} else {
+		tmp = data->cfg.cmd.burstwrap_off_data;
+	}
+	FLASH_WRITE32(tmp, SF_CTRL_BUF_BASE);
+
+	return flash_bflb_send_command(data, &enable_burstwrap);
 }
 
 static __nxipfunc void flash_bflb_set_32b_enabled(struct flash_bflb_data *data, bool yes)
@@ -1144,7 +1207,7 @@ static __nxipfunc int flash_bflb_save_xip_state(const struct device *dev)
 
 	/* Disable burst with wrap*/
 	if (data->cfg.cmd.burstwrap != 0) {
-		ret = flash_bflb_flash_disable_burst(data);
+		ret = flash_bflb_flash_set_burst(data, false);
 		if (ret != 0) {
 			goto exit_here;
 		}
@@ -1161,14 +1224,6 @@ static __nxipfunc int flash_bflb_save_xip_state(const struct device *dev)
 	/* Samely */
 	if (data->controller->addr_32bits && data->cfg.cmd.enter_32bits_addr) {
 		flash_bflb_enable_32baddr(data);
-	}
-
-	/* disable burst with wrap*/
-	if (data->cfg.cmd.burstwrap != 0) {
-		ret = flash_bflb_flash_disable_burst(data);
-		if (ret != 0) {
-			goto exit_here;
-		}
 	}
 
 exit_here:
@@ -1193,7 +1248,7 @@ static __nxipfunc bool flash_bflb_flash_busy_wait(struct flash_bflb_data *data)
 		BFLB_FLASH_CHIP_BUSY_TIMEOUT * 20000) {
 		flash_bflb_flash_read_register(data, data->cfg.reg.busy_index, &tmp_bus,
 					       data->cfg.reg.busy_read_len);
-		clock_bflb_settle();
+		__asm__ volatile (".rept 20 ; nop ; .endr");
 		counter++;
 	}
 
@@ -1320,16 +1375,16 @@ static __nxipfunc int flash_bflb_restore_xip_state(struct flash_bflb_data *data)
 		}
 	}
 
-	/* reenable burst read */
+	if (data->controller->addr_32bits && data->cfg.cmd.enter_32bits_addr != 0) {
+		flash_bflb_enable_32baddr(data);
+	}
+
+	/* Reenable burst read */
 	if (data->cfg.cmd.burstwrap != 0) {
-		ret = flash_bflb_flash_enable_burst(data);
+		ret = flash_bflb_flash_set_burst(data, true);
 		if (ret != 0) {
 			goto exit_here;
 		}
-	}
-
-	if (data->controller->addr_32bits && data->cfg.cmd.enter_32bits_addr != 0) {
-		flash_bflb_enable_32baddr(data);
 	}
 
 	ret = flash_bflb_xip_init(data);
@@ -1345,7 +1400,6 @@ static __nxipfunc int flash_bflb_restore_xip_state(struct flash_bflb_data *data)
 	}
 
 exit_here:
-
 	if (ret != 0) {
 		/* Attempt to restore still functional XIP bank (Fine if it is bank 2 failing) */
 		flash_bflb_set_bus(data, 1);
@@ -2077,11 +2131,22 @@ static int flash_bflb_init_bootbank(struct flash_bflb_data *data)
 	return 0;
 }
 
+/* The only delays used in the SDK are 'di' and 'cs'.
+ * possibly each bit sets 3ns, or the value of 3 does, which is the maximum.
+ * It used for final fine tuning.
+ */
 static __nxipfunc void flash_bflb_set_io_delays(struct flash_bflb_data *data,
-						uint8_t doDelay, uint8_t diDelay, uint8_t oeDelay)
+						uint8_t dod, uint8_t did, uint8_t oed,
+						uint8_t csd, uint8_t clkd)
 {
 	uint32_t tmp = 0;
 	uint32_t offset = 0;
+
+	dod &= 0x3;
+	did &= 0x3;
+	oed &= 0x3;
+	csd &= 0x3;
+	clkd &= 0x3;
 
 	if (data->pad == PAD1) {
 		offset = SF_CTRL_BASE + SF_CTRL_IF_IO_DLY_1_OFFSET;
@@ -2091,41 +2156,51 @@ static __nxipfunc void flash_bflb_set_io_delays(struct flash_bflb_data *data,
 		offset = SF_CTRL_BASE + SF_CTRL_IF_IO_DLY_3_OFFSET;
 	}
 
+	/* Set cs and clk delay */
+	tmp = FLASH_READ32(offset + SF_CTRL_IO_DLY_0_OFFSET);
+	tmp &= ~SF_CTRL_CS_DLY_SEL_MSK;
+	tmp |= (uint32_t)csd << SF_CTRL_CS_DLY_SEL_POS;
+	tmp &= ~SF_CTRL_CS2_DLY_SEL_MSK;
+	tmp |= (uint32_t)csd << SF_CTRL_CS2_DLY_SEL_POS;
+	tmp &= ~SF_CTRL_CLK_OUT_DLY_SEL_MSK;
+	tmp |= (uint32_t)clkd << SF_CTRL_CLK_OUT_DLY_SEL_POS;
+	FLASH_WRITE32(tmp, offset + SF_CTRL_IO_DLY_0_OFFSET);
+
 	/* Set do di and oe delay */
 	tmp = FLASH_READ32(offset + SF_CTRL_IO_DLY_1_OFFSET);
 	tmp &= ~SF_CTRL_IO_0_DO_DLY_SEL_MSK;
-	tmp |= (uint32_t)doDelay << SF_CTRL_IO_0_DO_DLY_SEL_POS;
+	tmp |= (uint32_t)dod << SF_CTRL_IO_0_DO_DLY_SEL_POS;
 	tmp &= ~SF_CTRL_IO_0_DI_DLY_SEL_MSK;
-	tmp |= (uint32_t)diDelay << SF_CTRL_IO_0_DI_DLY_SEL_POS;
+	tmp |= (uint32_t)did << SF_CTRL_IO_0_DI_DLY_SEL_POS;
 	tmp &= ~SF_CTRL_IO_0_OE_DLY_SEL_MSK;
-	tmp |= (uint32_t)oeDelay << SF_CTRL_IO_0_OE_DLY_SEL_POS;
+	tmp |= (uint32_t)oed << SF_CTRL_IO_0_OE_DLY_SEL_POS;
 	FLASH_WRITE32(tmp, offset + SF_CTRL_IO_DLY_1_OFFSET);
 
 	tmp = FLASH_READ32(offset + SF_CTRL_IO_DLY_2_OFFSET);
 	tmp &= ~SF_CTRL_IO_0_DO_DLY_SEL_MSK;
-	tmp |= (uint32_t)doDelay << SF_CTRL_IO_0_DO_DLY_SEL_POS;
+	tmp |= (uint32_t)dod << SF_CTRL_IO_0_DO_DLY_SEL_POS;
 	tmp &= ~SF_CTRL_IO_0_DI_DLY_SEL_MSK;
-	tmp |= (uint32_t)diDelay << SF_CTRL_IO_0_DI_DLY_SEL_POS;
+	tmp |= (uint32_t)did << SF_CTRL_IO_0_DI_DLY_SEL_POS;
 	tmp &= ~SF_CTRL_IO_0_OE_DLY_SEL_MSK;
-	tmp |= (uint32_t)oeDelay << SF_CTRL_IO_0_OE_DLY_SEL_POS;
+	tmp |= (uint32_t)oed << SF_CTRL_IO_0_OE_DLY_SEL_POS;
 	FLASH_WRITE32(tmp, offset + SF_CTRL_IO_DLY_2_OFFSET);
 
 	tmp = FLASH_READ32(offset + SF_CTRL_IO_DLY_3_OFFSET);
 	tmp &= ~SF_CTRL_IO_0_DO_DLY_SEL_MSK;
-	tmp |= (uint32_t)doDelay << SF_CTRL_IO_0_DO_DLY_SEL_POS;
+	tmp |= (uint32_t)dod << SF_CTRL_IO_0_DO_DLY_SEL_POS;
 	tmp &= ~SF_CTRL_IO_0_DI_DLY_SEL_MSK;
-	tmp |= (uint32_t)diDelay << SF_CTRL_IO_0_DI_DLY_SEL_POS;
+	tmp |= (uint32_t)did << SF_CTRL_IO_0_DI_DLY_SEL_POS;
 	tmp &= ~SF_CTRL_IO_0_OE_DLY_SEL_MSK;
-	tmp |= (uint32_t)oeDelay << SF_CTRL_IO_0_OE_DLY_SEL_POS;
+	tmp |= (uint32_t)oed << SF_CTRL_IO_0_OE_DLY_SEL_POS;
 	FLASH_WRITE32(tmp, offset + SF_CTRL_IO_DLY_3_OFFSET);
 
 	tmp = FLASH_READ32(offset + SF_CTRL_IO_DLY_4_OFFSET);
 	tmp &= ~SF_CTRL_IO_0_DO_DLY_SEL_MSK;
-	tmp |= (uint32_t)doDelay << SF_CTRL_IO_0_DO_DLY_SEL_POS;
+	tmp |= (uint32_t)dod << SF_CTRL_IO_0_DO_DLY_SEL_POS;
 	tmp &= ~SF_CTRL_IO_0_DI_DLY_SEL_MSK;
-	tmp |= (uint32_t)diDelay << SF_CTRL_IO_0_DI_DLY_SEL_POS;
+	tmp |= (uint32_t)did << SF_CTRL_IO_0_DI_DLY_SEL_POS;
 	tmp &= ~SF_CTRL_IO_0_OE_DLY_SEL_MSK;
-	tmp |= (uint32_t)oeDelay << SF_CTRL_IO_0_OE_DLY_SEL_POS;
+	tmp |= (uint32_t)oed << SF_CTRL_IO_0_OE_DLY_SEL_POS;
 	FLASH_WRITE32(tmp, offset + SF_CTRL_IO_DLY_4_OFFSET);
 }
 
@@ -2161,7 +2236,7 @@ static __nxipfunc void flash_bflb_set_cmds(struct flash_bflb_data *data, uint8_t
 	tmp |= SF_CTRL_SF_CMDS_1_EN_MSK;
 	if (data->bank == BANK2) {
 		tmp &= ~SF_CTRL_SF_CMDS_2_WRAP_MODE_MSK;
-		tmp &= ~SF_CTRL_SF_CMDS_1_WRAP_LEN_MSK;
+		tmp &= ~SF_CTRL_SF_CMDS_2_WRAP_LEN_MSK;
 		tmp |= (uint32_t)mode << SF_CTRL_SF_CMDS_2_WRAP_MODE_POS;
 		tmp |= (uint32_t)len << SF_CTRL_SF_CMDS_2_WRAP_LEN_POS;
 	} else {
@@ -2460,7 +2535,7 @@ static __nxipfunc void flash_bflb_configure_timings(struct flash_bflb_data *data
 	FLASH_WRITE32(tmp, GLB_BASE + GLB_SF_CFG0_OFFSET);
 
 	/* Reset IO delays */
-	flash_bflb_set_io_delays(data, 0, 0, 0);
+	flash_bflb_set_io_delays(data, 0, 0, 0, 0, 0);
 
 	/* Set IAHB delay */
 	if (data->pad == PAD1) {
@@ -2532,6 +2607,29 @@ static __nxipfunc void flash_bflb_configure_timings(struct flash_bflb_data *data
 	FLASH_WRITE32(tmp, GLB_BASE + GLB_SF_CFG0_OFFSET);
 }
 
+static __nxipfunc void flash_bflb_apply_pads(struct flash_bflb_data *data)
+{
+	enum flash_bflb_pad bank_a, bank_b;
+	size_t other = 0;
+
+	if (data->controller->banks[other] == data) {
+		other = 1;
+	}
+
+	bank_a = data->pad;
+	if (data->controller->banks[other] == NULL) {
+		bank_b = data->pad + 1 >= PADMAX ? PAD1 : data->pad + 1;
+	} else {
+		bank_b = data->controller->banks[other]->pad;
+	}
+
+	if (data->bank == BANK1) {
+		flash_bflb_select_pads(data, bank_a, bank_b);
+	} else {
+		flash_bflb_select_pads(data, bank_b, bank_a);
+	}
+}
+
 static __nxipfunc int flash_bflb_init(const struct device *dev)
 {
 	const struct flash_bflb_config *cfg = dev->config;
@@ -2550,18 +2648,20 @@ static __nxipfunc int flash_bflb_init(const struct device *dev)
 		}
 	}
 
-	if (data->bank == BANK1) {
-		ret = flash_bflb_init_bootbank(data);
-		if (ret != 0) {
-			return ret;
-		}
-	} else {
-		/* Enable bank2 */
+	if (data->controller->bank_cnt > 1) {
+		/* Enable bank2 as early as possible (If there is a swap it needs to be enabled) */
 		tmp = FLASH_READ32(data->reg + SF_CTRL_2_OFFSET);
 		tmp |= SF_CTRL_SF_IF_BK2_EN_MSK;
 		/* On BL70x/L this describes shared pad, multi-CS mode */
 		tmp |= SF_CTRL_SF_IF_BK2_MODE_MSK;
 		FLASH_WRITE32(tmp, data->reg + SF_CTRL_2_OFFSET);
+	}
+
+	if (data->bank == BANK1) {
+		ret = flash_bflb_init_bootbank(data);
+		if (ret != 0) {
+			return ret;
+		}
 	}
 
 	/* No default so set default */
@@ -2583,6 +2683,8 @@ static __nxipfunc int flash_bflb_init(const struct device *dev)
 		irq_unlock(locker);
 		return ret;
 	}
+
+	flash_bflb_apply_pads(data);
 
 	flash_bflb_configure_timings(data);
 
@@ -2623,7 +2725,9 @@ static __nxipfunc int flash_bflb_init(const struct device *dev)
 	}
 
 #if defined(CONFIG_SOC_SERIES_BL61X)
-	/* Copy what the SDK does here since the role is unclear but effects are apparent */
+	/* Copy what the SDK does here since the role is unclear
+	 * but effects (it breaks when this is not good values) are apparent
+	 */
 	if (data->cfg.auto_spi_mode == BUS_QIO) {
 		flash_bflb_set_cmds(data, 2, 2);
 	} else {
@@ -2736,6 +2840,11 @@ static DEVICE_API(flash, flash_bflb_api) = {
 
 #define FLASH_BFLB_DEVICE_IS_BANK2(_n) (DT_REG_ADDR(_n) == BFLB_XIP_BASE_BANK2)
 
+#define FLASH_BFLB_DEVICE_DECLARE(_n)							\
+	static struct flash_bflb_data flash_bflb_data_##_n;
+
+#define FLASH_BFLB_DEVICE_PICKUP(_n)	&flash_bflb_data_##_n,
+
 #define FLASH_BFLB_DEVICE_DEFINE(_n, _controller_n)					\
 	BUILD_ASSERT(DT_REG_ADDR(_n) == BFLB_XIP_BASE_BANK1				\
 		     || FLASH_BFLB_DEVICE_IS_BANK2(_n),					\
@@ -2778,9 +2887,12 @@ static DEVICE_API(flash, flash_bflb_api) = {
 			      &flash_bflb_api);
 
 #define FLASH_BFLB_CONTROLLER_INIT(_n)							\
+	DT_FOREACH_CHILD_STATUS_OKAY(_n, FLASH_BFLB_DEVICE_DECLARE)			\
 	static struct flash_bflb_controller_data flash_bflb_controller_data_##_n = {	\
 		.override_bank1 = DT_PROP(_n, override_bank1),				\
 		.addr_32bits = DT_PROP(_n, use_32b_addresses),				\
+		.banks = { DT_FOREACH_CHILD_STATUS_OKAY(_n, FLASH_BFLB_DEVICE_PICKUP) },\
+		.bank_cnt = DT_CHILD_NUM(_n),						\
 	};										\
 	DT_FOREACH_CHILD_STATUS_OKAY_VARGS(_n, FLASH_BFLB_DEVICE_DEFINE, _n)		\
 	BUILD_ASSERT(DT_CHILD_NUM(_n) <= 2, "Only 2 banks available");			\

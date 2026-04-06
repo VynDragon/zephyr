@@ -266,7 +266,6 @@ struct flash_bflb_device_cfg {
 	uint32_t sector_size;
 	uint32_t block_size;
 	uint8_t jedec_id[3];
-
 };
 
 enum flash_bflb_nxip_message_id {
@@ -283,12 +282,6 @@ enum flash_bflb_nxip_message_id {
 	NXIP_MSG_SADSUP_SFDP,
 	NXIP_MSG_INITSEQ_FAIL,
 	NXIP_MSG_MAX
-};
-
-struct flash_bflb_controller_data {
-	bool override_bank1;
-	struct bflb_header_flash_cfg flash_header_cfg;
-	bool addr_32bits;
 };
 
 enum flash_bflb_bank {
@@ -310,6 +303,16 @@ enum flash_bflb_bus_mode {
 	BUS_QO = 2,
 	BUS_DIO = 3,
 	BUS_QIO = 4,
+};
+
+struct flash_bflb_data;
+
+struct flash_bflb_controller_data {
+	bool override_bank1;
+	struct bflb_header_flash_cfg flash_header_cfg;
+	bool addr_32bits;
+	struct flash_bflb_data *banks[2];
+	uint8_t bank_cnt;
 };
 
 struct flash_bflb_data {
