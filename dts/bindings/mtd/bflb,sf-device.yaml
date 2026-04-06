@@ -10,7 +10,9 @@ description: |
 
 compatible: "bflb,sf-device"
 
-include: pinctrl-device.yaml
+include:
+  - flash-controller.yaml
+  - pinctrl-device.yaml
 
 properties:
   reg:
@@ -36,11 +38,14 @@ properties:
      Numbers refer to the number of line used in each direction.
 
      Possible values are:
-      - IO <0> = 1 In (to the device), 1 Out (from the device)
-      - DO <1> = 1 In, 2 Out
-      - QO <2> = 1 In, 4 Out
-      - DIO <3> = 2 In, 2 Out
-      - QIO <4> = 4 In, 4 Out
+      - IO <0> = x-1-1 mode
+      - DO <1> = x-1-2 mode
+      - QO <2> = x-1-4 mode
+      - DIO <3> = x-2-2 mode
+      - QIO <4> = x-4-4 mode
+
+      x is always 1 with the current driver. The hardware supports QPI where x is 4.
+
     enum:
       - 0
       - 1
@@ -77,6 +82,37 @@ properties:
   initialization-sequence:
     type: array
     description: |
-      Triples of command, data, datalength writes to set things up at setup time. For example to clear
-      out block protection, or setup dummy timing. up to 4 bytes of data can be sent at once.
-      Remember the byte order is inverted (right to left)
+      Triples of command, data, datalength writes to set things up at setup time.
+      For example to clear out block protection, or setup dummy timing.
+      up to 4 bytes of data can be sent at once.
+      Remember the byte order is inverted (right to left).
+      Example of setting OC bits to 11 and disabling block protections on MX25L25645G:
+      initialization-sequence = <0x06 0x0 0x0 0x1 0xc002 0x2>;
+      If using this on internal flash this can be VERY dangerous, devcube / eflash loader is able
+      to recover register settings in case of needs.
+
+  read-delay:
+    type: int
+    default: 1
+    enum:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+    description: Flash Read delay.
+      This may be necessary to achieve flash clock higher than XCLK.
+
+  clock-invert:
+    type: boolean
+    description: Invert Clock Signal.
+      This may be necessary to achieve flash clock higher than XCLK.
+
+  rx-clock-invert:
+    type: boolean
+    description: Invert RX Clock Signal.
+      This may be necessary to achieve flash clock higher than XCLK.
+
+  jedec-id:
+    type: uint8-array
+    description: JEDEC ID as manufacturer ID, memory type, memory density

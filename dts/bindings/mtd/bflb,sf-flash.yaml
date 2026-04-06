@@ -3,12 +3,11 @@
 
 title: Bouffalolab Serial Flash controller Flash
 
-description: Bouffalolab Serial Flash controller Flash
+description: Bouffalolab Serial Flash controller Flash or device compatible with JESD216
 
 compatible: "bflb,sf-flash"
 
 include:
-  - flash-controller.yaml
   - soc-nv-flash.yaml
   - "bflb,sf-device.yaml"
   - "jedec,spi-nor-common.yaml"

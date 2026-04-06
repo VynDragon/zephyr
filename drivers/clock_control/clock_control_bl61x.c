@@ -99,9 +99,6 @@ struct clock_control_bl61x_bclk_config {
 struct clock_control_bl61x_flashclk_config {
 	enum bl61x_clkid	source;
 	uint8_t			divider;
-	uint8_t			bank1_read_delay;
-	bool			bank1_clock_invert;
-	bool			bank1_rx_clock_invert;
 };
 
 struct clock_control_bl61x_config {
@@ -930,22 +927,6 @@ static __ramfunc void clock_control_bl61x_update_flash_clk(const struct device *
 	tmp |= (data->flashclk.divider - 1) << GLB_SF_CLK_DIV_POS;
 	*(volatile uint32_t *)(GLB_BASE + GLB_SF_CFG0_OFFSET) = tmp;
 
-	tmp = *(volatile uint32_t *)(SF_CTRL_BASE + SF_CTRL_0_OFFSET);
-	tmp |= SF_CTRL_SF_IF_READ_DLY_EN_MSK;
-	tmp &= ~SF_CTRL_SF_IF_READ_DLY_N_MSK;
-	tmp |= (data->flashclk.bank1_read_delay << SF_CTRL_SF_IF_READ_DLY_N_POS);
-	if (data->flashclk.bank1_clock_invert) {
-		tmp &= ~SF_CTRL_SF_CLK_OUT_INV_SEL_MSK;
-	} else {
-		tmp |= SF_CTRL_SF_CLK_OUT_INV_SEL_MSK;
-	}
-	if (data->flashclk.bank1_rx_clock_invert) {
-		tmp |= SF_CTRL_SF_CLK_SF_RX_INV_SEL_MSK;
-	} else {
-		tmp &= ~SF_CTRL_SF_CLK_SF_RX_INV_SEL_MSK;
-	}
-	*(volatile uint32_t *)(SF_CTRL_BASE + SF_CTRL_0_OFFSET) = tmp;
-
 	tmp = *(volatile uint32_t *)(GLB_BASE + GLB_SF_CFG0_OFFSET);
 	tmp &= GLB_SF_CLK_SEL_UMSK;
 	tmp &= GLB_SF_CLK_SEL2_UMSK;
@@ -1524,11 +1505,14 @@ static struct clock_control_bl61x_data clock_control_bl61x_data = {
 #else
 		.source = bl61x_clkid_clk_rc32m,
 #endif
-		.bank1_read_delay = DT_PROP(DT_INST_CLOCKS_CTLR_BY_NAME(0, flash), read_delay),
-		.bank1_clock_invert = DT_PROP(DT_INST_CLOCKS_CTLR_BY_NAME(0, flash), clock_invert),
-		.bank1_rx_clock_invert =
-			DT_PROP(DT_INST_CLOCKS_CTLR_BY_NAME(0, flash), rx_clock_invert),
+		/* If flash controller will manage flash, set to slowest speed
+		 * and let it set the divider.
+		 */
+#if defined(CONFIG_SOC_FLASH_BFLB)
+		.divider = 8,
+#else
 		.divider = DT_PROP(DT_INST_CLOCKS_CTLR_BY_NAME(0, flash), divider),
+#endif
 	},
 
 	.f32k = {

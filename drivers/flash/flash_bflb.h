@@ -247,17 +247,26 @@ struct flash_bflb_device_registers {
 	uint8_t busy_read_len;
 };
 
+struct flash_bflb_device_timing {
+	uint8_t 	divider;
+	uint8_t		read_delay;
+	bool		clock_invert;
+	bool		rx_clock_invert;
+};
+
 struct flash_bflb_device_cfg {
 	/* SPI modes to use */
 	uint8_t auto_spi_mode;
 	uint8_t manual_spi_mode;
 	struct flash_bflb_device_commands cmd;
 	struct flash_bflb_device_registers reg;
+	struct flash_bflb_device_timing timing;
 	uint32_t size;
 	uint32_t page_size;
 	uint32_t sector_size;
 	uint32_t block_size;
 	uint8_t jedec_id[3];
+
 };
 
 enum flash_bflb_nxip_message_id {
@@ -324,23 +333,4 @@ struct flash_bflb_data {
 
 struct flash_bflb_config {
 	const struct pinctrl_dev_config *pincfg;
-};
-
-enum flash_bflb_quirky_devices {
-	ESP_PSRAM64H,
-	QUIRKY_DEVICES_MAX,
-};
-
-static const struct flash_bflb_device_cfg flash_bflb_quirky_devices[QUIRKY_DEVICES_MAX] = {
-	[ESP_PSRAM64H] = {
-		.auto_spi_mode = BUS_DIO,
-		.manual_spi_mode = BUS_NIO,
-		.size = 0x800000,
-		.page_size = 1,
-		.sector_size = 1,
-		.block_size = 1,
-		.jedec_id = { 0xD, 0x5D, },
-	},
-
-
 };
