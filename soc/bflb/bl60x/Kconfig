@@ -22,5 +22,6 @@ config SOC_SERIES_BL60X
 	select SOC_PREP_HOOK
 	select SYSCON
 	imply CODE_DATA_RELOCATION
+	imply FLASH
 	imply REGULATOR
 	imply XIP
