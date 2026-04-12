@@ -14,25 +14,38 @@
 
 &flashctrl {
 	flash0: flash@23000000 {
-		compatible = "soc-nv-flash";
-		reg = <0x23000000 DT_SIZE_M(4)>;
-		write-block-size = <256>;
+		compatible = "bflb,sf-flash";
+		reg = <0x23000000 (DT_SIZE_M(4) - 0x2000)>;
+		ranges = <0x0 0x23000000 (DT_SIZE_M(4) - 0x2000)>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		write-block-size = <1>;
 		erase-block-size = <DT_SIZE_K(4)>;
+		spi-bus-mode = <2>;
+		sf-pad = <2>;
+		pinctrl-0 = <&sf2_default>;
+		pintctrl-names = "default";
 
-		partitions {
-			compatible = "fixed-partitions";
+		partitions: partitions@23000000 {
+			compatible = "soc-nv-flash";
+			reg = <0x23000000 (DT_SIZE_M(4) - 0x2000)>;
+			ranges;
 			#address-cells = <1>;
 			#size-cells = <1>;
+			write-block-size = <1>;
+			erase-block-size = <DT_SIZE_K(4)>;
 
 			slot0_partition: partition@0 {
+				compatible = "zephyr,mapped-partition";
 				label = "image-0";
 				reg = <0x00000000 DT_SIZE_K(4064)>;
 				read-only;
 			};
 
-			storage_partition: partition@3f8000 {
+			storage_partition: partition@3f8000  {
+				compatible = "zephyr,mapped-partition";
 				label = "storage";
-				reg = <0x003f8000 DT_SIZE_K(32)>;
+				reg = <0x003f8000 DT_SIZE_K(30)>;
 			};
 		};
 	};

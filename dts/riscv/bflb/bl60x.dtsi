@@ -90,10 +90,6 @@
 		};
 	};
 
-	chosen {
-		zephyr,flash-controller = &flashctrl;
-	};
-
 	cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -327,7 +323,7 @@
 		};
 
 		flashctrl: flash-controller@4000b000 {
-			compatible = "bflb,flash-controller";
+			compatible = "bflb,sf-controller";
 			reg = <0x4000b000 0x1000>;
 			#address-cells = <1>;
 			#size-cells = <1>;

@@ -221,6 +221,8 @@ struct flash_bflb_device_commands {
 	uint8_t block_erase;
 	uint8_t enter_32bits_addr;
 	uint8_t exit_32bits_addr;
+	uint8_t enter_qpi;
+	uint8_t exit_qpi;
 	/* Extended ops */
 	uint8_t reset_enable;
 	uint8_t reset;
@@ -252,6 +254,11 @@ struct flash_bflb_device_timing {
 	uint8_t		read_delay;
 	bool		clock_invert;
 	bool		rx_clock_invert;
+	uint8_t		dod;
+	uint8_t		did;
+	uint8_t		csd;
+	uint8_t		clkd;
+	uint8_t		oed;
 };
 
 struct flash_bflb_device_cfg {
@@ -262,6 +269,7 @@ struct flash_bflb_device_cfg {
 	struct flash_bflb_device_registers reg;
 	struct flash_bflb_device_timing timing;
 	uint32_t size;
+	uint32_t write_align;
 	uint32_t page_size;
 	uint32_t sector_size;
 	uint32_t block_size;
@@ -309,7 +317,6 @@ struct flash_bflb_data;
 
 struct flash_bflb_controller_data {
 	bool override_bank1;
-	struct bflb_header_flash_cfg flash_header_cfg;
 	bool addr_32bits;
 	struct flash_bflb_data *banks[2];
 	uint8_t bank_cnt;
@@ -330,8 +337,13 @@ struct flash_bflb_data {
 	struct flash_pages_layout layout;
 	struct flash_parameters parameters;
 	bool use_sfdp;
+	bool use_qpi;
 	uint32_t *init_seq;
 	size_t init_seq_len;
+	uint8_t *quirk_bytes_write;
+	size_t quirk_bytes_write_len;
+	uint8_t *quirk_bytes_read;
+	size_t quirk_bytes_read_len;
 };
 
 struct flash_bflb_config {

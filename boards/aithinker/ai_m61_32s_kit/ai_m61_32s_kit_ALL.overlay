@@ -8,5 +8,8 @@
 	/* ALL revision is BL618M65, which has an internal XMC Flash die
 	 * instead of an external SOIC Flash.
 	 */
-	compatible = "soc-nv-flash", "xmc,xm25qw64";
+	compatible = "bflb,sf-flash", "xmc,xm25qw64";
+	rx-clock-invert;
+	read-dummy-cycles = <2>;
+	continuous-read-command = <0x20>;
 };

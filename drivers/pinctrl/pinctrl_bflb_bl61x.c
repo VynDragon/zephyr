@@ -91,7 +91,7 @@ void pinctrl_bflb_configure_uart(uint8_t pin, uint8_t func)
 /* On BL616, 3 pads:
  * SF1: Embedded pad, io3 to io0 and io2 to cs swaps, not provided, keep as default
  * SF2: External pad, io3 to io0 swap.
- * SF3: No swap.
+ * SF3: External pad, No swap.
  */
 void pinctrl_bflb_configure_sf_pads(pinctrl_soc_pin_t pin)
 {

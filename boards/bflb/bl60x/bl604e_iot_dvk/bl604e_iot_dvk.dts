@@ -35,24 +35,35 @@
 
 &flashctrl {
 	flash0: flash@23000000 {
-		compatible = "soc-nv-flash", "issi,is25lp128";
+		compatible = "bflb,sf-flash", "issi,is25lp128";
 		reg = <0x23000000 (0x1000000 - 0x2000)>;
-		write-block-size = <256>;
+		ranges = <0x0 0x23000000 (0x1000000 - 0x2000)>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		write-block-size = <1>;
 		erase-block-size = <DT_SIZE_K(4)>;
-		/* jedec-id = [96 60 18]; */
+		spi-bus-mode = <2>;
+		sf-pad = <1>;
+		jedec-id = [96 60 18];
 
-		partitions {
-			compatible = "fixed-partitions";
+		partitions: partitions@23000000 {
+			compatible = "soc-nv-flash";
+			reg = <0x23000000 (0x1000000 - 0x2000)>;
+			ranges;
 			#address-cells = <1>;
 			#size-cells = <1>;
+			write-block-size = <1>;
+			erase-block-size = <DT_SIZE_K(4)>;
 
 			slot0_partition: partition@0 {
+				compatible = "zephyr,mapped-partition";
 				label = "image-0";
-				reg = <0x00000000 0x100000>;
+				reg = <0x00000000 0x00100000>;
 				read-only;
 			};
 
 			storage_partition: partition@100000 {
+				compatible = "zephyr,mapped-partition";
 				label = "storage";
 				reg = <0x00100000 (0xF00000 - 0x2000)>;
 			};

@@ -88,10 +88,6 @@
 		};
 	};
 
-	chosen {
-		zephyr,flash-controller = &flashctrl;
-	};
-
 	cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -146,7 +142,7 @@
 
 		itcm: itcm@22014000 {
 			compatible = "zephyr,memory-region", "sifive,dtim0";
-			reg = <0x22014000 DT_SIZE_K(12)>;
+			reg = <0x22014000 DT_SIZE_K(16)>;
 			zephyr,memory-region = "ITCM";
 		};
 
@@ -334,7 +330,7 @@
 		};
 
 		flashctrl: flash-controller@4000b000 {
-			compatible = "bflb,flash-controller";
+			compatible = "bflb,sf-controller";
 			reg = <0x4000b000 0x1000>;
 			#address-cells = <1>;
 			#size-cells = <1>;
@@ -400,12 +396,6 @@
 		retram: memory@40010000 {
 			compatible = "mmio-sram";
 			reg = <0x40010000 DT_SIZE_K(4)>;
-		};
-
-		dtcm: dtcm@42017000 {
-			compatible = "zephyr,memory-region", "sifive,dtim0";
-			reg = <0x42017000 DT_SIZE_K(4)>;
-			zephyr,memory-region = "DTCM";
 		};
 
 		sram0: memory@42018000 {

@@ -5,11 +5,55 @@ title: Bouffalolab Serial Flash controller device
 
 description: |
   Bouffalolab Serial Flash controller device
-  QPI (Quad I/O for everything) mode is unsupported by the driver
-  Continuous read support is experimental.
-  Big struggle with QIO and DIO.
 
 compatible: "bflb,sf-device"
+
+examples:
+  - |
+    // S3A1604 MRAM in QPI QIO
+    mram: sf@A4000000 {
+      compatible = "bflb,sf-device", "netsol,s3a1604";
+      reg = <0xA4000000 0x200000>;
+      ranges = <0x0 0xA4000000 0x200000>;
+      #address-cells = <1>;
+      #size-cells = <1>;
+      read-command = <0x0b>;
+      read-dummy-cycles = <3>;
+      spi-bus-mode = <4>;
+      write-command = <0xda>;
+      write-dummy-cycles = <0>;
+      use-qpi;
+      enter-qpi-command = <0x38>;
+      exit-qpi-command = <0xff>;
+      sf-pad = <2>;
+      jedec-id = [d9 01 05];
+      pinctrl-0 = <&sf2_default>;
+      pinctrl-names = "default";
+      initialization-sequence = <0x06 0x0 0x0 0x87 0x01210600 0x4>;
+      quirk-bytes-read = [ a0 ];
+      quirk-bytes-write = [ a0 ];
+    };
+  - |
+    // PM004MNI MRAM in QPI QIO
+    mram: sf@A4000000 {
+      compatible = "bflb,sf-device", "siproin,pm004mni";
+      reg = <0xA4000000 0x80000>;
+      ranges = <0x0 0xA4000000 0x80000>;
+      #address-cells = <1>;
+      #size-cells = <1>;
+      read-command = <0xeb>;
+      read-dummy-cycles = <0>;
+      spi-bus-mode = <4>;
+      write-command = <0x38>;
+      write-dummy-cycles = <0>;
+      use-qpi;
+      enter-qpi-command = <0x35>;
+      exit-qpi-command = <0xf5>;
+      sf-pad = <2>;
+      jedec-id = [29 55 00];
+      pinctrl-0 = <&sf2_default>;
+      pinctrl-names = "default";
+    };
 
 include:
   - flash-controller.yaml
@@ -25,7 +69,7 @@ properties:
     description: |
       Which pad is this device holding. This is directly related to which pins are used.
       Pad 1 is usually the embedded flash, Pad 2 and Pad 3 are usually external.
-      Main exception is BL70x where the default embedded pad is SF2.
+      Main exception is BL70x/L where the default embedded pad is SF2.
     enum:
       - 1
       - 2
@@ -35,17 +79,15 @@ properties:
     type: int
     required: true
     description: |
-     The width and mode of SPI bus to which the device is connected.
+     The width and mode of SPI bus to use for the device.
      Numbers refer to the number of line used in each direction.
 
      Possible values are:
-      - IO <0> = x-1-1 mode
-      - DO <1> = x-1-2 mode
-      - QO <2> = x-1-4 mode
-      - DIO <3> = x-2-2 mode
-      - QIO <4> = x-4-4 mode
-
-      x is always 1 with the current driver. The hardware supports QPI where x is 4.
+      - IO <0> = 1-1-1 mode
+      - DO <1> = 1-1-2 mode
+      - QO <2> = 1-1-4 mode
+      - DIO <3> = 1-2-2 mode
+      - QIO <4> = 1-4-4 mode or 4-4-4 mode (QPI)
 
     enum:
       - 0
@@ -53,6 +95,10 @@ properties:
       - 2
       - 3
       - 4
+
+  use-qpi:
+    type: boolean
+    description: Enable QPI, only 4-4-4 is supported
 
   read-command:
     type: int
@@ -62,7 +108,8 @@ properties:
   read-dummy-cycles:
     type: int
     description: |
-      Dummy cycles for automatic read mode. They are expressed in bytes (8 cycles).
+      Dummy cycles for automatic read mode.
+      They are expressed in bytes of the address: 8 cycles with NIO, DO, QO, 4 with DIO, 2 with QIO.
 
   continuous-read-command:
     type: int
@@ -78,7 +125,8 @@ properties:
   write-dummy-cycles:
     type: int
     description: |
-      Dummy cycles for automatic write mode. They are expressed in bytes (8 cycles).
+      Dummy cycles for automatic write mode.
+      They are expressed in bytes of the address: 8 cycles with NIO, DO, QO, 4 with DIO, 2 with QIO.
 
   initialization-sequence:
     type: array
@@ -92,6 +140,14 @@ properties:
       If using this on internal flash this can be VERY dangerous, devcube / eflash loader is able
       to recover register settings in case of needs.
 
+  enter-qpi-command:
+    type: int
+    description: Command to enter QPI
+
+  exit-qpi-command:
+    type: int
+    description: Command to exit QPI
+
   read-delay:
     type: int
     default: 1
@@ -101,19 +157,49 @@ properties:
       - 2
       - 3
       - 4
-    description: Flash Read delay.
-      This may be necessary to achieve flash clock higher than XCLK.
+    description: Flash Read delay. The default is appropriate for standard flash speed.
 
   clock-invert:
     type: boolean
     description: Invert Clock Signal.
-      This may be necessary to achieve flash clock higher than XCLK.
 
   rx-clock-invert:
     type: boolean
     description: Invert RX Clock Signal.
-      This may be necessary to achieve flash clock higher than XCLK.
 
   jedec-id:
     type: uint8-array
-    description: JEDEC ID as manufacturer ID, memory type, memory density
+    description: JEDEC ID as manufacturer ID, memory type, memory density.
+
+  quirk-bytes-write:
+    type: uint8-array
+    description: Up to 4 bytes appended after the address for the auto-write command.
+
+  quirk-bytes-read:
+    type: uint8-array
+    description: Up to 4 bytes appended after the address for the auto-read command.
+
+  tune-di:
+    type: int
+    default: 0
+    description: Fine tune pad delay for data in (0-3). Fine tuning is not usually necessary.
+
+  tune-do:
+    type: int
+    default: 0
+    description: Fine tune pad delay for data out (0-3). Fine tuning is not usually necessary.
+
+  tune-cs:
+    type: int
+    default: 0
+    description: Fine tune pad delay for CS (0-3). Fine tuning is not usually necessary.
+
+  tune-clk:
+    type: int
+    default: 0
+    description: Fine tune pad delay for CLK (0-3). Fine tuning is not usually necessary.
+
+  tune-oe:
+    type: int
+    default: 0
+    description: Fine tune pad delay for output enable (0-3). Fine tuning is not usually necessary.

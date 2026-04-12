@@ -76,26 +76,38 @@
 
 &flashctrl {
 	flash0: flash@23000000 {
-		compatible = "soc-nv-flash", "zb,zb25d80d";
-		/* 1MB flash minus 8KB bootheader */
-		reg = <0x23000000 (DT_SIZE_K(1024) - DT_SIZE_K(8))>;
+		compatible = "bflb,sf-flash", "zb,zb25d80d";
+		reg = <0x23000000 (DT_SIZE_K(1024) - 0x2000)>;
+		ranges = <0x0 0x23000000 (DT_SIZE_K(1024) - 0x2000)>;
+		#address-cells = <1>;
+		#size-cells = <1>;
 		write-block-size = <1>;
 		erase-block-size = <DT_SIZE_K(4)>;
+		/* Only Dual mode :( */
+		spi-bus-mode = <1>;
+		sf-pad = <1>;
+		jedec-id = [5e 32 14];
 
-		partitions {
-			compatible = "fixed-partitions";
+		partitions: partitions@23000000 {
+			compatible = "soc-nv-flash";
+			reg = <0x23000000 (0x100000 - 0x2000)>;
+			ranges;
 			#address-cells = <1>;
 			#size-cells = <1>;
+			write-block-size = <1>;
+			erase-block-size = <DT_SIZE_K(4)>;
 
 			slot0_partition: partition@0 {
+				compatible = "zephyr,mapped-partition";
 				label = "image-0";
-				reg = <0x00000000 DT_SIZE_K(1008)>;
+				reg = <0x00000000 DT_SIZE_K(900)>;
 				read-only;
 			};
 
-			storage_partition: partition@f8000 {
+			storage_partition: partition@e1000 {
+				compatible = "zephyr,mapped-partition";
 				label = "storage";
-				reg = <0x000f8000 DT_SIZE_K(8)>;
+				reg = <0x000e1000 DT_SIZE_K(122)>;
 			};
 		};
 	};

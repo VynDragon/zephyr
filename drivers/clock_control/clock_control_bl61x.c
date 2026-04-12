@@ -21,7 +21,6 @@ LOG_MODULE_REGISTER(clock_control_bl61x, CONFIG_CLOCK_CONTROL_LOG_LEVEL);
 #include <bouffalolab/bl61x/hbn_reg.h>
 #include <bouffalolab/bl61x/mcu_misc_reg.h>
 #include <bouffalolab/bl61x/pds_reg.h>
-#include <bouffalolab/bl61x/sf_ctrl_reg.h>
 #include <zephyr/drivers/clock_control/clock_control_bflb_common.h>
 
 #define CLK_SRC_IS(clk, src)                                                                       \
@@ -47,6 +46,8 @@ LOG_MODULE_REGISTER(clock_control_bl61x, CONFIG_CLOCK_CONTROL_LOG_LEVEL);
 #define CRYSTAL_ID_FREQ_40000000	3
 #define CRYSTAL_ID_FREQ_26000000	4
 #define CRYSTAL_VALUES_CNT		5
+
+#define BL61X_TARGET_BASIC_CLOCK	MHZ(40)
 
 #define CRYSTAL_FREQ_TO_ID(freq) CONCAT(CRYSTAL_ID_FREQ_, freq)
 
@@ -920,26 +921,39 @@ static __ramfunc void clock_control_bl61x_update_flash_clk(const struct device *
 {
 	struct clock_control_bl61x_data *data = dev->data;
 	volatile uint32_t tmp;
+	uint32_t clk;
 
 	tmp = *(volatile uint32_t *)(GLB_BASE + GLB_SF_CFG0_OFFSET);
 	tmp &= GLB_SF_CLK_DIV_UMSK;
 	tmp &= GLB_SF_CLK_EN_UMSK;
-	tmp |= (data->flashclk.divider - 1) << GLB_SF_CLK_DIV_POS;
 	*(volatile uint32_t *)(GLB_BASE + GLB_SF_CFG0_OFFSET) = tmp;
 
 	tmp = *(volatile uint32_t *)(GLB_BASE + GLB_SF_CFG0_OFFSET);
 	tmp &= GLB_SF_CLK_SEL_UMSK;
 	tmp &= GLB_SF_CLK_SEL2_UMSK;
 	if (data->flashclk.source == bl61x_clkid_clk_wifipll) {
+		clk = clock_control_bl61x_get_hclk(dev);
 		tmp |= 0U << GLB_SF_CLK_SEL_POS;
 		tmp |= 0U << GLB_SF_CLK_SEL2_POS;
 	} else if (data->flashclk.source == bl61x_clkid_clk_crystal) {
+		clk = clock_control_bl61x_get_xclk(dev);
 		tmp |= 0U << GLB_SF_CLK_SEL_POS;
 		tmp |= 1U << GLB_SF_CLK_SEL2_POS;
 	} else {
+		clk = clock_control_bl61x_get_bclk(dev);
 		/* If using RC32M or BCLK, use BCLK */
 		tmp |= 2U << GLB_SF_CLK_SEL_POS;
 	}
+
+	/* If flash controller will manage flash, set to standard speed
+	 * and let it set the divider.
+	 */
+#if defined(CONFIG_SOC_FLASH_BFLB)
+	clk = DIV_ROUND_CLOSEST(clk, BL61X_TARGET_BASIC_CLOCK);
+	tmp |= clamp(clk - 1, 0x0, 0x7) << GLB_SF_CLK_DIV_POS;
+#else
+	tmp |= (data->flashclk.divider - 1) << GLB_SF_CLK_DIV_POS;
+#endif
 
 	*(volatile uint32_t *)(GLB_BASE + GLB_SF_CFG0_OFFSET) = tmp;
 
@@ -1505,14 +1519,7 @@ static struct clock_control_bl61x_data clock_control_bl61x_data = {
 #else
 		.source = bl61x_clkid_clk_rc32m,
 #endif
-		/* If flash controller will manage flash, set to slowest speed
-		 * and let it set the divider.
-		 */
-#if defined(CONFIG_SOC_FLASH_BFLB)
-		.divider = 8,
-#else
 		.divider = DT_PROP(DT_INST_CLOCKS_CTLR_BY_NAME(0, flash), divider),
-#endif
 	},
 
 	.f32k = {

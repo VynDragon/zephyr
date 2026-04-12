@@ -26,3 +26,8 @@ properties:
     description: |
       Enables using 32 bits length addresses. Must be supported by all devices connected.
 
+  no-header:
+    type: boolean
+    description: |
+      Do not use the bootheader for flash information.
+
