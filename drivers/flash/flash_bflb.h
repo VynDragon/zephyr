@@ -196,86 +196,6 @@ struct bflb_flash_command {
 	uint32_t cmd_buf[2];
 };
 
-struct flash_bflb_device_commands {
-	/* Auto = commands used with instruction bus (= XIP / memory mapped access) */
-	uint8_t auto_read;
-	uint8_t auto_read_dmycy;
-	uint8_t auto_write;
-	uint8_t auto_write_dmycy;
-	/* Manual = commands used with system bus (= CPU command access) */
-	uint8_t manual_read;
-	/* Left so fast read can be used */
-	uint8_t manual_read_dmycy;
-	/* Up to 4 read/write registers commands */
-	uint8_t read_reg[4];
-	uint8_t write_reg[4];
-	uint8_t contread_on;
-	uint8_t contread_off;
-	uint8_t burstwrap;
-	uint8_t burstwrap_dmycy;
-	uint8_t burstwrap_on_data;
-	uint8_t burstwrap_off_data;
-	uint8_t write_enable;
-	uint8_t page_program;
-	uint8_t sector_erase;
-	uint8_t block_erase;
-	uint8_t enter_32bits_addr;
-	uint8_t exit_32bits_addr;
-	uint8_t enter_qpi;
-	uint8_t exit_qpi;
-	/* Extended ops */
-	uint8_t reset_enable;
-	uint8_t reset;
-	uint8_t powerdown;
-	uint8_t release_powerdown;
-};
-
-/* Register access
- * Index indicates which register command to use
- * Bit indicates position of the bit in the register of size len
- * Len indicates the length to interact with: Some flash require reading each register
- * separately, but write all at once (MX25Lxxx45G for example).
- */
-struct flash_bflb_device_registers {
-	uint8_t write_enable_index;
-	uint8_t write_enable_bit;
-	uint8_t write_enable_read_len;
-	uint8_t quad_enable_index;
-	uint8_t quad_enable_bit;
-	uint8_t quad_enable_read_len;
-	uint8_t quad_enable_write_len;
-	uint8_t busy_index;
-	uint8_t busy_bit;
-	uint8_t busy_read_len;
-};
-
-struct flash_bflb_device_timing {
-	uint8_t 	divider;
-	uint8_t		read_delay;
-	bool		clock_invert;
-	bool		rx_clock_invert;
-	uint8_t		dod;
-	uint8_t		did;
-	uint8_t		csd;
-	uint8_t		clkd;
-	uint8_t		oed;
-};
-
-struct flash_bflb_device_cfg {
-	/* SPI modes to use */
-	uint8_t auto_spi_mode;
-	uint8_t manual_spi_mode;
-	struct flash_bflb_device_commands cmd;
-	struct flash_bflb_device_registers reg;
-	struct flash_bflb_device_timing timing;
-	uint32_t size;
-	uint32_t write_align;
-	uint32_t page_size;
-	uint32_t sector_size;
-	uint32_t block_size;
-	uint8_t jedec_id[3];
-};
-
 enum flash_bflb_nxip_message_id {
 	NXIP_MSG_NONE = -1,
 	NXIP_MSG_READ_INVALID = 0,
@@ -289,6 +209,7 @@ enum flash_bflb_nxip_message_id {
 	NXIP_MSG_NOTSUP_SFDP,
 	NXIP_MSG_SADSUP_SFDP,
 	NXIP_MSG_INITSEQ_FAIL,
+	NXIP_MSG_SFDP_BADSIZE,
 	NXIP_MSG_MAX
 };
 
@@ -313,39 +234,118 @@ enum flash_bflb_bus_mode {
 	BUS_QIO = 4,
 };
 
-struct flash_bflb_data;
+struct flash_bflb_device_commands {
+	/* Auto = commands used with instruction bus (= XIP / memory mapped access) */
+	uint8_t					auto_read;
+	uint8_t					auto_read_dmycy;
+	uint8_t					auto_write;
+	uint8_t					auto_write_dmycy;
+	/* Manual = commands used with system bus (= CPU command access) */
+	uint8_t					manual_read;
+	/* Left so fast read can be used */
+	uint8_t					manual_read_dmycy;
+	/* Up to 4 read/write registers commands */
+	uint8_t					read_reg[4];
+	uint8_t					write_reg[4];
+	uint8_t					contread_on;
+	uint8_t					contread_off;
+	uint8_t					burstwrap;
+	uint8_t					burstwrap_dmycy;
+	uint8_t					burstwrap_on_data;
+	uint8_t					burstwrap_off_data;
+	uint8_t					write_enable;
+	uint8_t					page_program;
+	uint8_t					sector_erase;
+	uint8_t					block_erase;
+	uint8_t					enter_32bits_addr;
+	uint8_t					exit_32bits_addr;
+	uint8_t					enter_qpi;
+	uint8_t					exit_qpi;
+	/* Extended ops */
+	uint8_t					reset_enable;
+	uint8_t					reset;
+	uint8_t					powerdown;
+	uint8_t					release_powerdown;
+};
+
+/* Register access
+ * Index indicates which register command to use
+ * Bit indicates position of the bit in the register of size len
+ * Len indicates the length to interact with: Some flash require reading each register
+ * separately, but write all at once (MX25Lxxx45G for example).
+ */
+struct flash_bflb_device_registers {
+	uint8_t					write_enable_index;
+	uint8_t					write_enable_bit;
+	uint8_t					write_enable_read_len;
+	uint8_t					quad_enable_index;
+	uint8_t					quad_enable_bit;
+	uint8_t					quad_enable_read_len;
+	uint8_t					quad_enable_write_len;
+	uint8_t					busy_index;
+	uint8_t					busy_bit;
+	uint8_t					busy_read_len;
+};
+
+struct flash_bflb_pad_cfg {
+	enum flash_bflb_pad			id;
+	bool					is_external;
+	uint8_t					read_delay;
+	bool					clock_invert;
+	bool					rx_clock_invert;
+	uint8_t					dod;
+	uint8_t					did;
+	uint8_t					csd;
+	uint8_t					clkd;
+	uint8_t					oed;
+};
+
+struct flash_bflb_device_cfg {
+	/* SPI modes to use */
+	uint8_t					auto_spi_mode;
+	uint8_t					manual_spi_mode;
+	bool					use_qpi;
+	struct flash_bflb_device_commands	cmd;
+	struct flash_bflb_device_registers	reg;
+	struct flash_bflb_pad_cfg		pad;
+	uint32_t				size;
+	uint32_t				page_size;
+	uint32_t				sector_size;
+	uint32_t				block_size;
+	uint8_t					jedec_id[3];
+	uint32_t				*init_seq;
+	size_t					init_seq_len;
+	uint8_t					*quirk_bytes_write;
+	size_t					quirk_bytes_write_len;
+	uint8_t					*quirk_bytes_read;
+	size_t					quirk_bytes_read_len;
+	bool					use_sfdp;
+	struct flash_pages_layout		layout;
+	struct flash_parameters			parameters;
+};
+
+struct flash_bflb_bank_data;
 
 struct flash_bflb_controller_data {
-	bool override_bank1;
-	bool addr_32bits;
-	struct flash_bflb_data *banks[2];
-	uint8_t bank_cnt;
+	bool					override_bank1;
+	bool					addr_32bits;
+	struct flash_bflb_bank_data		*banks[2];
+	uint8_t					bank_cnt;
+	uint8_t					clk_divider;
 };
 
-struct flash_bflb_data {
-	uintptr_t reg;
-	struct flash_bflb_controller_data *controller;
-	struct flash_bflb_device_cfg cfg;
-	enum flash_bflb_nxip_message_id nxip_message;
-	uint32_t nxip_message_args[3];
-	uint32_t last_flash_offset;
-	enum flash_bflb_bank bank;
-	enum flash_bflb_pad pad;
-	uintptr_t xip_base;
-	uintptr_t xip_end;
-	struct k_mutex sahb_mutex;
-	struct flash_pages_layout layout;
-	struct flash_parameters parameters;
-	bool use_sfdp;
-	bool use_qpi;
-	uint32_t *init_seq;
-	size_t init_seq_len;
-	uint8_t *quirk_bytes_write;
-	size_t quirk_bytes_write_len;
-	uint8_t *quirk_bytes_read;
-	size_t quirk_bytes_read_len;
+struct flash_bflb_bank_data {
+	uintptr_t				reg;
+	enum flash_bflb_bank			bank;
+	struct flash_bflb_controller_data	*controller;
+	struct flash_bflb_device_cfg		cfg;
+	uintptr_t				xip_base;
+	enum flash_bflb_nxip_message_id		nxip_message;
+	uint32_t				nxip_message_args[3];
+	uint32_t				last_flash_offset;
+	struct k_mutex				sahb_mutex;
 };
 
-struct flash_bflb_config {
-	const struct pinctrl_dev_config *pincfg;
+struct flash_bflb_bank_config {
+	const struct pinctrl_dev_config		*pincfg;
 };

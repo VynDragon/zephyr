@@ -11,53 +11,65 @@ compatible: "bflb,sf-device"
 examples:
   - |
     // S3A1604 MRAM in QPI QIO
-    mram: sf@A4000000 {
-      compatible = "bflb,sf-device", "netsol,s3a1604";
-      reg = <0xA4000000 0x200000>;
-      ranges = <0x0 0xA4000000 0x200000>;
-      #address-cells = <1>;
-      #size-cells = <1>;
-      read-command = <0x0b>;
-      read-dummy-cycles = <3>;
-      spi-bus-mode = <4>;
-      write-command = <0xda>;
-      write-dummy-cycles = <0>;
-      use-qpi;
-      enter-qpi-command = <0x38>;
-      exit-qpi-command = <0xff>;
-      sf-pad = <2>;
-      jedec-id = [d9 01 05];
-      pinctrl-0 = <&sf2_default>;
+    &sf_bank2 {
+      reg = <0xa4000000 0x200000>;
+      ranges = <0x0 0xa4000000 0x200000>;
+      status = "okay";
+
+      pinctrl-0 = <&sf3_default>;
       pinctrl-names = "default";
-      initialization-sequence = <0x06 0x0 0x0 0x87 0x01210600 0x4>;
-      quirk-bytes-read = [ a0 ];
-      quirk-bytes-write = [ a0 ];
+
+      s3a1604: mram@0 {
+        compatible = "bflb,sf-device";
+        reg = <0 0x200000>;
+
+        spi-bus-mode = <4>;
+        use-qpi;
+        sf-pad = <3>;
+        jedec-id = [d9 01 05];
+
+        read-command = <0x0b>;
+        read-dummy-cycles = <3>;
+        write-command = <0xda>;
+        write-dummy-cycles = <0>;
+        enter-qpi-command = <0x38>;
+        exit-qpi-command = <0xff>;
+
+        initialization-sequence = <0x06 0x0 0x0 0x87 0x01250600 0x4>;
+        quirk-bytes-read = [ a0 ];
+        quirk-bytes-write = [ a0 ];
+      };
     };
   - |
     // PM004MNI MRAM in QPI QIO
-    mram: sf@A4000000 {
-      compatible = "bflb,sf-device", "siproin,pm004mni";
-      reg = <0xA4000000 0x80000>;
-      ranges = <0x0 0xA4000000 0x80000>;
-      #address-cells = <1>;
-      #size-cells = <1>;
-      read-command = <0xeb>;
-      read-dummy-cycles = <0>;
-      spi-bus-mode = <4>;
-      write-command = <0x38>;
-      write-dummy-cycles = <0>;
-      use-qpi;
-      enter-qpi-command = <0x35>;
-      exit-qpi-command = <0xf5>;
-      sf-pad = <2>;
-      jedec-id = [29 55 00];
+    &sf_bank2 {
+      reg = <0xa4000000 0x80000>;
+      ranges = <0x0 0xa4000000 0x80000>;
+      status = "okay";
+
       pinctrl-0 = <&sf2_default>;
       pinctrl-names = "default";
+
+      pm004mni: mram@0 {
+        compatible = "bflb,sf-device";
+        reg = <0 0x80000>;
+
+        spi-bus-mode = <4>;
+        use-qpi;
+        sf-pad = <2>;
+        jedec-id = [29 55 00];
+
+        read-command = <0xeb>;
+        read-dummy-cycles = <0>;
+        write-command = <0x38>;
+        write-dummy-cycles = <0>;
+        enter-qpi-command = <0x35>;
+        exit-qpi-command = <0xf5>;
+      };
     };
 
 include:
-  - flash-controller.yaml
-  - pinctrl-device.yaml
+  - soc-nv-flash.yaml
 
 properties:
   reg:
@@ -67,9 +79,10 @@ properties:
     type: int
     required: true
     description: |
-      Which pad is this device holding. This is directly related to which pins are used.
+      Which pad is this device using. This is directly related to which pins are used.
       Pad 1 is usually the embedded flash, Pad 2 and Pad 3 are usually external.
       Main exception is BL70x/L where the default embedded pad is SF2.
+      External pads require a pinctrl entry at the bank.
     enum:
       - 1
       - 2
@@ -87,7 +100,7 @@ properties:
       - DO <1> = 1-1-2 mode
       - QO <2> = 1-1-4 mode
       - DIO <3> = 1-2-2 mode
-      - QIO <4> = 1-4-4 mode or 4-4-4 mode (QPI)
+      - QIO <4> = 1-4-4 mode or 4-4-4 mode (QPI), or 0-4-4 mode (Continuous Read / XIP mode)
 
     enum:
       - 0
@@ -99,6 +112,12 @@ properties:
   use-qpi:
     type: boolean
     description: Enable QPI, only 4-4-4 is supported
+
+  sf-pad-is-external:
+    type: boolean
+    description: |
+      Some pads can be both external and internal (like SF2 on BL70x/L).
+      Use external pad instead of the internal one.
 
   read-command:
     type: int
@@ -148,6 +167,10 @@ properties:
     type: int
     description: Command to exit QPI
 
+  jedec-id:
+    type: uint8-array
+    description: JEDEC ID as manufacturer ID, memory type, memory density.
+
   read-delay:
     type: int
     default: 1
@@ -166,10 +189,6 @@ properties:
   rx-clock-invert:
     type: boolean
     description: Invert RX Clock Signal.
-
-  jedec-id:
-    type: uint8-array
-    description: JEDEC ID as manufacturer ID, memory type, memory density.
 
   quirk-bytes-write:
     type: uint8-array

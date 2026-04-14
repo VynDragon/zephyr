@@ -8,33 +8,25 @@ description: Bouffalolab Serial Flash controller Flash or device compatible with
 compatible: "bflb,sf-flash"
 
 include:
-  - soc-nv-flash.yaml
   - "bflb,sf-device.yaml"
   - "jedec,spi-nor-common.yaml"
 
 examples:
   - |
     // mx25l51245g in DIO mode.
-    flash1: flash@A4000000 {
-      compatible = "bflb,sf-flash", "mxic,mx25l51245g";
-      // We cannot use 4 bytes addresses without the main flash also supporting it
-      reg = <0xA4000000 0x1000000>;
-      ranges = <0x0 0xA4000000 0x1000000>;
-      #address-cells = <1>;
-      #size-cells = <1>;
-      write-block-size = <256>;
+    mx25l51245g: flash@0 {
+      compatible = "bflb,sf-flash", "soc-nv-flash";
+      reg = <0 0x1000000>;
+      write-block-size = <1>;
       erase-block-size = <DT_SIZE_K(4)>;
-      spi-bus-mode = <3>;
-      sf-pad = <2>;
-      jedec-id = [c2 20 1a];
-      pinctrl-0 = <&sf2_default>;
-      pinctrl-names = "default";
-      use-sfdp;
-      initialization-sequence = <0x06 0x0 0x0 0x1 0x0002 0x2>;
 
+      spi-bus-mode = <3>;
+      sf-pad = <3>;
+      jedec-id = [c2 20 1a];
+      use-sfdp;
+
+      initialization-sequence = <0x06 0x0 0x0 0x1 0x0002 0x2>;
       partitions {
-        compatible = "soc-nv-flash";
-        ranges;
         #address-cells = <1>;
         #size-cells = <1>;
 

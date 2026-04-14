@@ -13,8 +13,6 @@
 	compatible = "bflb,bl706-iot-dvk";
 
 	chosen {
-		zephyr,flash = &flash0;
-		zephyr,code-partition = &slot0_partition;
 		zephyr,itcm = &itcm;
 		zephyr,dtcm = &dtcm;
 		zephyr,sram = &sram0_bt;
