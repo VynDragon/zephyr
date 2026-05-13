@@ -466,6 +466,16 @@
 			status = "disabled";
 		};
 
+		usbd: usbd@20072000 {
+			compatible = "bflb,udc-2";
+			reg = <0x20072000 0x1000>;
+			maximum-speed = "high-speed";
+			status = "disabled";
+
+			interrupts = <37 8>;
+			interrupt-parent = <&clic>;
+		};
+
 		/* All contiguous fast RAM for M0
 		 * It is kept tightly coupled by this CPU's internal cache
 		 */

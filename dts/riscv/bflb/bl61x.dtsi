@@ -514,6 +514,16 @@
 			tcap-capcode = <28 29 30 31 32 33 34 35 36 37 38>;
 		};
 
+		usbd: usbd@20072000 {
+			compatible = "bflb,udc-2";
+			reg = <0x20072000 0x1000>;
+			maximum-speed = "high-speed";
+			status = "disabled";
+
+			interrupts = <37 8>;
+			interrupt-parent = <&clic>;
+		};
+
 		/* All contiguous fast RAM
 		 * It is kept tightly coupled by the CPU's internal cache
 		 */
