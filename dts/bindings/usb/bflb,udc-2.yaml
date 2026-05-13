@@ -1,0 +1,15 @@
+# Copyright (c) 2024-2026 MASSDRIVER EI (massdriver.space)
+# SPDX-License-Identifier: Apache-2.0
+
+description: Bouffalo Lab USB 2.0 High-Speed device controller (v2 block)
+
+compatible: "bflb,udc-2"
+
+include: [usb-controller.yaml]
+
+properties:
+  reg:
+    required: true
+
+  interrupts:
+    required: true
