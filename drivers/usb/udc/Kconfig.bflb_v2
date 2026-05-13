@@ -1,0 +1,42 @@
+# Copyright (c) 2024-2026 MASSDRIVER EI (massdriver.space)
+# Copyright The Zephyr Project Contributors
+# SPDX-License-Identifier: Apache-2.0
+
+config UDC_BFLB_V2
+	bool "Bouffalo Lab USB V2 device controller driver"
+	default y
+	depends on DT_HAS_BFLB_UDC_2_ENABLED
+	select UDC_DRIVER_HAS_HIGH_SPEED_SUPPORT
+	imply UDC_WORKQUEUE
+	help
+	  USB 2.0 device controller driver for Bouffalo Lab SoCs
+	  with the USB V2 peripheral.
+	  Supports high-speed operation and exposes EP0 plus
+	  four shared DMA-backed data endpoints.
+
+if UDC_BFLB_V2
+
+choice UDC_BFLB_V2_FIFO_SETUP
+	bool "How many FIFOs are used per endpoint"
+	default UDC_BFLB_V2_FIFO_BIDIR
+
+config UDC_BFLB_V2_FIFO_MONODIR
+	bool "Use a FIFO per endpoint direction"
+	help
+	  Use one FIFO per endpoint direction: Limits usable endpoints to two.
+
+config UDC_BFLB_V2_FIFO_BIDIR
+	bool "Use a FIFO for both endpoint directions"
+	help
+	  Use a single FIFO for both endpoint direction.
+
+endchoice
+
+config UDC_BFLB_V2_EVENT_COUNT
+	int "Number or blocks in event slab"
+	range 8 32
+	default 16
+	help
+	  Number of blocks in slab for internal endpoint events.
+
+endif # UDC_BFLB_V2
