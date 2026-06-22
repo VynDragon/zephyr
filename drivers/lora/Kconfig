@@ -18,6 +18,8 @@ choice LORA_MODULE_BACKEND
 	prompt "Low-level LoRa modem integration to use"
 	default LORA_MODULE_BACKEND_LORA_BASICS_MODEM if DT_HAS_SEMTECH_SX1268_ENABLED \
 		|| DT_HAS_SEMTECH_LLCC68_ENABLED || DT_HAS_SEMTECH_SX1278_ENABLED
+	default LORA_MODULE_BACKEND_NATIVE if DT_HAS_SEMTECH_LR1121_ENABLED \
+		|| DT_HAS_PANCHIP_PAN3029_ENABLED || DT_HAS_PANCHIP_PAN3060_ENABLED
 
 config LORA_MODULE_BACKEND_LORAMAC_NODE
 	bool "loramac-node backend"
@@ -38,7 +40,7 @@ config LORA_MODULE_BACKEND_NATIVE
 	bool "Native Zephyr backend"
 	help
 	  Use Zephyr's built-in LoRa drivers without external modules.
-	  Currently supports SX1261/SX1262 transceivers.
+	  Currently supports SX1261/SX1262, LR1121, and PAN3029/PAN3060 transceivers.
 
 endchoice
 

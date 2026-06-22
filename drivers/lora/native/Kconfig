@@ -3,3 +3,4 @@
 
 rsource "sx126x/Kconfig"
 rsource "lr11xx/Kconfig"
+rsource "pan30xx/Kconfig"

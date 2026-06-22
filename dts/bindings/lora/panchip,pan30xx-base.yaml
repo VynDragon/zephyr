@@ -1,0 +1,83 @@
+# Copyright (c) 2026 MASSDRIVER EI (massdriver.space)
+# SPDX-License-Identifier: Apache-2.0
+
+properties:
+  irq-gpios:
+    type: phandle-array
+    required: true
+    description: |
+      Pin connected to the modem's typically active-high IRQ Pin.
+
+  reset-gpios:
+    type: phandle-array
+    description: |
+      Optional pin connected to the modem's typically active-low RESET signal.
+
+  gpio10-is-txen:
+    type: boolean
+    description: |
+      Configure modem's GPIO10 pin to output the transmission status:
+      Low for Receiving or inactive, High for Transmitting.
+
+  gpio11-is-cad:
+    type: boolean
+    description: |
+      Configure modem's GPIO11 pin to inform the host of an ongoing preamble transmission
+      with the same bandwidth and spreading factor settings when in RX mode.
+      High when currently detecting a signal, Low otherwise.
+
+  tcxo-power-startup-delay-ms:
+    type: int
+    default: 30
+    description: |
+      Startup delay to let the TCXO stabilize after TCXO power on. 30 ms is usually sufficient.
+
+  gpios-enable:
+    type: int
+    default: 0
+    description: |
+      Use bitmasked GPIOs as outputs. Pins set here are used to set the RF path,
+      power the TCXO and drive other functions the user may need in the provided states.
+      Unset pins are kept Hi-Z.
+      - A[0]: GPIO0 (TX_EN in switched reference design)
+      - A[1]: GPIO3
+      - A[2]: GPIO10 (RX_EN in switched reference design)
+      - A[3]: GPIO11
+
+      The default has no GPIOs active.
+      GPIO10 cannot be used simultaneously with gpio10-is-txen.
+      GPIO11 cannot be used simultaneously with gpio11-is-cad.
+      To use a GPIO to power a TCXO, set the GPIO bit corresponding to it in all modes.
+      The GPIOs enabled here are directly controlled by the host and not automated by the modem.
+
+  gpios-standby:
+    type: int
+    default: 0
+    description: |
+      GPIOs state in standby mode. See gpios-enable for mask bit meaning.
+      Defines which GPIOs are set high (bit set) or low (bit unset) in standby mode.
+
+  gpios-rx:
+    type: int
+    default: 0
+    description: GPIOs state in RX mode. See gpios-standby.
+
+  gpios-tx:
+    type: int
+    default: 0
+    description: GPIOs state in TX mode. See gpios-standby.
+
+  use-dcdc:
+    type: boolean
+    description: Use DCDC regulator instead of LDO.
+
+  force-ldro:
+    type: boolean
+    description: |
+      Force usage of Low Data Rate Optimization even in cases where the symbol time is shorter than
+      16.38ms. Useful for designs using no TCXO or with bad heat dissipation.
+
+  lora-modulation:
+    type: boolean
+    description: |
+      Use LoRa modulation instead of ChirpIoT modulation.

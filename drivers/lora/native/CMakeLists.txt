@@ -3,5 +3,6 @@
 
 # zephyr-keep-sorted-start
 add_subdirectory_ifdef(CONFIG_LORA_LR11XX_NATIVE lr11xx)
+add_subdirectory_ifdef(CONFIG_LORA_PAN30XX_NATIVE pan30xx)
 add_subdirectory_ifdef(CONFIG_LORA_SX126X_NATIVE sx126x)
 # zephyr-keep-sorted-stop

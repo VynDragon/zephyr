@@ -1,0 +1,14 @@
+# Copyright (c) 2026 MASSDRIVER EI (massdriver.space)
+# SPDX-License-Identifier: Apache-2.0
+
+title: Panchip PAN3060 ChirpIoT Modem on I2C bus
+
+description: |
+  Panchip PAN3060 ChirpIoT Modem. It supports up to 20dBm of transmit power over the
+  137-1110MHz sub-GHz ISM bands, sensitivity as low as -130dBm, spreading factors 5 to 9,
+  and bandwidths of 125KHz, 250KHz, and 500KHz.
+  It has limited compatibility with LoRa modulation.
+
+compatible: "panchip,pan3060"
+
+include: ["panchip,pan30xx-base.yaml", "i2c-device.yaml"]
