@@ -1,0 +1,6 @@
+board:
+  name: e290_400mbl_sc
+  full_name: Ebyte E290 Module Development Board (PAN3029)
+  vendor: ebyte
+  socs:
+    - name: stm32f103xb

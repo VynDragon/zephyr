@@ -1,0 +1,59 @@
+# SPDX-FileCopyrightText: Copyright The Zephyr Project Contributors
+# SPDX-License-Identifier: Apache-2.0
+
+if BOARD_E290_400MBL_SC
+
+if LORA
+
+choice LORA_MODULE_BACKEND
+	default LORA_MODULE_BACKEND_NATIVE
+endchoice
+
+endif # LORA
+
+config USB_SELF_POWERED
+	default n
+
+source "boards/common/usb/Kconfig.cdc_acm_serial.defconfig"
+
+# We are starved for space, save space
+
+if LOG
+
+choice LOG_MODE
+	default LOG_MODE_MINIMAL
+endchoice
+
+endif # LOG
+
+if I2C
+
+config I2C_STM32_INTERRUPT
+	default n
+
+endif # I2C
+
+if UDC_DRIVER
+
+config UDC_DRIVER_HIGH_SPEED_SUPPORT_ENABLED
+	default n
+
+choice USBD_MAX_SPEED_CHOICE
+	default USBD_MAX_SPEED_FULL
+endchoice
+
+if USBD_CDC_ACM_CLASS
+
+config USBD_CDC_ACM_STACK_SIZE
+	default 512
+
+config USBD_CDC_ACM_BUF_POOL_SIZE
+	default 64
+	# Wrong range in class Kconfig
+	range 64 $(UINT16_MAX)
+
+endif # USBD_CDC_ACM_CLASS
+
+endif # UDC_DRIVER
+
+endif # BOARD_E290_400MBL_SC
