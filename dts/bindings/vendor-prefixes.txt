@@ -540,6 +540,7 @@ ovti	OmniVision Technologies Inc.
 oxsemi	Oxford Semiconductor, Ltd.
 ozzmaker	OzzMaker
 panasonic	Panasonic Corporation
+panchip	Panchip Microelectronics Co., Ltd.
 parade	Parade Technologies Inc.
 parallax	Parallax Inc.
 particle	Particle.io
