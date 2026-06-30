@@ -521,6 +521,10 @@ static int uart_bflb_pm_control(const struct device *dev,
 		} else if (cfg->base_reg == UART1_BASE) {
 			tmp |= (1 << 17);
 #endif
+#ifdef UART2_BASE
+		} else if (cfg->base_reg == UART2_BASE) {
+			tmp |= (1 << 26);
+#endif
 		} else {
 			return -EINVAL;
 		}
@@ -538,6 +542,10 @@ static int uart_bflb_pm_control(const struct device *dev,
 #ifdef UART1_BASE
 		} else if (cfg->base_reg == UART1_BASE) {
 			tmp &= ~(1 << 17);
+#endif
+#ifdef UART2_BASE
+		} else if (cfg->base_reg == UART2_BASE) {
+			tmp |= (1 << 26);
 #endif
 		} else {
 			return -EINVAL;

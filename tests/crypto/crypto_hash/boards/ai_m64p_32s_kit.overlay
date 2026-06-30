@@ -1,0 +1,13 @@
+/*
+ * Copyright The Zephyr Project Contributors
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+&sec_eng_aes {
+	status = "okay";
+};
+
+&sec_eng_sha {
+	status = "okay";
+};
