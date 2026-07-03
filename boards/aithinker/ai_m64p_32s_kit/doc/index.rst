@@ -24,12 +24,12 @@ Ai-M64P-32S-Kit provides the following hardware components:
 
 - Two Buttons:
 
-   - Reset Button (END)
+   - Reset Button (EN)
    - Boot Select Button (BOOT)
 
 - CH340C USB to UART adapter.
 
-For more information about the Bouffalo Lab BL-616CL MCU:
+For more information about the Bouffalo Lab BL616CL MCU:
 
 - `Bouffalo Lab BL616CL MCU Datasheet`_
 - `Bouffalo Lab Development Zone`_

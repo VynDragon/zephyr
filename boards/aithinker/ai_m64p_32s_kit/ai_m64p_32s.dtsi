@@ -19,7 +19,6 @@
 		zephyr,console = &uart0;
 		zephyr,shell-uart = &uart0;
 		zephyr,entropy = &sec_eng_trng;
-		// zephyr,bt-hci = &bt_hci_bflb;
 	};
 
 	aliases {
@@ -31,9 +30,9 @@
 	clock-frequency = <DT_FREQ_M(320)>;
 };
 
-// &clk_flash {
-// 	divider = <1>;
-// };
+&clk_flash {
+	divider = <1>;
+};
 
 &sf_ctrl {
 	override-bank1;
@@ -112,8 +111,3 @@
 	reg = <0x88000000 DT_SIZE_M(4)>;
 	ranges = <0x0 0x88000000 DT_SIZE_M(4)>;
 };
-
-//
-// &bt_hci_bflb {
-// 	status = "okay";
-// };

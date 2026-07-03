@@ -14,7 +14,6 @@ config SOC_SERIES_BL616CL
 	select SOC_PREP_HOOK
 	select USE_DT_CODE_PARTITION
 	imply CODE_DATA_RELOCATION
-# 	imply FLASH
+	imply FLASH
 	imply FPU
-# 	imply REGULATOR
 	imply XIP
