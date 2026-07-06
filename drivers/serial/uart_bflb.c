@@ -85,7 +85,7 @@ static uint32_t uart_bflb_get_clock(void)
 	clock_control_get_rate(clock_ctrl, (void *)BFLB_CLKID_CLK_BCLK, &uclk);
 #endif
 
-	return uclk / (uart_divider + 1);
+	return MHZ(40) / (uart_divider + 1);
 }
 
 

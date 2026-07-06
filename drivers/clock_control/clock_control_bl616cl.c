@@ -409,7 +409,7 @@ static void clock_control_bl616cl_deinit_pll(void)
 	sys_write32(tmp, GLB_BASE + GLB_WIFIPLL_ANA_CTRL_OFFSET);
 }
 
-/* RC32M : 0
+/* XCLK XTAL / SOC XTAL : 0
  * XTAL : 1
  */
 static void clock_control_bl616cl_set_pll_source(uint32_t source)
@@ -532,11 +532,12 @@ static void clock_control_bl616cl_init_pll(const bl616cl_pll_config *const *conf
 
 	clock_control_bl616cl_deinit_pll();
 
+	/* Always use XCLK XTAL or RF will be sad and not work*/
+	clock_control_bl616cl_set_pll_source(0);
+
 	if (source == BL616CL_CLKID_CLK_CRYSTAL) {
-		clock_control_bl616cl_set_pll_source(1);
 		clock_control_bl616cl_init_pll_setup(config[crystal_id], top_frequency);
 	} else {
-		clock_control_bl616cl_set_pll_source(0);
 		clock_control_bl616cl_init_pll_setup(config[CRYSTAL_ID_FREQ_32000000],
 						     top_frequency);
 	}
@@ -1217,9 +1218,10 @@ static void clock_control_bl616cl_peripheral_clock_init(void)
 	regval |= (1U << 18);
 	/* enable SDH clock routing */
 	regval |= (1U << 22);
+
 	sys_write32(regval, GLB_BASE + GLB_CGEN_CFG2_OFFSET);
 
-	clock_control_bl616cl_uart_set_clock(true, 0, 2);
+	clock_control_bl616cl_uart_set_clock(true, 2, 2);
 }
 
 static int clock_control_bl616cl_on(const struct device *dev, clock_control_subsys_t sys)

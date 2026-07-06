@@ -20,6 +20,11 @@
 	#address-cells = <1>;
 	#size-cells = <1>;
 
+	bt_hci_bflb: bt-hci {
+		compatible = "bflb,bt-hci";
+		status = "disabled";
+	};
+
 	clocks {
 		clk_rc32m: clk-rc32m {
 			#clock-cells = <0>;
@@ -356,7 +361,7 @@
 			reg-names = "hbn", "aon";
 			status = "okay";
 
-			brown-out-threshold-microvolt = <2670000>;
+			brown-out-threshold-microvolt = <2420000>;
 
 			interrupts = <67 1>, <68 1>, <69 1>;
 			interrupt-parent = <&clic>;
