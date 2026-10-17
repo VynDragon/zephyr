@@ -8,7 +8,7 @@ zephyr_sources_ifdef(CONFIG_BFLB_AOS_SHIM aos_shim.c)
 
 # BL61x IEEE 802.15.4 uses the shared wl_api blobs, which need these GLB reset /
 # memcpy shims (BL702/BL702L provide their own platform shim instead).
-if(CONFIG_IEEE802154_BFLB AND CONFIG_SOC_SERIES_BL61X)
+if(CONFIG_IEEE802154_BFLB AND (CONFIG_SOC_SERIES_BL61X OR CONFIG_SOC_SERIES_BL808))
   zephyr_sources(bflb_lmac154_shim.c)
 endif()
 

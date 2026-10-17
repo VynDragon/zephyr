@@ -473,6 +473,17 @@
 			pwr-table-11n = <14 14 14 14 14 14 14 14>;
 		};
 
+		ieee802154: ieee802154@2c000000 {
+			compatible = "bflb,ieee802154";
+			reg = <0x2c000000 0x1000>;
+			interrupts = <64 1>, <63 1>, <65 1>;
+			interrupt-names = "m154", "m154-req-ack", "m154-aes";
+			interrupt-parent = <&clic>;
+			pwr-table-zigbee = <13>;
+			pwr-offset-bz = <16 16 16 16 16>;
+			status = "disabled";
+		};
+
 		psram_uhs_ctrl: psram-uhs@3000f000 {
 			compatible = "bflb,bl808-psram-uhs-controller";
 			reg = <0x3000f000 DT_SIZE_K(4)>;

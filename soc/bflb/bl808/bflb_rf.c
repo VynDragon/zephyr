@@ -32,7 +32,9 @@ BUILD_ASSERT(offsetof(struct wl_cfg_t, en_full_cal) == 2U, "en_full_cal offset")
 BUILD_ASSERT(offsetof(struct wl_cfg_t, param) == 4U, "param offset");
 BUILD_ASSERT(offsetof(struct wl_cfg_t, param_load) == 112U, "param_load offset");
 
-#ifdef CONFIG_BT_BFLB_BL808
+void rf_init(unsigned int);
+
+#if defined(CONFIG_BT_BFLB_BL808) || defined(CONFIG_IEEE802154_BFLB)
 int bflb_rf_init(void)
 {
 	struct wl_cfg_t *cfg;
@@ -60,6 +62,9 @@ int bflb_rf_init(void)
 		LOG_ERR("wl_init failed: %d", ret);
 		return -EIO;
 	}
+
+	rf_init(40000000);
+
 
 	return 0;
 }

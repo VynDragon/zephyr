@@ -20,7 +20,7 @@ LOG_MODULE_REGISTER(ieee802154_bflb, CONFIG_IEEE802154_DRIVER_LOG_LEVEL);
 #include <bouffalolab/common/lmac154/lmac154_fpt.h>
 #include <bflb_soc.h>
 #include <glb_reg.h>
-#if defined(CONFIG_SOC_SERIES_BL61X)
+#if defined(CONFIG_SOC_SERIES_BL61X) || defined(CONFIG_SOC_SERIES_BL808)
 #include <wl_api.h>
 #endif
 
@@ -73,6 +73,11 @@ LOG_MODULE_REGISTER(ieee802154_bflb, CONFIG_IEEE802154_DRIVER_LOG_LEVEL);
 #define IEEE802154_BFLB_MTU         1280
 #endif
 
+/* Use the newer API, often referred to as 'dual stack' by vendor */
+#if defined(CONFIG_SOC_SERIES_BL61X) || defined(CONFIG_SOC_SERIES_BL808)
+#define IEEE802154_DUAL_STACK_API
+#endif
+
 static struct bflb_ieee802154_data bflb_ieee802154_data_inst;
 
 static lmac154_isr_t m154_isr_handler;
@@ -80,7 +85,7 @@ static energy_scan_done_cb_t ed_scan_done_cb;
 
 extern int bflb_rf_init(void);
 
-#if defined(CONFIG_SOC_SERIES_BL61X)
+#ifdef IEEE802154_DUAL_STACK_API
 extern void zb_timer_cfg(uint32_t init_time);
 #elif defined(CONFIG_SOC_SERIES_BL70X)
 /* BL70x: RF PHY functions from libbl702_rf.a */
@@ -95,7 +100,7 @@ extern bool bz_phy_optimize_tx_channel(uint32_t channel_mhz);
 extern void rf_tx_pwr_init(void);
 #endif
 
-#if defined(CONFIG_SOC_SERIES_BL61X)
+#ifdef IEEE802154_DUAL_STACK_API
 static void bflb_rx_cb(lmac154_rx_status_t status, lmac154_receiveInfo_t *info, uint32_t *frame);
 static void bflb_tx_done_cb(lmac154_tx_status_t tx_status, uint32_t *ack_frame,
 			    uint32_t ack_frame_len);
@@ -122,7 +127,7 @@ static int bflb_ieee802154_init(const struct device *dev);
 
 static K_WORK_DELAYABLE_DEFINE(ed_scan_work, ed_scan_work_handler);
 
-#if defined(CONFIG_SOC_SERIES_BL61X)
+#ifdef IEEE802154_DUAL_STACK_API
 /*
  * Registered RX callback for BL616 (v2.3.24 API).
  * Called once per received frame with status indicating event type.
@@ -427,7 +432,7 @@ static int bflb_ieee802154_set_txpower(const struct device *dev, int16_t dbm)
 	}
 
 	lmac154_setTxPower((lmac154_tx_power_t)dbm);
-#if defined(CONFIG_SOC_SERIES_BL61X)
+#ifdef IEEE802154_DUAL_STACK_API
 	wl_rf_set_154_tx_power((uint32_t)dbm);
 #else
 	(void)bz_phy_set_tx_power((int)dbm);
@@ -445,7 +450,7 @@ static int bflb_ieee802154_tx(const struct device *dev, enum ieee802154_tx_mode 
 	uint8_t *data = frag->data;
 	uint8_t len = frag->len;
 	bool csma = false;
-#if defined(CONFIG_SOC_SERIES_BL61X)
+#ifdef IEEE802154_DUAL_STACK_API
 	static lmac154_txParam_ext_t tp;
 	static uint8_t __aligned(16) tx_buf[IEEE802154_BFLB_MAX_PKT_LEN];
 	unsigned int key;
@@ -479,7 +484,7 @@ static int bflb_ieee802154_tx(const struct device *dev, enum ieee802154_tx_mode 
 	bflb_ieee802154_data_inst.tx_status = IEEE802154_BFLB_TX_STATUS_PENDING;
 	bflb_ieee802154_data_inst.ack_received = 0U;
 
-#if defined(CONFIG_SOC_SERIES_BL61X)
+#ifdef IEEE802154_DUAL_STACK_API
 	/* BL616: use triggerParamTx which delivers ACKED/NO_ACK through
 	 * the registered tx_done_cb -- the weak ackEvent does not fire
 	 * when using registerEventCallback for the ISR path.
@@ -517,7 +522,7 @@ static int bflb_ieee802154_tx(const struct device *dev, enum ieee802154_tx_mode 
 	/* Wait for TX done */
 	ret = k_sem_take(&bflb_ieee802154_data_inst.tx_sem, IEEE802154_BFLB_TX_TIMEOUT);
 	if (ret != 0) {
-#if defined(CONFIG_SOC_SERIES_BL61X)
+#ifdef IEEE802154_DUAL_STACK_API
 		lmac154_resetTx();
 		lmac154_enableRx();
 #endif
@@ -526,7 +531,7 @@ static int bflb_ieee802154_tx(const struct device *dev, enum ieee802154_tx_mode 
 	}
 
 	switch (bflb_ieee802154_data_inst.tx_status) {
-#if defined(CONFIG_SOC_SERIES_BL61X)
+#ifdef IEEE802154_DUAL_STACK_API
 	case (uint8_t)LMAC154_TX_STATUS_ACKED:
 		return 0;
 	case (uint8_t)LMAC154_TX_STATUS_NO_ACK:
@@ -569,7 +574,7 @@ static int bflb_ieee802154_start(const struct device *dev)
 		return -EALREADY;
 	}
 
-#if defined(CONFIG_SOC_SERIES_BL61X)
+#ifdef IEEE802154_DUAL_STACK_API
 	lmac154_enable1stStack();
 	lmac154_registerEventCallback(LMAC154_STACK_1, bflb_rx_cb);
 	m154_isr_handler = lmac154_getInterruptCallback();
@@ -688,10 +693,12 @@ static const struct ieee802154_radio_api bflb_ieee802154_radio_api = {
 
 /* Device init */
 
+void GLB_AHB_MCU_Software_Reset(uint8_t swrst);
+
 static int bflb_ieee802154_init(const struct device *dev)
 {
 	struct bflb_ieee802154_data *data = dev->data;
-#if defined(CONFIG_SOC_SERIES_BL61X)
+#ifdef IEEE802154_DUAL_STACK_API
 	uint32_t cgen2;
 	uint64_t now_us;
 #else
@@ -707,11 +714,13 @@ static int bflb_ieee802154_init(const struct device *dev)
 	/* Set the locally-administered bit, clear multicast bit */
 	data->mac[0] = (data->mac[0] | 0x02U) & 0xFEU;
 
-#if defined(CONFIG_SOC_SERIES_BL61X)
+#ifdef IEEE802154_DUAL_STACK_API
 	/* BL616: enable M154 + BT/BLE peripheral clock gates */
 	cgen2 = sys_read32(GLB_BASE + GLB_CGEN_CFG2_OFFSET);
 	cgen2 |= GLB_CGEN_S3_M1542_MSK | GLB_CGEN_S3_BT_BLE2_MSK;
 	sys_write32(cgen2, GLB_BASE + GLB_CGEN_CFG2_OFFSET);
+
+	GLB_AHB_MCU_Software_Reset(11);
 
 #elif defined(CONFIG_SOC_SERIES_BL70X)
 	/* Enable BL70x MAC154/Zigbee peripheral clock and pulse its soft reset */
@@ -767,15 +776,22 @@ static int bflb_ieee802154_init(const struct device *dev)
 	/* Initialize lmac154 MAC layer */
 	lmac154_init();
 
-#if defined(CONFIG_SOC_SERIES_BL61X)
+#ifdef IEEE802154_DUAL_STACK_API
+	/* Breaks on BL808: Until coexistence is touched elsewhere, init defaults are fine */
 	lmac154_enableCoex();
+#if defined(CONFIG_SOC_SERIES_BL808)
+	sys_write32(0x500c0000U, 0x24920004U);
+	sys_write32(0x0, 0x24920028U);
+#endif
 	lmac154_setStd2015Extra(true);
 	lmac154_setTxRetry(0);
 	lmac154_fptClear();
 	lmac154_setEnhAckWaitTime((IEEE802154_BFLB_AIFS_SYMBOLS + (6 + 39) * 2 + 20)
 				  << IEEE802154_BFLB_US_PER_SYMBOL_BITS);
 	lmac154_setRxStateWhenIdle(true);
+#if defined(CONFIG_SOC_SERIES_BL61X)
 	lmac154_setFramePendingMode(LMAC154_FPT_ANY);
+#endif
 
 	now_us = k_ticks_to_us_floor64(k_uptime_ticks());
 	zb_timer_cfg((uint32_t)(now_us >> IEEE802154_BFLB_US_PER_SYMBOL_BITS));
@@ -789,7 +805,7 @@ static int bflb_ieee802154_init(const struct device *dev)
 
 	IRQ_CONNECT(M154_IRQ, M154_IRQ_PRIO, m154_irq_handler, NULL, 0);
 	irq_enable(M154_IRQ);
-#if !defined(CONFIG_SOC_SERIES_BL61X)
+#ifndef IEEE802154_DUAL_STACK_API
 #if defined(CONFIG_SOC_SERIES_BL70XL)
 	rf_tx_pwr_init();
 #endif
