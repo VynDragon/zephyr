@@ -25,3 +25,12 @@ config CLOCK_CONTROL_BOUFFALOLAB_BL808
 	bool "Bouffalolab BL808 Clock Control Driver"
 	default y
 	depends on DT_HAS_BFLB_BL808_CLOCK_CONTROLLER_ENABLED
+
+if CLOCK_CONTROL_BOUFFALOLAB_BL808
+
+config CLOCK_CONTROL_BOUFFALOLAB_BL808_FULL
+	bool "Only allow querying for extra CPUs"
+	default y if SOC_SERIES_BL808_M0
+	default n
+
+endif

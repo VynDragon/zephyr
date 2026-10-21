@@ -89,6 +89,8 @@ struct gpio_bflb_bl61x_parent_config {
 	const struct device **children;
 	size_t child_cnt;
 	size_t ngpios;
+	/* Multi-CPU SoC may not have GPIO IRQ on all CPUs */
+	bool irq_disabled;
 	void (*irq_config_func)(void);
 };
 
@@ -275,6 +277,8 @@ static void gpio_bflb_pin_interrupt_clear(const struct device *dev, gpio_pin_t p
 	sys_write32(tmp, GPIO_BFLB_PIN_REG(cfg->base, pin, cfg->section));
 }
 
+#if DT_ANY_INST_HAS_PROP_STATUS_OKAY(interrupts)
+
 static void gpio_bflb_pins_interrupt_clear(const struct device *dev, uint32_t mask)
 {
 	const struct gpio_bflb_config * const cfg = dev->config;
@@ -285,6 +289,8 @@ static void gpio_bflb_pins_interrupt_clear(const struct device *dev, uint32_t ma
 		}
 	}
 }
+
+#endif
 
 static int gpio_bflb_pin_interrupt_configure(const struct device *dev,
 					     gpio_pin_t pin,
@@ -452,7 +458,9 @@ void gpio_bflb_init_parent(const struct device *dev)
 #ifdef CONFIG_GPIO_BL61X_808_WO
 		gpio_bflb_common_init_bl61x_wo();
 #endif
-		cfg->p_config->irq_config_func();
+		if (!cfg->p_config->irq_disabled) {
+			cfg->p_config->irq_config_func();
+		}
 		cfg->p_data->initialized = true;
 	}
 }
@@ -472,6 +480,8 @@ int gpio_bflb_init(const struct device *dev)
 
 	return 0;
 }
+
+#if DT_ANY_INST_HAS_PROP_STATUS_OKAY(interrupts)
 
 static void gpio_bflb_isr(const struct gpio_bflb_bl61x_parent_config *p_cfg)
 {
@@ -494,6 +504,8 @@ static void gpio_bflb_isr(const struct gpio_bflb_bl61x_parent_config *p_cfg)
 	}
 
 }
+
+#endif
 
 static int gpio_bflb_manage_callback(const struct device *port,
 				     struct gpio_callback *callback,
@@ -566,12 +578,15 @@ static DEVICE_API(gpio, gpio_bflb_api) = {
 			    &gpio_bflb_api);
 
 #define GPIO_BFLB_INIT_PARENT(n)								  \
-	GPIO_BFLB_IRQ_DECL(n);									  \
+	IF_ENABLED(DT_INST_IRQ_HAS_IDX(n, 0),							  \
+		(GPIO_BFLB_IRQ_DECL(n);))							  \
 	static const struct gpio_bflb_bl61x_parent_config gpio_bflb_bl61x_##n##_parent_config = { \
 		.children = (const struct device * []){ GPIO_BFLB_GET_INST_PORTS(n) },		  \
 		.child_cnt = DT_INST_CHILD_NUM_STATUS_OKAY(n),					  \
 		.ngpios = GPIO_BFLB_INST_COUNT_GPIOS(n),					  \
-		.irq_config_func = gpio_bflb_bl61x_##n##_irq_config_func,			  \
+		.irq_disabled = !(DT_INST_IRQ_HAS_IDX(n, 0)),					  \
+		IF_ENABLED(DT_INST_IRQ_HAS_IDX(n, 0),						  \
+			(.irq_config_func = gpio_bflb_bl61x_##n##_irq_config_func,))		  \
 	};											  \
 	static struct gpio_bflb_bl61x_parent_data gpio_bflb_bl61x_##n##_parent_data = {		  \
 		.initialized = false,								  \
@@ -579,7 +594,8 @@ static DEVICE_API(gpio, gpio_bflb_api) = {
 	DT_INST_FOREACH_CHILD_STATUS_OKAY_VARGS(n, GPIO_BFLB_INIT,				  \
 						&gpio_bflb_bl61x_##n##_parent_data,		  \
 						&gpio_bflb_bl61x_##n##_parent_config)		  \
-	GPIO_BFLB_IRQ_FUNC(n, &gpio_bflb_bl61x_##n##_parent_config);
+	IF_ENABLED(DT_INST_IRQ_HAS_IDX(n, 0), 							  \
+		   (GPIO_BFLB_IRQ_FUNC(n, &gpio_bflb_bl61x_##n##_parent_config);))
 
 DT_INST_FOREACH_STATUS_OKAY(GPIO_BFLB_INIT_PARENT)
 

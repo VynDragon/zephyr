@@ -117,8 +117,8 @@ LOG_MODULE_REGISTER(flash_bflb, CONFIG_FLASH_LOG_LEVEL);
 #define DUMMY_PAGE_SIZE				256
 #define DUMMY_WRITE_ALIGN			4
 
-#define FLASH_READ32(address)		(*((volatile uint32_t *)(address)))
-#define FLASH_WRITE32(value, address)	(*((volatile uint32_t *)(address))) = value;
+#define FLASH_READ32(address)		(*((volatile uintptr_t *)(address)))
+#define FLASH_WRITE32(value, address)	(*((volatile uintptr_t *)(address))) = value;
 
 #define THEORETICAL_CLEAR_MIN	24
 
@@ -228,10 +228,10 @@ static void flash_bflb_nxip_message_clear(struct flash_bflb_bank_data *data)
 /* Will using function cause error ? */
 static __ramfunc bool flash_bflb_is_in_xip(struct flash_bflb_bank_data *data, void *func)
 {
-	if (((uint32_t)func >= (BFLB_XIP_BASE_BANK1)
-	    && (uint32_t)func < (BFLB_XIP_BASE_BANK1 + BFLB_XIP_SIZE))
-	    || ((uint32_t)func >= (BFLB_XIP_BASE_BANK2)
-	    && (uint32_t)func < (BFLB_XIP_BASE_BANK2 + BFLB_XIP_SIZE))) {
+	if (((uintptr_t)func >= (BFLB_XIP_BASE_BANK1)
+	    && (uintptr_t)func < (BFLB_XIP_BASE_BANK1 + BFLB_XIP_SIZE))
+	    || ((uintptr_t)func >= (BFLB_XIP_BASE_BANK2)
+	    && (uintptr_t)func < (BFLB_XIP_BASE_BANK2 + BFLB_XIP_SIZE))) {
 		LOG_ERR("function at %p is in a SF controller region and will crash the device",
 			func);
 		return true;
