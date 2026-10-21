@@ -18,7 +18,7 @@ config RISCV_MACHINE_TIMER
 if RISCV_MACHINE_TIMER
 
 config RISCV_MACHINE_TIMER_NO_64BIT_MMIO
-	bool "Use 32-bit accesses for mtimecmp on 64-bit targets"
+	bool
 	depends on 64BIT
 	help
 	  Some RISC-V implementations do not support atomic 64-bit

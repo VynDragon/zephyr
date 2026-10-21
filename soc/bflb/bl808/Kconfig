@@ -51,6 +51,7 @@ DT_CHOSEN_BFLB_LP_PARTITION := bflb,lp-partition
 config SOC_SERIES_BL808_D0_START
 	bool "Start D0 C906 core"
 	depends on $(dt_chosen_enabled,$(DT_CHOSEN_BFLB_D0_PARTITION))
+	depends on SOC_SERIES_BL808_M0
 	select SOC_LATE_INIT_HOOK
 	help
 	  The M0 CPU core starts the D0 CPU at the chosen partition offset once its initialization
@@ -59,6 +60,7 @@ config SOC_SERIES_BL808_D0_START
 config SOC_SERIES_BL808_LP_START
 	bool "Start LP E902 core"
 	depends on $(dt_chosen_enabled,$(DT_CHOSEN_BFLB_LP_PARTITION))
+	depends on SOC_SERIES_BL808_M0
 	select SOC_LATE_INIT_HOOK
 	help
 	  The M0 CPU core starts the LP CPU at the chosen partition offset once its initialization

@@ -5,7 +5,7 @@
  *
  */
 
-#include <bflb/bl808_32bits_common.dtsi>
+#include <bflb/bl808_32bit_common.dtsi>
 
 / {
 	#address-cells = <1>;

@@ -8,7 +8,7 @@ vendor: sipeed
 type: mcu
 arch: riscv
 ram: 512
-flash: 8128
+flash: 4096
 toolchain:
   - zephyr
 testing:

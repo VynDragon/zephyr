@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 MASSDRIVER EI (massdriver.space)
+ * Copyright (c) 2024-2026 MASSDRIVER EI (massdriver.space)
  * Copyright (c) 2018-2023 Intel Corporation
  *
  * SPDX-License-Identifier: Apache-2.0
@@ -10,6 +10,7 @@
 #include <zephyr/drivers/timer/system_timer.h>
 #include <zephyr/sys/clock.h>
 #include <zephyr/irq.h>
+#include <zephyr/arch/riscv/csr.h>
 
 #define DT_DRV_COMPAT riscv_machine_timer
 
@@ -51,11 +52,10 @@ static void set_mtimecmp(uint64_t time)
 static uint64_t mtime(void)
 {
 #if !defined(MTIME_REG) && defined(CONFIG_64BIT)
-	uint64_t val;
-	__asm__ volatile("csrr %0, time" : "=r"(val));
-	return val;
+	return csr_read(time);
 #elif !defined(MTIME_REG)
-#error Unsupported configuration
+	BUILD_ASSERT(false,
+		     "Unsupported configuration, 32-bit targets still require a mtime register");
 #elif defined(CONFIG_64BIT)
 	return *(volatile uint64_t *)MTIME_REG;
 #else

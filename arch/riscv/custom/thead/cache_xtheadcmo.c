@@ -9,7 +9,7 @@
 
 int arch_dcache_invd_all(void)
 {
-#ifdef CONFIG_CPU_HAS_DCACHE
+#ifdef CONFIG_DCACHE
 	__asm__ volatile (
 		"fence\n"
 		"fence.i\n"
@@ -26,7 +26,7 @@ int arch_dcache_invd_all(void)
 #endif
 }
 
-#ifdef CONFIG_CPU_HAS_DCACHE
+#ifdef CONFIG_DCACHE
 static void arch_cache_invalidate_dcache_line(uintptr_t address)
 {
 	__asm__ volatile (
@@ -40,7 +40,7 @@ static void arch_cache_invalidate_dcache_line(uintptr_t address)
 
 int arch_dcache_invd_range(void *addr_in, size_t size)
 {
-#ifdef CONFIG_CPU_HAS_DCACHE
+#ifdef CONFIG_DCACHE
 	uintptr_t addr = (uintptr_t)addr_in;
 
 	__asm__ volatile (
@@ -67,7 +67,7 @@ int arch_dcache_invd_range(void *addr_in, size_t size)
 
 int arch_icache_invd_all(void)
 {
-#ifdef CONFIG_CPU_HAS_ICACHE
+#ifdef CONFIG_ICACHE
 	__asm__ volatile (
 		"fence\n"
 		"fence.i\n"
@@ -84,7 +84,7 @@ int arch_icache_invd_all(void)
 #endif
 }
 
-#ifdef CONFIG_CPU_HAS_ICACHE
+#ifdef CONFIG_ICACHE
 static void arch_cache_invalidate_icache_line(uintptr_t address)
 {
 	__asm__ volatile (
@@ -98,7 +98,7 @@ static void arch_cache_invalidate_icache_line(uintptr_t address)
 
 int arch_icache_invd_range(void *addr_in, size_t size)
 {
-#ifdef CONFIG_CPU_HAS_ICACHE
+#ifdef CONFIG_ICACHE
 	uintptr_t addr = (uintptr_t)addr_in;
 
 	__asm__ volatile (
@@ -125,7 +125,7 @@ int arch_icache_invd_range(void *addr_in, size_t size)
 
 int arch_dcache_flush_all(void)
 {
-#ifdef CONFIG_CPU_HAS_DCACHE
+#ifdef CONFIG_DCACHE
 	__asm__ volatile (
 		"fence\n"
 		"fence.i\n"
@@ -142,7 +142,7 @@ int arch_dcache_flush_all(void)
 #endif
 }
 
-#ifdef CONFIG_CPU_HAS_DCACHE
+#ifdef CONFIG_DCACHE
 static void arch_cache_clean_dcache_line(uintptr_t address)
 {
 	__asm__ volatile (
@@ -156,7 +156,7 @@ static void arch_cache_clean_dcache_line(uintptr_t address)
 
 int arch_dcache_flush_range(void *addr_in, size_t size)
 {
-#ifdef CONFIG_CPU_HAS_DCACHE
+#ifdef CONFIG_DCACHE
 	uintptr_t addr = (uintptr_t)addr_in;
 
 	__asm__ volatile (
@@ -183,7 +183,7 @@ int arch_dcache_flush_range(void *addr_in, size_t size)
 
 int arch_dcache_flush_and_invd_all(void)
 {
-#ifdef CONFIG_CPU_HAS_DCACHE
+#ifdef CONFIG_DCACHE
 	__asm__ volatile (
 		"fence\n"
 		"fence.i\n"
@@ -200,7 +200,7 @@ int arch_dcache_flush_and_invd_all(void)
 #endif
 }
 
-#ifdef CONFIG_CPU_HAS_DCACHE
+#ifdef CONFIG_DCACHE
 static void arch_cache_clean_invalidate_dcache_line(uintptr_t address)
 {
 	__asm__ volatile (
@@ -214,7 +214,7 @@ static void arch_cache_clean_invalidate_dcache_line(uintptr_t address)
 
 int arch_dcache_flush_and_invd_range(void *addr_in, size_t size)
 {
-#ifdef CONFIG_CPU_HAS_DCACHE
+#ifdef CONFIG_DCACHE
 	uintptr_t addr = (uintptr_t)addr_in;
 
 	__asm__ volatile (
@@ -264,11 +264,3 @@ int arch_icache_flush_and_invd_range(void *addr, size_t size)
 
 	return -ENOTSUP;
 }
-
-#ifdef CONFIG_CPU_HAS_DCACHE
-BUILD_ASSERT(CONFIG_DCACHE_LINE_SIZE > 0, "D-Cache line size must be non-zero");
-#endif
-
-#ifdef CONFIG_CPU_HAS_ICACHE
-BUILD_ASSERT(CONFIG_ICACHE_LINE_SIZE > 0, "I-Cache line size must be non-zero");
-#endif

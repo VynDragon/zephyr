@@ -4,13 +4,13 @@
 
 if SOC_SERIES_BL808
 
-config SYS_CLOCK_TICKS_PER_SEC
-	default 5000
-
 config ARCH_SW_ISR_TABLE_ALIGN
 	default 64
 
 if SOC_SERIES_BL808_M0
+
+config SYS_CLOCK_TICKS_PER_SEC
+	default 5000
 
 config SOC_RESET_HOOK
 	default y
@@ -24,6 +24,9 @@ config RISCV_MCAUSE_EXCEPTION_MASK
 endif # SOC_SERIES_BL808_M0
 
 if SOC_SERIES_BL808_D0
+
+config SYS_CLOCK_TICKS_PER_SEC
+	default 5000
 
 config 2ND_LVL_INTR_00_OFFSET
 	default 11

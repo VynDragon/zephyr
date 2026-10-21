@@ -29,8 +29,7 @@ config CLOCK_CONTROL_BOUFFALOLAB_BL808
 if CLOCK_CONTROL_BOUFFALOLAB_BL808
 
 config CLOCK_CONTROL_BOUFFALOLAB_BL808_FULL
-	bool "Only allow querying for extra CPUs"
+	bool
 	default y if SOC_SERIES_BL808_M0
-	default n
 
 endif

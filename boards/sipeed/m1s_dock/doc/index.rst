@@ -64,7 +64,7 @@ Flashing
 
    .. zephyr-app-commands::
       :zephyr-app: samples/hello_world
-      :board: m1s_dock//m0
+      :board: m1s_dock/bl808c09q2i/m0
       :goals: build flash
 
 #. Run your favorite terminal program to listen for output. For example:
@@ -98,7 +98,7 @@ Asymmetric Multiprocessing
       :board: m1s_dock/bl808c09q2i/lp
       :goals: build
 
-#. The flash tool has limited ability to flash multiple firmware, start from the highest flash address and provide it with the target address minux bootheader size (0x2000):
+#. The flash tool has limited ability to flash multiple firmware, start from the highest flash address and provide it with the target address minus bootheader size (0x2000):
 
    .. code-block:: console
 

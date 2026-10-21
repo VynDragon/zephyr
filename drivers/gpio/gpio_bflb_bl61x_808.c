@@ -300,6 +300,10 @@ static int gpio_bflb_pin_interrupt_configure(const struct device *dev,
 	const struct gpio_bflb_config * const cfg = dev->config;
 	uint32_t tmp;
 
+	if (cfg->p_config->irq_disabled) {
+		return -ENOTSUP;
+	}
+
 	tmp = sys_read32(GPIO_BFLB_PIN_REG(cfg->base, pin, cfg->section));
 	tmp |= GLB_REG_GPIO_0_INT_MASK_MSK;
 	sys_write32(tmp, GPIO_BFLB_PIN_REG(cfg->base, pin, cfg->section));
@@ -456,7 +460,9 @@ void gpio_bflb_init_parent(const struct device *dev)
 	/* Only do initialization once, this is functionally a single peripheral */
 	if (!cfg->p_data->initialized) {
 #ifdef CONFIG_GPIO_BL61X_808_WO
-		gpio_bflb_common_init_bl61x_wo();
+		if (!cfg->p_config->irq_disabled) {
+			gpio_bflb_common_init_bl61x_wo();
+		}
 #endif
 		if (!cfg->p_config->irq_disabled) {
 			cfg->p_config->irq_config_func();
@@ -475,7 +481,9 @@ int gpio_bflb_init(const struct device *dev)
 						       GLB_GPIO_CFG136_OFFSET, cfg->section));
 #endif
 
-	gpio_bflb_reset_all_pins_irq(dev);
+	if (!cfg->p_config->irq_disabled) {
+		gpio_bflb_reset_all_pins_irq(dev);
+	}
 	gpio_bflb_init_parent(dev);
 
 	return 0;
@@ -594,7 +602,7 @@ static DEVICE_API(gpio, gpio_bflb_api) = {
 	DT_INST_FOREACH_CHILD_STATUS_OKAY_VARGS(n, GPIO_BFLB_INIT,				  \
 						&gpio_bflb_bl61x_##n##_parent_data,		  \
 						&gpio_bflb_bl61x_##n##_parent_config)		  \
-	IF_ENABLED(DT_INST_IRQ_HAS_IDX(n, 0), 							  \
+	IF_ENABLED(DT_INST_IRQ_HAS_IDX(n, 0),							  \
 		   (GPIO_BFLB_IRQ_FUNC(n, &gpio_bflb_bl61x_##n##_parent_config);))
 
 DT_INST_FOREACH_STATUS_OKAY(GPIO_BFLB_INIT_PARENT)

@@ -9,10 +9,10 @@
 #define THEAD_MHINT	"0x7C5"
 #define THEAD_MEXSTATUS	"0x7E1"
 
-/* Enforce memory alignement disable */
-#define THEAD_MXTATUS_MM		BIT(15)
+/* Enforce memory alignment disable */
+#define THEAD_MXSTATUS_MM		BIT(15)
 /* XThead extension enable */
-#define THEAD_MXTATUS_THEADISAEE	BIT(22)
+#define THEAD_MXSTATUS_THEADISAEE	BIT(22)
 
 /* I-cache enable */
 #define THEAD_MHCR_IE			BIT(0)
@@ -31,7 +31,7 @@
 
 /* Cache prefetch enable */
 #define THEAD_MHINT_DPLD		BIT(2)
-/* Cache write allocation adjustement policy */
+/* Cache write allocation adjustment policy */
 #define THEAD_MHINT_AMR			GENMASK(4, 3)
 /* ICache prediction enable */
 #define THEAD_MHINT_IWPE		BIT(10)

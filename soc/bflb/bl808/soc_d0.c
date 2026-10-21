@@ -10,19 +10,7 @@
  */
 
 #include <zephyr/kernel.h>
-#include <zephyr/device.h>
-#include <zephyr/init.h>
-#include <zephyr/irq.h>
 #include <zephyr/cache.h>
-
-#include <bflb_soc.h>
-#include <glb_reg.h>
-#include <hbn_reg.h>
-#include <mm_glb_reg.h>
-#include <mm_misc_reg.h>
-#include <mcu_misc_reg.h>
-#include <pds_reg.h>
-#include <tzc_sec_reg.h>
 
 #include "thead_csr.h"
 
@@ -34,6 +22,7 @@ void soc_early_init_hook(void)
 
 void arch_cache_init(void)
 {
+	/* MXSTATUS is 32-bits on C906, so using the same code as E907 is fine */
 	enable_thead_isa_ext();
 	set_thead_enforce_aligned(false);
 	sys_cache_data_enable();

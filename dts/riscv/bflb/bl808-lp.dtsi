@@ -5,7 +5,7 @@
  *
  */
 
-#include <bflb/bl808_32bits_common.dtsi>
+#include <bflb/bl808_32bit_common.dtsi>
 
 / {
 	#address-cells = <1>;
@@ -43,7 +43,7 @@
 		#size-cells = <1>;
 		ranges;
 
-		/* LP has its own memory overlapping in the same area as M0's */
+		/* LP has its own not-shared memory overlapping in the same area as M0's */
 		all_ram: memory@2202C000 {
 			compatible = "mmio-sram";
 			reg = <0x2202C000 DT_SIZE_K(48)>;

@@ -22,14 +22,7 @@
 #define THEAD_MHCR	0x7C1
 #define THEAD_MXSTATUS	0x7C0
 
-/* Select a RAM to use for initialization
- * Use DRAM on D0 (no access to RETRAM)
- */
-#ifdef CONFIG_SOC_SERIES_BL808_D0
-#define RAM_ADDR	(DT_REG_ADDR(DT_NODELABEL(dram0)))
-#else
-#define RAM_ADDR	(DT_REG_ADDR(DT_COMPAT_GET_ANY_STATUS_OKAY(mmio_sram)))
-#endif
+#define RAM_ADDR	(DT_REG_ADDR(DT_NODELABEL(all_ram)))
 
 /* Fetch what offset to use from ranges */
 #if DT_RANGES_HAS_IDX(DT_CHOSEN(zephyr_flash), 0)

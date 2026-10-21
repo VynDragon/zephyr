@@ -41,7 +41,7 @@ void enable_thead_isa_ext(void)
 	__asm__ volatile(
 		"csrr %0, " THEAD_MXSTATUS
 		: "=r"(tmp));
-	tmp |= THEAD_MXTATUS_THEADISAEE;
+	tmp |= THEAD_MXSTATUS_THEADISAEE;
 	__asm__ volatile(
 		"csrw " THEAD_MXSTATUS ", %0"
 		:
@@ -56,9 +56,9 @@ void set_thead_enforce_aligned(bool enable)
 		"csrr %0, " THEAD_MXSTATUS
 		: "=r"(tmp));
 	if (enable) {
-		tmp &= ~THEAD_MXTATUS_MM;
+		tmp &= ~THEAD_MXSTATUS_MM;
 	} else {
-		tmp |= THEAD_MXTATUS_MM;
+		tmp |= THEAD_MXSTATUS_MM;
 	}
 	__asm__ volatile(
 		"csrw " THEAD_MXSTATUS ", %0"
